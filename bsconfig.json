@@ -1,0 +1,11 @@
+{
+  "name": "@nobleai/rescript-fieldtrip",
+  "sources": [{
+    "dir": "src",
+    "subdirs": true
+  }],
+  "bs-dependencies": [
+    "@rescript/react",
+    "@nobleai/rescript-rxjs"
+  ]
+}
