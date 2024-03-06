@@ -1,7 +1,6 @@
 // Named Vector to avoid naming conflict with Tuple, but storage is tuples, AxM
 
 // shadow global Dynamic with the impl chosen by FT
-open! FieldTrip
 
 type error = [#Whole(string) | #Part]
 type resultValidate = Promise.t<Result.t<unit, string>>
@@ -100,8 +99,8 @@ module type Tail = {
   let inner: t => inner
   let set: input => t
   let empty: contextInner => inner
-  let hasEnum: (inner, FieldTrip.enum) => bool
-  let toResultInner: inner => result<output, FieldTrip.enum>
+  let hasEnum: (inner, Store.enum) => bool
+  let toResultInner: inner => result<output, Store.enum>
   let validateInner: (contextInner, inner) => Dynamic.t<inner>
 
   type changeInner
@@ -147,7 +146,7 @@ module Vector0 = {
 
   let hasEnum = (_x, e) => e == #Valid
 
-  let toResultInner = (): result<output, FieldTrip.enum> => Ok()
+  let toResultInner = (): result<output, Store.enum> => Ok()
   let validateInner = (_context, inner: inner): Dynamic.t<inner> => empty()->Dynamic.return
   let validate = (_force, _context: context, store: t): Dynamic.t<t> => init()->Dynamic.return
 
@@ -180,7 +179,7 @@ module Vector0 = {
 }
 
 module VectorRec = {
-  module Make = (I: Interface, Head: Field, Tail: Tail) => {
+  module Make = (I: Interface, Head: Field.T, Tail: Tail) => {
     type input = (Head.input, Tail.input)
     type inner = (Head.t, Tail.inner)
     type output = (Head.output, Tail.output)
@@ -242,7 +241,7 @@ module VectorRec = {
     }
 
     let allResult = Tuple.Tuple2.uncurry(Result.all2)
-    let toResultInner = (inner: inner): result<output, FieldTrip.enum> => {
+    let toResultInner = (inner: inner): result<output, Store.enum> => {
       open Tuple.Tuple2
       (outputresult(Head.output, Head.enum, _), Tail.toResultInner)->napply(inner)->allResult
     }
@@ -424,7 +423,7 @@ module VectorRec = {
     let show = (store: t): string => {
       `Vector3{
         validateImmediate: ${I.validateImmediate ? "true" : "false"},
-        state: ${store->enum->enumToPretty},
+        state: ${store->enum->Store.enumToPretty},
         error: ${store->printError->Option.or("None")},
         children: {
           ${showInner(store->inner)->Array.joinWith(",\n")}
@@ -436,48 +435,48 @@ module VectorRec = {
 module Vector1 = {
   module Make = (
     I: Interface,
-    A: Field
+    A: Field.T
   ) => VectorRec.Make( I, A, Vector0)
 }
 
 module Vector2 = {
   module Make = (
     I: Interface,
-    A: Field, B: Field
+    A: Field.T, B: Field.T
   ) => VectorRec.Make( I, B, Vector1.Make(I, A))
 }
 
 module Vector3 = {
   module Make = (
     I: Interface,
-    A: Field, B: Field, C: Field
+    A: Field.T, B: Field.T, C: Field.T
   ) => VectorRec.Make( I, C, Vector2.Make(I, A, B))
 }
 
 module Vector4 = {
   module Make = (
     I: Interface,
-    A: Field, B: Field, C: Field, D: Field
+    A: Field.T, B: Field.T, C: Field.T, D: Field.T
   ) => VectorRec.Make( I, D, Vector3.Make(I, A, B, C))
 }
 
 module Vector5 = {
   module Make = (
     I: Interface,
-    A: Field, B: Field, C: Field, D: Field, E: Field
+    A: Field.T, B: Field.T, C: Field.T, D: Field.T, E: Field.T
   ) => VectorRec.Make( I, E, Vector4.Make(I, A, B, C, D))
 }
 
 module Vector6 = {
   module Make = (
     I: Interface,
-    A: Field, B: Field, C: Field, D: Field, E: Field, F: Field,
+    A: Field.T, B: Field.T, C: Field.T, D: Field.T, E: Field.T, F: Field.T,
   ) => VectorRec.Make(I, F, Vector5.Make(I, A, B, C, D, E))
 }
 
 module Vector7 = {
   module Make = (
     I: Interface,
-    A: Field, B: Field, C: Field, D: Field, E: Field, F: Field, G: Field,
+    A: Field.T, B: Field.T, C: Field.T, D: Field.T, E: Field.T, F: Field.T, G: Field.T,
   ) => VectorRec.Make(I, G, Vector6.Make(I, A, B, C, D, E, F))
 }

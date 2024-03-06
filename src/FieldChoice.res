@@ -1,3 +1,4 @@
+// shadow global Dynamic with the impl chosen by FT
 open FieldIdentity
 module Make = (T: T) => {
   type context = array<T.t>
@@ -7,7 +8,7 @@ module Make = (T: T) => {
   type inner = T.t
   type t = Store.t<inner, output, error>
 
-  let empty = context => context->Js.Array2.unsafe_get(0)
+  let empty = context => context->Array.getUnsafe(0)
   let init = (context: context) => context->empty->Store.Init
 
   // TODO: should return #Valid based on a validateImmediate flag - AxM
@@ -28,10 +29,10 @@ module Make = (T: T) => {
   let reduce = (
     ~context: context,
     _store: t,
-    change: change,
+    change: Indexed.t<change>,
   ): Dynamic.t<t> => {
     ignore(context)
-    Store.Valid(change, change)->Dynamic.return
+    Store.Valid(change.value, change.value)->Dynamic.return
   }
 
   let enum = Store.toEnum

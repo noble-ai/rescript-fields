@@ -1,7 +1,5 @@
 open Vitest
 // shadow global Dynamic with the impl chosen by FT
-open! FieldTrip
-
 describe("FieldArray", () => {
   module FieldElement = FieldOpt.Int
   module FieldArray = FieldArray.Make(

@@ -1,10 +1,12 @@
+// shadow global Dynamic with the impl chosen by FT
 
 // Here as a touchpoint for copypaste
 // Explicitly typed as Field to force consistency with module type.
 // but you shouldnt need to do that if youre implementing your own.
-module Field: FieldTrip.Field = {
+module Field: Field.T = {
   type context = unit
   type input = string
+  let showInput = (input: input) => input
   type output = string
   type error = unit
 
@@ -23,11 +25,24 @@ module Field: FieldTrip.Field = {
   }
 
   type change = input
-  let reduce = (~context, store: Dynamic.t<t>, _change) => {
-    ignore(context)
-    store
+  let makeSet = input => input
+  let showChange = (change: change) => change
+
+  type actions = {
+    set: input => change
   }
 
+  let actions: actions = {
+    set: x => x
+  }
+
+  let reduce = (~context, store: Dynamic.t<t>, _change: Indexed.t<'ch>): Dynamic.t<t> => {
+    ignore(context)
+    // Wrap store in index from change
+    store
+    // ->Dynamic.map( store => change->Indexed.map(_ => store))
+  }
+  
   // Inner is the immediate store values of children
   let inner = Store.inner
 
@@ -42,6 +57,7 @@ module Field: FieldTrip.Field = {
     ignore(store)
     "Empty"
   }
+
   let printError = (_store: t) => {
     None
   }

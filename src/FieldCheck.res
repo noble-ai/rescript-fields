@@ -1,6 +1,8 @@
-
+// shadow global Dynamic with the impl chosen by FT
 type context = unit
 type input = bool
+let showInput = (input: input) => `${input->string_of_bool}`
+
 type output = bool
 type error = unit
 type inner = bool
@@ -24,17 +26,30 @@ let validate = (
 }
 
 type change = [#Set(input)]
+let makeSet = input => #Set(input)
+let showChange = (change: change) => {
+  switch change {
+  | #Set(input) => `Set(${input->string_of_bool})`
+  }
+}
+
+type actions = { set: input => change }
+let actions: actions = { 
+  set: input => #Set(input)
+}
+
 let reduce = (
   ~context: context,
   store: Dynamic.t<t>,
-  change: change,
+  change: Indexed.t<change>,
 ): Dynamic.t<t> => {
   ignore(context)
   ignore(store)
-  switch change {
+  switch change.value {
   | #Set(val) => Store.valid(val, val)->Dynamic.return
   }
 }
+
 
 let inner = Store.inner
 let input = Store.inner
@@ -44,7 +59,7 @@ let enum = Store.toEnum
 
 let show = (store: t) => {
   `FieldCheck{
-    state: ${store->enum->Store.Enum.toPretty},
+    state: ${store->enum->Store.enumToPretty},
   }`
 }
 

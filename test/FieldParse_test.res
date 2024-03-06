@@ -1,13 +1,12 @@
 open Vitest
 // shadow global Dynamic with the impl chosen by FT
-open! FieldTrip
 
 describe("FieldFloat", () => {
   module Field = FieldParse.Float
   describe("#validate", () => {
     describe("empty string", () => {
       let input = ""
-      let res = Field.validate(false, {}: Field.context, FieldTrip.Store.Dirty(input))
+      let res = Field.validate(false, {}: Field.context, Fields.Store.Dirty(input))
       testPromise("does not parse", () => {
         res
         ->Dynamic.toPromise

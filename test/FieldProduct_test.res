@@ -1,6 +1,5 @@
 open Vitest
 // prefer shadowing Dynamic
-open! FieldTrip
 open FieldProduct
 
 module Gen2 = {

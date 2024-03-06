@@ -1,5 +1,4 @@
 // prefer shadowing Dynamic
-open! FieldTrip
 
 // Field Either is the generic implentation for FieldSum
 // Instead of customizing the sum type, it is encoded as a nested Either
@@ -21,7 +20,7 @@ type error = [#Whole(string) | #Part]
 // can be split and recursed.
 
 module type Tail = {
-  include FieldTrip.Field
+  include Field.T
   type contextInner
 
   let initInner: contextInner => inner
@@ -41,7 +40,7 @@ module type Tail = {
   let mapActionsInner: ('a => 'b, actionsInner<'a>) => actionsInner<'b>
 
   let showChangeInner: changeInner => string
-  let toEnumInner: inner => FieldTrip.enum
+  let toEnumInner: inner => Store.enum
   let reduceSet: (contextInner, Dynamic.t<inner>, Indexed.t<unit>, input) => Dynamic.t<inner>
   let reduceInner: (
     contextInner,
@@ -125,7 +124,7 @@ module Either0 = {
 
 module Rec = {
   //Sum needs Product for maintaining context
-  module Make = (S: Interface, Head: Field, Tail: Tail) => {
+  module Make = (S: Interface, Head: Field.T, Tail: Tail) => {
     type input = Either.t<Head.input, Tail.input>
     type inner = Either.t<Head.t, Tail.inner>
     type output = Either.t<Head.output, Tail.output>
@@ -349,7 +348,7 @@ module Rec = {
 module Either1 = {
   type either<'a> = Either.Nested.t1<'a>
   type tuple<'a> = Tuple.Nested.tuple1<'a>
-  module Make = (I: Interface, A: Field): (
+  module Make = (I: Interface, A: Field.T): (
     Tail
       with type input = either<A.input>
       and type output = either<A.output>
@@ -370,7 +369,7 @@ module Either1 = {
 module Either2 = {
   type either<'a, 'b> = Either.Nested.t2<'a, 'b>
   type tuple<'a, 'b> = Tuple.Nested.tuple2<'a, 'b>
-  module Make = (I: Interface, A: Field, B: Field): (
+  module Make = (I: Interface, A: Field.T, B: Field.T): (
     Tail
       with type input = either<A.input, B.input>
       and type output = either<A.output, B.output>
@@ -391,7 +390,7 @@ module Either2 = {
 module Either3 = {
   type either<'a, 'b, 'c> = Either.Nested.t3<'a, 'b, 'c>
   type tuple<'a, 'b, 'c> = Tuple.Nested.tuple3<'a, 'b, 'c>
-  module Make = (I: Interface, A: Field, B: Field, C: Field): (
+  module Make = (I: Interface, A: Field.T, B: Field.T, C: Field.T): (
     Tail
       with type input = either<A.input, B.input, C.input>
       and type output = either<A.output, B.output, C.output>
@@ -417,7 +416,7 @@ module Either3 = {
 
 module Either4 = {
   type either<'a, 'b, 'c, 'd> = Either.Nested.t4<'a, 'b, 'c, 'd>
-  module Make = (I: Interface, A: Field, B: Field, C: Field, D: Field): (
+  module Make = (I: Interface, A: Field.T, B: Field.T, C: Field.T, D: Field.T): (
     Tail
       with type input = either<A.input, B.input, C.input, D.input>
       and type inner = either<A.t, B.t, C.t, D.t>
@@ -447,7 +446,7 @@ module Either4 = {
 
 module Either5 = {
   type either<'a, 'b, 'c, 'd, 'e> = Either.Nested.t5<'a, 'b, 'c, 'd, 'e>
-  module Make = (I: Interface, A: Field, B: Field, C: Field, D: Field, E: Field): (
+  module Make = (I: Interface, A: Field.T, B: Field.T, C: Field.T, D: Field.T, E: Field.T): (
     Tail
       with type input = either<A.input, B.input, C.input, D.input, E.input>
       and type inner = either<A.t, B.t, C.t, D.t, E.t>
@@ -480,7 +479,7 @@ module Either5 = {
 
 module Either6 = {
   type either<'a, 'b, 'c, 'd, 'e, 'f> = Either.Nested.t6<'a, 'b, 'c, 'd, 'e, 'f>
-  module Make = (I: Interface, A: Field, B: Field, C: Field, D: Field, E: Field, F: Field): (
+  module Make = (I: Interface, A: Field.T, B: Field.T, C: Field.T, D: Field.T, E: Field.T, F: Field.T): (
     Tail
       with type input = either<A.input, B.input, C.input, D.input, E.input, F.input>
       and type inner = either<A.t, B.t, C.t, D.t, E.t, F.t>

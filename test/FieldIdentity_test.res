@@ -1,7 +1,5 @@
 open Vitest
 // shadow global Dynamic with the impl chosen by FT
-open! FieldTrip
-
 describe("FieldIdentity", () => {
   module FieldIdentity = FieldIdentity.Float
   let value = 3.0

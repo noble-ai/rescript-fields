@@ -2,17 +2,38 @@
 # yarn lockfile v1
 
 
+"@nobleai/rescript-lodash@^4.17.21":
+  version "4.17.21"
+  resolved "https://registry.yarnpkg.com/@nobleai/rescript-lodash/-/rescript-lodash-4.17.21.tgz#1c4c7b598f96069a31024ad84937402e4c67179d"
+  integrity sha512-BKts8CWx84h5H1CAqjeAnBNivHNSH+V6RMM+C7A94lF1Q6+IgQD7+nnw5IibrSPFVHZioRyG28lcHLVlkYN3VQ==
+  dependencies:
+    rescript "^10.1"
+
+"@nobleai/rescript-prelude@^0.12.3":
+  version "0.12.3"
+  resolved "https://registry.yarnpkg.com/@nobleai/rescript-prelude/-/rescript-prelude-0.12.3.tgz#8793fea918c109a70a0b2cdf210cd1a3d8e76ec7"
+  integrity sha512-xq8tTD9aMqzWo2ERGTCDAj6aR88xae+836rtmD1MGTQZCSzs5nV9J5akL9vyprqgKhMq3wkBiioCjjaSKZr7cg==
+  dependencies:
+    "@nobleai/rescript-lodash" "^4.17.21"
+    numeral "^2.0.6"
+    rescript "^10.1"
+
 "@nobleai/rescript-rxjs@^7.5.6":
-  version "7.5.6"
-  resolved "https://registry.yarnpkg.com/@nobleai/rescript-rxjs/-/rescript-rxjs-7.5.6.tgz#35b66b58871b5392416ef35999a8d386b6d7081a"
-  integrity sha512-0SXNINwVCcjbpNyK9HOZrXM1XOgk2RXD5ucdfA95LSF8UJxM/mCcSbz7UFDz+2e4x35mmoYOvAlOXw/pQ9BMoQ==
+  version "7.5.14"
+  resolved "https://registry.yarnpkg.com/@nobleai/rescript-rxjs/-/rescript-rxjs-7.5.14.tgz#a5a1704361f60abec125e86859f4770bdbcaf008"
+  integrity sha512-Znbe3yG7hQ2u3IZ2P+cnzlGZf1kK9HKwAT2JqBZ4t9vi9QlhpswsZZEXKTzv7wGkAab0HJ6NJci8tW3DmWDkSw==
 
 "@rescript/react@^0.11.0":
   version "0.11.0"
   resolved "https://registry.yarnpkg.com/@rescript/react/-/react-0.11.0.tgz#d2545546d823bdb8e6b59daa1790098d1666f79e"
   integrity sha512-RzoAO+3cJwXE2D7yodMo4tBO2EkeDYCN/I/Sj/yRweI3S1CY1ZBOF/GMcVtjeIurJJt7KMveqQXTaRrqoGZBBg==
 
-rescript@^10.0.0:
+numeral@^2.0.6:
+  version "2.0.6"
+  resolved "https://registry.yarnpkg.com/numeral/-/numeral-2.0.6.tgz#4ad080936d443c2561aed9f2197efffe25f4e506"
+  integrity sha512-qaKRmtYPZ5qdw4jWJD6bxEf1FJEqllJrwxCLIm0sQU/A7v2/czigzOb+C2uSiFsa9lBUzeH7M1oK+Q+OLxL3kA==
+
+rescript@^10.0.0, rescript@^10.1:
   version "10.1.4"
   resolved "https://registry.yarnpkg.com/rescript/-/rescript-10.1.4.tgz#0f37710d371f32a704f17b4e804f66ce3c79a305"
   integrity sha512-FFKlS9AG/XrLepWsyw7B+A9DtQBPWEPDPDKghV831Y2KGbie+eeFBOS0xtRHp0xbt7S0N2Dm6hhX+kTZQ/3Ybg==

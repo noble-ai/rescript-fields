@@ -1,11 +1,15 @@
 {
-  "name": "@nobleai/rescript-fieldtrip",
+  "name": "@nobleai/rescript-fields",
   "sources": [{
     "dir": "src",
     "subdirs": true
   }],
+  "bsc-flags": [
+    "-open Prelude"
+  ],
   "bs-dependencies": [
     "@rescript/react",
-    "@nobleai/rescript-rxjs"
+    "@nobleai/rescript-rxjs",
+    "@nobleai/rescript-prelude"
   ]
 }

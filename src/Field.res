@@ -1,4 +1,4 @@
-// FieldTrip is a module for managing the update and validation of complex input.
+// Fields is a module for managing the update and validation of complex input.
 // The singular Field module type describes the requirements for
 // creating, modifying and validating an input
 // Fields can be built that represent base level types values and inputs
@@ -23,7 +23,7 @@
 // This module type describes the requirements for a Field module
 // You'll see this Field in the Module Functions which asserts
 // that a module passed to the function has each of these types and values.
-module type Field = {
+module type T = {
   // A field is passed a context to its validate and reduce methods
   // and it can be any shape of your choosing.
   // If you do not have any context you can use unit/()
@@ -33,6 +33,7 @@ module type Field = {
   // for composite fields this will likely be a composition of their childrens inputs
   // but you have the ability to fix or map the contexts of your children if you need to
   type input
+  let showInput: input => string
 
   // This is the type provided by a successful validation
   type output
@@ -52,6 +53,7 @@ module type Field = {
   let init: context => t
 
   // Provide a simple constructor for making a store from some initial input
+  // Dont use this in dynamic situations like reduce - AxM
   let set: input => t
 
   // Provide a validate function that
@@ -62,22 +64,27 @@ module type Field = {
   // since we prob dont want to apply ALL async validations when this is true - AxM
   let validate: (bool, context, t ) => Dynamic.t<t>
 
-  // let validate: (
-  //   ~context: context,
-  //   ~force: bool=?,
-  //   t,
-  // ) => Js.Promise.t<t>
-
   // Provide a type that specifies the changes you can make on this field.
   // So far this is a poly variant where some values may hold change types for children
   type change
+  type actions
+  let actions: actions
+
+  // When a composite field is given a set change, we want to allow our children
+  // to validate, but we do not have access [yet/ever] to their change action type
+  // to send to their reduce function.  So instead, provide an explicit setValidate
+  // that gives them context, and returns dynamic, like reduce would given a #Set - AxM
+  // Not using named arguments so this is easier to use with napply patterns in Product2 etc
+  let makeSet: input => change
+
+  let showChange: change => string
   // Reduce takes definite store instead of optional, unlike Redux, to match React.useReducer
   // Reduce is async as a reduce may invoke a validation which is asychronous
   // TODO: Maybe better to have reduce produce more actions?
   let reduce: (
     ~context: context,
     Dynamic.t<t>,
-    change,
+    Indexed.t<change>,
   ) => Dynamic.t<t>
 
   // Accessors for input, output, etc via the Field
@@ -93,7 +100,7 @@ module type Field = {
   // Since outputs are produced by validation, the composition is usually simpler
   let output: t => option<output>
   let error: t => option<error>
-  let enum: t => Store.Enum.t
+  let enum: t => Store.enum
 
   let show: t => string
 
@@ -102,5 +109,8 @@ module type Field = {
 }
 
 let printErrorArray = errors => {
-  errors->Array.catOptions->Js.Array2.joinWith(", ")->Some
+  errors->Array.catOptions->Array.joinWith(", ")->Some
 }
+
+// TODO: Needs consolidation with changes - AxM
+let setOrClear = v => v->Option.map(v => #Set(v))->Option.or(#Clear)

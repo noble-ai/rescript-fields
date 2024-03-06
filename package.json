@@ -1,5 +1,5 @@
 {
-  "name": "@nobleai/rescript-fieldtrip",
+  "name": "@nobleai/rescript-fields",
   "version": "0.1.0",
   "description": "Elaborate form validation system for Rescript",
   "files": [
@@ -25,17 +25,15 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+ssh://github.com/noble-ai/rescript-fieldtrip.git"
+    "url": "git+ssh://github.com/noble-ai/rescript-fields.git"
   },
   "devDependencies": {
-    "rescript": "^10.0.0",
-    "rxjs": "^7.5.5"
-  },
-  "peerDependencies": {
-    "rxjs": "^7.5.5"
+    "rescript": "^10.0.0"
   },
   "dependencies": {
-    "@nobleai/rescript-rxjs": "^7.5.6",
-    "@rescript/react": "^0.11.0"
+    "rxjs": "^7.5.5",
+    "@rescript/react": "^0.11.0",
+    "@nobleai/rescript-prelude": "^0.12.3",
+    "@nobleai/rescript-rxjs": "^7.5.6"
   }
 }

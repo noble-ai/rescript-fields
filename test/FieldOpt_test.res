@@ -1,7 +1,5 @@
 open Vitest
 // shadow global Dynamic with the impl chosen by FT
-open! FieldTrip
-
 describe("FieldOpt", () => {
   module FieldOpt = FieldOpt.Int
   describe("#validate", () => {
