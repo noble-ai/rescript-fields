@@ -28,12 +28,14 @@
     "url": "git+ssh://github.com/noble-ai/rescript-fields.git"
   },
   "devDependencies": {
+    "@nobleai/rescript-documentation": "^0.6.2",
+    "@rescript/tools": "^0.5.0",
     "rescript": "^10.0.0"
   },
   "dependencies": {
-    "rxjs": "^7.5.5",
-    "@rescript/react": "^0.11.0",
     "@nobleai/rescript-prelude": "^0.12.3",
-    "@nobleai/rescript-rxjs": "^7.5.6"
+    "@nobleai/rescript-rxjs": "^7.5.6",
+    "@rescript/react": "^0.11.0",
+    "rxjs": "^7.5.5"
   }
 }

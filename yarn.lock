@@ -2,6 +2,16 @@
 # yarn lockfile v1
 
 
+"@nobleai/rescript-documentation@^0.6.2":
+  version "0.6.2"
+  resolved "https://registry.yarnpkg.com/@nobleai/rescript-documentation/-/rescript-documentation-0.6.2.tgz#c72b4286c59307a8cf2f6155e14f3ad839edeebe"
+  integrity sha512-d3c7uFbafoX+dplOYG74X2bk/zpL83/MneIQKLKryoi3t9+t8txyifaEKZPsZKPPIt/R1g2XFC79eq6sg5P+og==
+  dependencies:
+    "@nobleai/rescript-prelude" "^0.7.0"
+    lodash "4.17.21"
+    rescript "^10.1"
+    rescript-nodejs "^16.0.0"
+
 "@nobleai/rescript-lodash@^4.17.21":
   version "4.17.21"
   resolved "https://registry.yarnpkg.com/@nobleai/rescript-lodash/-/rescript-lodash-4.17.21.tgz#1c4c7b598f96069a31024ad84937402e4c67179d"
@@ -18,6 +28,15 @@
     numeral "^2.0.6"
     rescript "^10.1"
 
+"@nobleai/rescript-prelude@^0.7.0":
+  version "0.7.0"
+  resolved "https://registry.yarnpkg.com/@nobleai/rescript-prelude/-/rescript-prelude-0.7.0.tgz#b712d39e73ac935384dbb588e1f13c567511b0b1"
+  integrity sha512-B4u3oFLIkNIp7oSsVSHkZBterexmVVfJayskxaclU49PcamyK29v0+RrAs6wBpgCFgw4mi/LJ2mOSzFUpWUhrg==
+  dependencies:
+    "@nobleai/rescript-lodash" "^4.17.21"
+    numeral "^2.0.6"
+    rescript "^10.1"
+
 "@nobleai/rescript-rxjs@^7.5.6":
   version "7.5.14"
   resolved "https://registry.yarnpkg.com/@nobleai/rescript-rxjs/-/rescript-rxjs-7.5.14.tgz#a5a1704361f60abec125e86859f4770bdbcaf008"
@@ -28,15 +47,37 @@
   resolved "https://registry.yarnpkg.com/@rescript/react/-/react-0.11.0.tgz#d2545546d823bdb8e6b59daa1790098d1666f79e"
   integrity sha512-RzoAO+3cJwXE2D7yodMo4tBO2EkeDYCN/I/Sj/yRweI3S1CY1ZBOF/GMcVtjeIurJJt7KMveqQXTaRrqoGZBBg==
 
+"@rescript/tools@^0.5.0":
+  version "0.5.0"
+  resolved "https://registry.yarnpkg.com/@rescript/tools/-/tools-0.5.0.tgz#c54ef2b796250d9d070ba1b65791a623521540b0"
+  integrity sha512-gqKZhpXdFMRb0i+aCNKNtbHANFYC/nM7LLLRkkYQLgeJ2teVCV9otO09KIA7CvSZevN6x68r/dkeWi3klLdydA==
+  dependencies:
+    rescript "^11.0.0-rc.7"
+
+lodash@4.17.21:
+  version "4.17.21"
+  resolved "https://registry.yarnpkg.com/lodash/-/lodash-4.17.21.tgz#679591c564c3bffaae8454cf0b3df370c3d6911c"
+  integrity sha512-v2kDEe57lecTulaDIuNTPy3Ry4gLGJ6Z1O3vE1krgXZNrsQ+LFTGHVxVjcXPs17LhbZVGedAJv8XZ1tvj5FvSg==
+
 numeral@^2.0.6:
   version "2.0.6"
   resolved "https://registry.yarnpkg.com/numeral/-/numeral-2.0.6.tgz#4ad080936d443c2561aed9f2197efffe25f4e506"
   integrity sha512-qaKRmtYPZ5qdw4jWJD6bxEf1FJEqllJrwxCLIm0sQU/A7v2/czigzOb+C2uSiFsa9lBUzeH7M1oK+Q+OLxL3kA==
 
+rescript-nodejs@^16.0.0:
+  version "16.0.0"
+  resolved "https://registry.yarnpkg.com/rescript-nodejs/-/rescript-nodejs-16.0.0.tgz#87b3e9f58d6544e145ac2c9753f754a34789a70b"
+  integrity sha512-1/SJmjH06xdeq1IFIIcKV6QKnidrav/gIc0Rw4GCUD0ceYPPZ5wDB51UFyk98in5N4gv8X/bTg6dVBMyRsC9tw==
+
 rescript@^10.0.0, rescript@^10.1:
   version "10.1.4"
   resolved "https://registry.yarnpkg.com/rescript/-/rescript-10.1.4.tgz#0f37710d371f32a704f17b4e804f66ce3c79a305"
   integrity sha512-FFKlS9AG/XrLepWsyw7B+A9DtQBPWEPDPDKghV831Y2KGbie+eeFBOS0xtRHp0xbt7S0N2Dm6hhX+kTZQ/3Ybg==
+
+rescript@^11.0.0-rc.7:
+  version "11.0.1"
+  resolved "https://registry.yarnpkg.com/rescript/-/rescript-11.0.1.tgz#c74af134dc8a16d152169b2456d0720324835f54"
+  integrity sha512-7T4PRp/d0+CBNnY6PYKffFqo9tGZlvnZpboF/n+8SKS+JZ6VvXJO7W538VPZXf3EYx1COGAWWvkF9e/HgSAqHg==
 
 rxjs@^7.5.5:
   version "7.8.0"
