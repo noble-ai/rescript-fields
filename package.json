@@ -1,6 +1,6 @@
 {
   "name": "@nobleai/rescript-fields",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "description": "Elaborate form validation system for Rescript",
   "files": [
     "README.md",
@@ -36,9 +36,9 @@
     "rescript": "^10.0.0"
   },
   "dependencies": {
-    "@nobleai/rescript-prelude": "^0.12.3",
+    "@nobleai/rescript-prelude": "^0.12.4",
     "@nobleai/rescript-rxjs": "^7.5.6",
     "@rescript/react": "^0.11.0",
     "rxjs": "^7.5.5"
-  } 
+  }
 }

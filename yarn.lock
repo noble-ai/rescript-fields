@@ -19,10 +19,10 @@
   dependencies:
     rescript "^10.1"
 
-"@nobleai/rescript-prelude@^0.12.3":
-  version "0.12.3"
-  resolved "https://registry.yarnpkg.com/@nobleai/rescript-prelude/-/rescript-prelude-0.12.3.tgz#8793fea918c109a70a0b2cdf210cd1a3d8e76ec7"
-  integrity sha512-xq8tTD9aMqzWo2ERGTCDAj6aR88xae+836rtmD1MGTQZCSzs5nV9J5akL9vyprqgKhMq3wkBiioCjjaSKZr7cg==
+"@nobleai/rescript-prelude@^0.12.4":
+  version "0.12.4"
+  resolved "https://registry.yarnpkg.com/@nobleai/rescript-prelude/-/rescript-prelude-0.12.4.tgz#2943d87405908a0a0d3015e1dfeb8e269aba2551"
+  integrity sha512-FEoaLfX2Z8xcE2y0iuhHSLMJcyv5qJJv8i6KWRs4gAgoAKFwZuYUXbmqLRHLGyMI7iVDVMK1tZx5X86hn51+cQ==
   dependencies:
     "@nobleai/rescript-lodash" "^4.17.21"
     numeral "^2.0.6"
