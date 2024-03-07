@@ -1,7 +1,317 @@
+# Dynamic
+
+
+
+
+### Dynamic.t
+  
+`type t<'a> = Rxjs.t<Rxjs.foreign, Rxjs.void, 'a>`  
+
+
+### Dynamic.return
+  
+`let return: 'a => Rxjs.t<Rxjs.foreign, Rxjs.void, 'a>`  
+
+
+### Dynamic.fromPromise
+  
+`let fromPromise: Js.Promise.t<'a> => Rxjs.t<Rxjs.foreign, Rxjs.void, 'a>`  
+
+
+### Dynamic.toPromise
+  
+`let toPromise: Rxjs.t<'a, 'b, 'c> => Js.Promise.t<'c>`  
+
+
+### Dynamic.toHistory
+  
+`let toHistory: t<'a> => Js.Promise.t<Array.t<'a>>`  
+
+
+### Dynamic.startWith
+  
+`let startWith: (Rxjs.t<'a, 'b, 'c>, 'c) => Rxjs.t<'a, 'b, 'c>`  
+
+
+### Dynamic.combineLatest
+  
+`let combineLatest: array<
+  Rxjs.t<Rxjs.foreign, Rxjs.void, 'a>,
+> => Rxjs.t<Rxjs.foreign, Rxjs.void, array<'a>>`  
+
+
+### Dynamic.combineLatest2
+  
+`let combineLatest2: (
+  (Rxjs.t<'a, 'b, 'c>, Rxjs.t<'d, 'e, 'f>),
+) => Rxjs.t<Rxjs.foreign, Rxjs.void, ('c, 'f)>`  
+
+
+### Dynamic.combineLatest3
+  
+`let combineLatest3: (
+  (
+    Rxjs.t<'a, 'b, 'c>,
+    Rxjs.t<'d, 'e, 'f>,
+    Rxjs.t<'g, 'h, 'i>,
+  ),
+) => Rxjs.t<Rxjs.foreign, Rxjs.void, ('c, 'f, 'i)>`  
+
+
+### Dynamic.combineLatest4
+  
+`let combineLatest4: (
+  (
+    Rxjs.t<'a, 'b, 'c>,
+    Rxjs.t<'d, 'e, 'f>,
+    Rxjs.t<'g, 'h, 'i>,
+    Rxjs.t<'j, 'k, 'l>,
+  ),
+) => Rxjs.t<Rxjs.foreign, Rxjs.void, ('c, 'f, 'i, 'l)>`  
+
+
+### Dynamic.combineLatest5
+  
+`let combineLatest5: (
+  (
+    Rxjs.t<'a, 'b, 'c>,
+    Rxjs.t<'d, 'e, 'f>,
+    Rxjs.t<'g, 'h, 'i>,
+    Rxjs.t<'j, 'k, 'l>,
+    Rxjs.t<'m, 'n, 'o>,
+  ),
+) => Rxjs.t<Rxjs.foreign, Rxjs.void, ('c, 'f, 'i, 'l, 'o)>`  
+
+
+### Dynamic.combineLatest6
+  
+`let combineLatest6: (
+  (
+    Rxjs.t<'a, 'b, 'c>,
+    Rxjs.t<'d, 'e, 'f>,
+    Rxjs.t<'g, 'h, 'i>,
+    Rxjs.t<'j, 'k, 'l>,
+    Rxjs.t<'m, 'n, 'o>,
+    Rxjs.t<'p, 'q, 'r>,
+  ),
+) => Rxjs.t<
+  Rxjs.foreign,
+  Rxjs.void,
+  ('c, 'f, 'i, 'l, 'o, 'r),
+>`  
+
+
+### Dynamic.map
+  
+`let map: (Rxjs.t<'a, 'b, 'c>, 'c => 'd) => Rxjs.t<'a, 'b, 'd>`  
+
+
+### Dynamic.mapi
+  
+`let mapi: (Rxjs.t<'a, 'b, 'c>, ('c, int) => 'd) => Rxjs.t<'a, 'b, 'd>`  
+
+
+### Dynamic.const
+  
+`let const: (Rxjs.t<'a, 'b, 'c>, 'd) => Rxjs.t<'a, 'b, 'd>`  
+
+
+### Dynamic.bind
+  
+`let bind: (t<'a>, 'a => t<'b>) => t<'b>`  
+
+
+### Dynamic.merge
+  
+`let merge: (t<'a>, 'a => t<'b>) => t<'b>`  
+
+
+### Dynamic.switchMap
+  
+`let switchMap: (t<'a>, 'a => t<'b>) => t<'b>`  
+
+
+### Dynamic.tap
+  
+`let tap: (Rxjs.t<'a, 'b, 'c>, 'c => unit) => Rxjs.t<'a, 'b, 'c>`  
+
+
+### Dynamic.filter
+  
+`let filter: (Rxjs.t<'a, 'b, 'c>, 'c => bool) => Rxjs.t<'a, 'b, 'c>`  
+
+
+### Dynamic.finalize
+  
+`let finalize: (Rxjs.t<'a, 'b, 'c>, unit => unit) => Rxjs.t<'a, 'b, 'c>`  
+
+
+### Dynamic.finally
+  
+`let finally: (Rxjs.t<'a, 'b, 'c>, 'c => unit) => unit`  
+
+
+### Dynamic.withLatestFrom
+  
+`let withLatestFrom: (
+  Rxjs.t<'a, 'b, 'c>,
+  Rxjs.t<'d, 'e, 'f>,
+) => Rxjs.t<'a, 'b, ('c, 'f)>`  
+
+
+### Dynamic.withLatestFrom2
+  
+`let withLatestFrom2: (
+  Rxjs.t<'a, 'b, 'c>,
+  Rxjs.t<'d, 'e, 'f>,
+  Rxjs.t<'g, 'h, 'i>,
+) => Rxjs.t<'a, 'b, ('c, 'f, 'i)>`  
+
+
+### Dynamic.take
+  
+`let take: (Rxjs.t<'a, 'b, 'c>, int) => Rxjs.t<'a, 'b, 'c>`  
+
+
+### Dynamic.keepMap
+  
+`let keepMap: (Rxjs.t<'a, 'b, 'c>, 'c => option<'d>) => Rxjs.t<'a, 'b, 'd>`  
+
+
+### Dynamic.partition2
+  
+`let partition2: (
+  Rxjs.t<'a, 'b, 'c>,
+  ('c => option<'d>, 'c => option<'e>),
+) => (Rxjs.t<'a, 'b, 'd>, Rxjs.t<'a, 'b, 'e>)`  
+
+
+### Dynamic.partition3
+  
+`let partition3: (
+  Rxjs.t<'a, 'b, 'c>,
+  ('c => option<'d>, 'c => option<'e>, 'c => option<'f>),
+) => (
+  Rxjs.t<'a, 'b, 'd>,
+  Rxjs.t<'a, 'b, 'e>,
+  Rxjs.t<'a, 'b, 'f>,
+)`  
+
+
+### Dynamic.partition4
+  
+`let partition4: (
+  Rxjs.t<'a, 'b, 'c>,
+  (
+    'c => option<'d>,
+    'c => option<'e>,
+    'c => option<'f>,
+    'c => option<'g>,
+  ),
+) => (
+  Rxjs.t<'a, 'b, 'd>,
+  Rxjs.t<'a, 'b, 'e>,
+  Rxjs.t<'a, 'b, 'f>,
+  Rxjs.t<'a, 'b, 'g>,
+)`  
+
+
+### Dynamic.partition5
+  
+`let partition5: (
+  Rxjs.t<'a, 'b, 'c>,
+  (
+    'c => option<'d>,
+    'c => option<'e>,
+    'c => option<'f>,
+    'c => option<'g>,
+    'c => option<'h>,
+  ),
+) => (
+  Rxjs.t<'a, 'b, 'd>,
+  Rxjs.t<'a, 'b, 'e>,
+  Rxjs.t<'a, 'b, 'f>,
+  Rxjs.t<'a, 'b, 'g>,
+  Rxjs.t<'a, 'b, 'h>,
+)`  
+
+
+### Dynamic.partition6
+  
+`let partition6: (
+  Rxjs.t<'a, 'b, 'c>,
+  (
+    'c => option<'d>,
+    'c => option<'e>,
+    'c => option<'f>,
+    'c => option<'g>,
+    'c => option<'h>,
+    'c => option<'i>,
+  ),
+) => (
+  Rxjs.t<'a, 'b, 'd>,
+  Rxjs.t<'a, 'b, 'e>,
+  Rxjs.t<'a, 'b, 'f>,
+  Rxjs.t<'a, 'b, 'g>,
+  Rxjs.t<'a, 'b, 'h>,
+  Rxjs.t<'a, 'b, 'i>,
+)`  
+
+
+### Dynamic.partition7
+  
+`let partition7: (
+  Rxjs.t<'a, 'b, 'c>,
+  (
+    'c => option<'d>,
+    'c => option<'e>,
+    'c => option<'f>,
+    'c => option<'g>,
+    'c => option<'h>,
+    'c => option<'i>,
+    'c => option<'j>,
+  ),
+) => (
+  Rxjs.t<'a, 'b, 'd>,
+  Rxjs.t<'a, 'b, 'e>,
+  Rxjs.t<'a, 'b, 'f>,
+  Rxjs.t<'a, 'b, 'g>,
+  Rxjs.t<'a, 'b, 'h>,
+  Rxjs.t<'a, 'b, 'i>,
+  Rxjs.t<'a, 'b, 'j>,
+)`  
+
+
+### Dynamic.finalizeWithValue
+  
+`let finalizeWithValue: (
+  t<'o>,
+  option<'o> => unit,
+) => Rxjs.t<Rxjs.foreign, Rxjs.void, 'o>`  
+
+
+### Dynamic.delay
+  
+`let delay: Rxjs.t<'a, 'b, 'c> => Rxjs.t<'a, 'b, 'c>`  
+
+
+### Dynamic.jitter
+  
+`let jitter: t<'a> => t<'a>`  
+
+
+### Dynamic.log
+  
+`let log: (Rxjs.t<'a, 'b, 'c>, 'd) => Rxjs.t<'a, 'b, 'c>`  
+
 # Field
 
 
-\nThis module type describes the requirements for a Field module\nYou'll see this Field.T in the Module Functions which asserts\nthat a module passed to the function has each of these types and values.\n
+  
+This module type describes the requirements for a Field module  
+You'll see this Field.T in the Module Functions which asserts  
+that a module passed to the function has each of these types and values.  
+
 
 ### Field.T
   
@@ -139,13 +449,299 @@
   
 `let setOrClear: option<'a> => [> #Clear | #Set('a)]`  
 
+# FieldArray
+
+
+
+
+### FieldArray.Context
+  
+  
+### FieldArray.Context.structure
+  
+`type structure<'output, 'element> = {
+  validate?: array<'output> => Prelude.Promise.t<
+    Prelude.Result.t<unit, string>,
+  >,
+  element: 'element,
+}`  
+
+
+### FieldArray.length
+  
+`let length: (
+  ~len: int,
+  Array.t<'a>,
+) => Prelude.Promise.t<result<unit, string>>`  
+
+
+### FieldArray.IArray
+  
+  
+### FieldArray.IArray.filter
+  
+`let filter: array<F.t> => array<F.t>`  
+
+
+### FieldArray.IArray.empty
+  
+`let empty: Context.structure<F.output, F.context> => array<F.t>`  
+
+
+### FieldArray.IArray.validateImmediate
+  
+`let validateImmediate: bool`  
+
+
+### FieldArray.filterIdentity
+  
+`let filterIdentity: array<'a> => array<'a>`  
+
+
+### FieldArray.filterGrace
+  
+`let filterGrace: array<'t> => Array.t<'t>`  
+
+
+### FieldArray.Make
+  
+
+# FieldCheck
+
+
+
+
+### FieldCheck.context
+  
+`type context = unit`  
+
+
+### FieldCheck.input
+  
+`type input = bool`  
+
+
+### FieldCheck.showInput
+  
+`let showInput: input => string`  
+
+
+### FieldCheck.output
+  
+`type output = bool`  
+
+
+### FieldCheck.error
+  
+`type error = unit`  
+
+
+### FieldCheck.inner
+  
+`type inner = bool`  
+
+
+### FieldCheck.t
+  
+`type t = Store.t<inner, output, error>`  
+
+
+### FieldCheck.empty
+  
+`let empty: 'a => bool`  
+
+
+### FieldCheck.init
+  
+`let init: 'a => Store.t<bool, 'b, 'c>`  
+
+
+### FieldCheck.set
+  
+`let set: 'a => Store.t<'a, 'a, 'b>`  
+
+
+### FieldCheck.validate
+  
+`let validate: ('a, context, t) => Dynamic.t<t>`  
+
+
+### FieldCheck.change
+  
+`type change = [#Set(input)]`  
+
+
+### FieldCheck.makeSet
+  
+`let makeSet: 'a => [> #Set('a)]`  
+
+
+### FieldCheck.showChange
+  
+`let showChange: change => string`  
+
+
+### FieldCheck.actions
+  
+`type actions = {set: input => change}`  
+
+
+### FieldCheck.actions
+  
+`let actions: actions`  
+
+
+### FieldCheck.reduce
+  
+`let reduce: (
+  ~context: context,
+  Dynamic.t<t>,
+  Indexed.t<change>,
+) => Dynamic.t<t>`  
+
+
+### FieldCheck.inner
+  
+`let inner: Store.t<'a, 'b, 'c> => 'a`  
+
+
+### FieldCheck.input
+  
+`let input: Store.t<'a, 'b, 'c> => 'a`  
+
+
+### FieldCheck.output
+  
+`let output: Store.t<'a, 'b, 'c> => option<'b>`  
+
+
+### FieldCheck.error
+  
+`let error: Store.t<'a, 'b, 'c> => option<'c>`  
+
+
+### FieldCheck.enum
+  
+`let enum: Store.t<'a, 'b, 'c> => Store.enum`  
+
+
+### FieldCheck.show
+  
+`let show: t => string`  
+
+
+### FieldCheck.printError
+  
+`let printError: t => option<'a>`  
+
+# FieldChoice
+
+
+
+
+### FieldChoice.Make
+  
+  
+### FieldChoice.Make.context
+  
+`type context = array<T.t>`  
+
+
+### FieldChoice.Make.input
+  
+`type input = T.t`  
+
+
+### FieldChoice.Make.output
+  
+`type output = T.t`  
+
+
+### FieldChoice.Make.error
+  
+`type error = unit`  
+
+
+### FieldChoice.Make.inner
+  
+`type inner = T.t`  
+
+
+### FieldChoice.Make.t
+  
+`type t = Store.t<inner, output, error>`  
+
+
+### FieldChoice.Make.empty
+  
+`let empty: Array.t<'a> => 'a`  
+
+
+### FieldChoice.Make.init
+  
+`let init: context => Store.t<T.t, 'a, 'b>`  
+
+
+### FieldChoice.Make.set
+  
+`let set: 'a => Store.t<'a, 'b, 'c>`  
+
+
+### FieldChoice.Make.validate
+  
+`let validate: (~force: bool=?, 'a, t) => Dynamic.t<t>`  
+
+
+### FieldChoice.Make.change
+  
+`type change = T.t`  
+
+
+### FieldChoice.Make.reduce
+  
+`let reduce: (~context: context, t, Indexed.t<change>) => Dynamic.t<t>`  
+
+
+### FieldChoice.Make.enum
+  
+`let enum: Store.t<'a, 'b, 'c> => Store.enum`  
+
+
+### FieldChoice.Make.inner
+  
+`let inner: Store.t<'a, 'b, 'c> => 'a`  
+
+
+### FieldChoice.Make.input
+  
+`let input: Store.t<'a, 'b, 'c> => 'a`  
+
+
+### FieldChoice.Make.error
+  
+`let error: Store.t<'a, 'b, 'c> => option<'c>`  
+
+
+### FieldChoice.Make.output
+  
+`let output: Store.t<'a, 'b, 'c> => option<'b>`  
+
+
+### FieldChoice.Make.printError
+  
+`let printError: 'a => option<'b>`  
+
 invalid kind
 # FieldEmpty
 
 
-Here as a touchpoint for copypaste\n  Explicitly typed as Field to force consistency with module type.\n  but you shouldnt need to do that if youre implementing your own.\n
+Here as a touchpoint for copypaste  
+  Explicitly typed as Field to force consistency with module type.  
+  but you shouldnt need to do that if youre implementing your own.  
 
 
+
+invalid kind
 invalid kind
 invalid kind
 invalid kind

@@ -2,10 +2,10 @@
 # yarn lockfile v1
 
 
-"@nobleai/rescript-documentation@^0.6.2":
-  version "0.6.2"
-  resolved "https://registry.yarnpkg.com/@nobleai/rescript-documentation/-/rescript-documentation-0.6.2.tgz#c72b4286c59307a8cf2f6155e14f3ad839edeebe"
-  integrity sha512-d3c7uFbafoX+dplOYG74X2bk/zpL83/MneIQKLKryoi3t9+t8txyifaEKZPsZKPPIt/R1g2XFC79eq6sg5P+og==
+"@nobleai/rescript-documentation@^0.7.1":
+  version "0.7.1"
+  resolved "https://registry.yarnpkg.com/@nobleai/rescript-documentation/-/rescript-documentation-0.7.1.tgz#497f5caa00dd7fc39a1dc37ff6128bbca5d2ee1c"
+  integrity sha512-KnBp26SIlVaSuJuCYOCQbkcgIkUhjkUWQdkbYsbx9XShc+ZhI3/R/68FKrx45Filaeeo5C+wXoFsFac+HJmcyg==
   dependencies:
     "@nobleai/rescript-prelude" "^0.7.0"
     lodash "4.17.21"

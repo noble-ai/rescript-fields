@@ -28,7 +28,7 @@
     "url": "git+ssh://github.com/noble-ai/rescript-fields.git"
   },
   "devDependencies": {
-    "@nobleai/rescript-documentation": "^0.6.2",
+    "@nobleai/rescript-documentation": "^0.7.1",
     "@rescript/tools": "^0.5.0",
     "rescript": "^10.0.0"
   },

@@ -1,7 +1,11 @@
 # Field
 
 
-\nThis module type describes the requirements for a Field module\nYou'll see this Field.T in the Module Functions which asserts\nthat a module passed to the function has each of these types and values.\n
+  
+This module type describes the requirements for a Field module  
+You'll see this Field.T in the Module Functions which asserts  
+that a module passed to the function has each of these types and values.  
+
 
 ### Field.T
   
