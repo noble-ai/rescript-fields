@@ -1,10 +1,6 @@
-# rescript-fields
+# Rescript Fields
 
 Elaborate form validation for Rescript 
-
-https://github.com/noble-ai/rescript-fields
-
-## Introduction
 
 Fields is a module for managing the update and validation of complex input.
 The singular Field module type describes the requirements for

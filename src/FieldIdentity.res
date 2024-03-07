@@ -1,3 +1,10 @@
+@@ocaml.doc("FieldIdentity is the most basic field
+// for any T primitive, make a field module that holds that value
+// This is actually trouble for string inputs since
+// it will override the user input in strange ways
+// but useful for dropdowns
+")
+
 // shadow global Dynamic with the impl chosen by FT
 
 // T just says that a module provides a type t and an empty value
@@ -22,11 +29,7 @@ module type FieldIdentity = (T: T) =>
     and type change = setClear<T.t>
     and type context = contextEmpty<T.t>
 
-// FieldIdentity is the most basic field
-// for any T primitive, make a field module that holds that value
-// This is actually trouble for string inputs since
-// it will override the user input in strange ways
-// but useful for dropdowns
+
 module Make: FieldIdentity = (T: T) => {
   module T = T
   type context = contextEmpty<T.t>

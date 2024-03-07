@@ -1,11 +1,12 @@
 // prefer shadowing Dynamic
 
-// Field Either is the generic implentation for FieldSum
-// Instead of customizing the sum type, it is encoded as a nested Either
-// This leaves  the confusion around that translation apart from the
-// reduce and validation logic which is hard enough to understand on its own
-// FieldEither is implemented constructively from Either2(A: Field, B: Field)
-// and Rec(Head: Field, Tail: Tail)
+@@ocaml.doc("Field Either is the generic implentation for FieldSum
+Instead of customizing the sum type, it is encoded as a nested Either
+This leaves  the confusion around that translation apart from the
+reduce and validation logic which is hard enough to understand on its own
+FieldEither is implemented constructively from Either2(A: Field, B: Field)
+and Rec(Head: Field, Tail: Tail)
+")
 
 module type Interface = {
   let validateImmediate: bool

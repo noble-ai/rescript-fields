@@ -1,8 +1,10 @@
 // shadow global Dynamic with the impl chosen by FT
 
-// Here as a touchpoint for copypaste
-// Explicitly typed as Field to force consistency with module type.
-// but you shouldnt need to do that if youre implementing your own.
+@@ocaml.doc("Here as a touchpoint for copypaste
+  Explicitly typed as Field to force consistency with module type.
+  but you shouldnt need to do that if youre implementing your own.
+")
+
 module Field: Field.T = {
   type context = unit
   type input = string

@@ -1,6 +1,7 @@
 // shadow global Dynamic with the impl chosen by FT
 
-// A Field for parsing string input into some more strict type t
+@@ocaml.doc("A Field for parsing string input into some more strict type t")
+
 module type IParse = {
   type t
   let validateImmediate: bool
