@@ -3,7 +3,7 @@ open Vitest
 describe("FieldArray", () => {
   module FieldElement = FieldOpt.Int
   module FieldArray = FieldArray.Make(
-  (F: Field) => {
+  (F: Field.T) => {
     let filter = FieldArray.filterIdentity
     let empty = _ => []
     let validateImmediate = true

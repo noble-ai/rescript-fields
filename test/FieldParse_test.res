@@ -6,7 +6,7 @@ describe("FieldFloat", () => {
   describe("#validate", () => {
     describe("empty string", () => {
       let input = ""
-      let res = Field.validate(false, {}: Field.context, Fields.Store.Dirty(input))
+      let res = Field.validate(false, {}: Field.context, Store.Dirty(input))
       testPromise("does not parse", () => {
         res
         ->Dynamic.toPromise

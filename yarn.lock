@@ -19,7 +19,7 @@
   dependencies:
     rescript "^10.1"
 
-"@nobleai/rescript-prelude@^0.12.4":
+"@nobleai/rescript-prelude@^0.12.0", "@nobleai/rescript-prelude@^0.12.4":
   version "0.12.4"
   resolved "https://registry.yarnpkg.com/@nobleai/rescript-prelude/-/rescript-prelude-0.12.4.tgz#2943d87405908a0a0d3015e1dfeb8e269aba2551"
   integrity sha512-FEoaLfX2Z8xcE2y0iuhHSLMJcyv5qJJv8i6KWRs4gAgoAKFwZuYUXbmqLRHLGyMI7iVDVMK1tZx5X86hn51+cQ==
@@ -41,6 +41,23 @@
   version "7.5.14"
   resolved "https://registry.yarnpkg.com/@nobleai/rescript-rxjs/-/rescript-rxjs-7.5.14.tgz#a5a1704361f60abec125e86859f4770bdbcaf008"
   integrity sha512-Znbe3yG7hQ2u3IZ2P+cnzlGZf1kK9HKwAT2JqBZ4t9vi9QlhpswsZZEXKTzv7wGkAab0HJ6NJci8tW3DmWDkSw==
+
+"@nobleai/rescript-testing-library@^0.1.0":
+  version "0.1.0"
+  resolved "https://registry.yarnpkg.com/@nobleai/rescript-testing-library/-/rescript-testing-library-0.1.0.tgz#58931f41aa03a4e2305aadb47f955c359f796915"
+  integrity sha512-Hdiu2lCXI3rbMUQ79aq5zzHL85FZxKPTlDJZMF6D5KoEg18CDD/2MOnvMZesiaYvCGE+BVsRu2wMZv1a1VmUjg==
+  dependencies:
+    "@nobleai/rescript-prelude" "^0.12.0"
+    "@rescript/react" "^0.11.0"
+    rescript "^10.1"
+    rescript-webapi "^0.2.0"
+
+"@nobleai/rescript-vitest@^0.30.3":
+  version "0.30.3"
+  resolved "https://registry.yarnpkg.com/@nobleai/rescript-vitest/-/rescript-vitest-0.30.3.tgz#21820cc5c2d46c8acdf5dcd24bde1d1e9f85e336"
+  integrity sha512-t5dpkh1Pj+QjYNVWLyJJe0RvQGNwWLWzoWASUGZNtoJENloF/sIakzz668xJL94egn7lC92y0MZYNGVRd1cQxw==
+  dependencies:
+    rescript "^10.1"
 
 "@rescript/react@^0.11.0":
   version "0.11.0"
@@ -68,6 +85,11 @@ rescript-nodejs@^16.0.0:
   version "16.0.0"
   resolved "https://registry.yarnpkg.com/rescript-nodejs/-/rescript-nodejs-16.0.0.tgz#87b3e9f58d6544e145ac2c9753f754a34789a70b"
   integrity sha512-1/SJmjH06xdeq1IFIIcKV6QKnidrav/gIc0Rw4GCUD0ceYPPZ5wDB51UFyk98in5N4gv8X/bTg6dVBMyRsC9tw==
+
+rescript-webapi@^0.2.0:
+  version "0.2.0"
+  resolved "https://registry.yarnpkg.com/rescript-webapi/-/rescript-webapi-0.2.0.tgz#713cabf41b98b1bfa536ef25e2b333899e3cc570"
+  integrity sha512-SzWON5edviVG1mtHvrUR6UZIpDqSY/nYVkl9F92zFxXhZ+VAdmiJtYoHZTRJ9DSgaslcyY4c9ZlymRqyWZ7eEA==
 
 rescript@^10.0.0, rescript@^10.1:
   version "10.1.4"

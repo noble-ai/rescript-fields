@@ -59,9 +59,9 @@ describe("FieldSum", () => {
                     let change = #Set(Right(value))
                     let result =
                       subject
-                      ->Fields.Dynamic.return
+                      ->Dynamic.return
                       ->Subject.reduce(~context, {value: change, index: 0, priority: 0})
-                      ->Fields.Dynamic.toPromise
+                      ->Dynamic.toPromise
                     itPromise("Becomes valid", () => result->Promise.tap( result => expect(result->Subject.enum)->toEqual(#Valid),))
                     itPromise("Has Right value as output", () => result->Promise.tap( result => expect(result->Subject.output)->toEqual(Some(Right(value)))))
                   })

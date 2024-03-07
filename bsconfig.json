@@ -1,8 +1,17 @@
 {
   "name": "@nobleai/rescript-fields",
+  "jsx": {"version": 4, "mode": "classic"},
   "sources": [{
     "dir": "src",
     "subdirs": true
+  },{
+    "dir": "test",
+    "subdirs": true,
+    "type" : "dev"
+  },{
+    "dir": "examples",
+    "subdirs": true,
+    "type" : "dev"
   }],
   "bsc-flags": [
     "-open Prelude"
@@ -11,5 +20,10 @@
     "@rescript/react",
     "@nobleai/rescript-rxjs",
     "@nobleai/rescript-prelude"
+  ],
+  "bs-dev-dependencies": [
+    "@nobleai/rescript-vitest",
+    "@nobleai/rescript-lodash",
+    "@nobleai/rescript-testing-library"
   ]
 }
