@@ -16,13 +16,15 @@ Some fields are defined as Module Functions/Functors so they can be composed.  F
 The hope is that the basics will be nearly enough for small forms, but larger forms
 and validations will be more easily tested in vitro.
 
-TODO: debounced asyc validation
-TODO: graphql async validation based on hook provided function
-TODO: optimistic update chaging form twice?
-TODO: write tests for specific product fields. range etc.
-
 ## Installation
 
 * Add `@nobleai/rescript-fields` to your project as you like
 * Add `@nobleai/rescript-fields` to `bs-dev-dependencies`in bsconfig.json
 * build `-with-deps`
+
+TODO: debounced asyc validation  
+TODO: graphql async validation based on hook provided function  
+TODO: optimistic update chaging form twice?  
+TODO: write tests for specific product fields. range etc.  
+
+
