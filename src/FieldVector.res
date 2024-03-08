@@ -29,7 +29,7 @@ module Context = {
 
 module Change = {
   type t<'input, 'inner> = [#Set('input) | #Clear | #Inner('inner) | #Validate]
-  let makeSet = input => #Set(input)
+  let makeSet = (x ) => #Set(x)
 
   let bimap = (f, g, c) => {
     switch c {
@@ -51,11 +51,25 @@ module Change = {
 }
 
 module Actions = {
-  type t<'input, 'inner, 'actionsInner> = {
-    set: 'input => Change.t<'input, 'inner>,
-    clear: () => Change.t<'input, 'inner>,
-    inner: 'actionsInner,
-    validate: () => Change.t<'input, 'inner>,
+  type t<'input, 'change, 'inner> = {
+    set: 'input => 'change,
+    clear: () => 'change,
+    inner: 'inner,
+    validate: () => 'change,
+  }
+
+  let make = (actionsInner) => {
+    set: input => #Set(input),
+    clear: () => #Clear,
+    inner: actionsInner,
+    validate: () => #Validate,
+  }
+
+  let trimap = (actions, fnInput, fn, fnInner) => {
+    set: input => input->fnInput->actions.set->fn,
+    clear: () => actions.clear()->fn,
+    inner: actions.inner->fnInner,
+    validate: () => actions.validate()->fn
   }
 }
 
@@ -105,8 +119,11 @@ module type Tail = {
 
   type changeInner
   let showChangeInner: changeInner => string
-  type actions
-  let actions: actions
+
+  type actionsInner<'change>
+  let mapActionsInner: (actionsInner<'change>, ('change => 'b)) => actionsInner<'b>
+  let actionsInner: actionsInner<changeInner>
+
   let reduceChannel: (
     ~contextInner: contextInner,
     Dynamic.t<inner>,
@@ -164,12 +181,18 @@ module Vector0 = {
   type changeInner = ()
   let showChangeInner = (_ch: changeInner) => `()`
 
-  type change = ()
-  let showChange = (): string => ""
+  type change = Change.t<input, changeInner> 
+  let showChange = change => change->Change.bimap(_ => "()", _ => "()", _)->Change.show
 
-  type actions = ()
-  let toChange = (_, _): change => ()
-  let actions: actions = ()
+  type actionsInner<'change> = ()
+  let mapActionsInner = (actionsInner, fn) => ()
+  let actionsInner: actionsInner<changeInner> = ()
+
+  // Both our root actions and inner actions produce "change"
+  type actions = Actions.t<input, change, actionsInner<change>>
+  let actions: actions = Actions.make(actionsInner)
+
+  // let toChange = (_, _): change => ()
 
   // We're counting on these streams producing values, so we cant just return the existing inner/store Dynamics - AxM
   let reduceChannel = (~contextInner, store, _change, _ch: changeInner): Dynamic.t<inner> => ()->Dynamic.return
@@ -298,8 +321,12 @@ module VectorRec = {
     let showChange = (change: change): string =>
       change->Change.bimap(showInput, showChangeInner, _)->Change.show
 
-    type actions = (Head.change => change, Tail.actions)
-    let actions: actions = ((c): change => #Inner(Left(c)), Tail.actions)
+    type actionsInner<'change> = (Head.actions<'change>, Tail.actionsInner<'change>)
+    let mapActionsInner = ((head, tail), fn) => (head->Head.mapActions(fn), tail->Tail.mapActionsInner(fn))
+    let actionsInner: actionsInner<changeInner> = (Head.actions->Head.mapActions((x): changeInner => Left(x)), Tail.actionsInner->Tail.mapActionsInner((x): changeInner => Right(x)))
+
+    type actions = Actions.t<input, change, actionsInner<change>>
+    let actions: actions = Actions.make(actionsInner->mapActionsInner((x): change => #Inner(x)))
 
     let reduceField = (inner, change, reduce) => {
       // These individual field setters return a different type based on the field

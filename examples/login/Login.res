@@ -55,7 +55,7 @@ let make = (~onSubmit) => {
 				value={username->FieldUsername.input}
 				onChange={e => {
 					let target = e->ReactEvent.Form.target
-					target["value"]->FieldUsername.makeSet->Field.actions.username->field.reduce
+					target["value"]->Field.actions.inner.username.set->field.reduce
 				}}
 			/>
 			{ password
@@ -68,9 +68,9 @@ let make = (~onSubmit) => {
 				value={password->FieldPassword.input}
 				onChange={e => {
 					let target = e->ReactEvent.Form.target
-					target["value"]->FieldPassword.makeSet->Field.actions.password->field.reduce
+					target["value"]->Field.actions.inner.password.set->field.reduce
 				}}
-				onBlur={(_) => #Validate->Field.actions.password->field.reduce}
+				onBlur={(_) => Field.actions.inner.password.validate()->field.reduce}
 			 />
 				{ password
 					->FieldPassword.printError

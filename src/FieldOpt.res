@@ -65,13 +65,21 @@ module Make = (F: Field.T) => {
     | #Validate => "Validate"
     }
 
-  type actions = {
-    none: () => change,
-    opt: (option<F.change>) => change,
-    some: (F.change) => change,
-    validate: () => change,
+  type actions<'change> = {
+    none: () => 'change,
+    opt: (option<F.change>) => 'change,
+    some: (F.change) => 'change,
+    validate: () => 'change,
   }
-  let actions: actions = {
+
+  let mapActions = ({none, opt, some, validate}, fn) => {
+    none: () => none()->fn,
+    opt: x => x->opt->fn,
+    some: x => x->some->fn,
+    validate: () => validate()->fn,
+  }
+
+  let actions: actions<change> = {
     none: () => #None,
     opt: x => #Opt(x),
     some: x => #Some(x),

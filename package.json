@@ -1,6 +1,6 @@
 {
   "name": "@nobleai/rescript-fields",
-  "version": "0.1.5",
+  "version": "0.2.0",
   "description": "Elaborate form validation system for Rescript",
   "files": [
     "README.md",

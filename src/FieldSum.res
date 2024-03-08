@@ -167,11 +167,11 @@ module Sum2 = {
     type actionsInner<'out> = P.structure<A.change => 'out, B.change => 'out>
     // let actionsInner: actionsInner<changeInner> = Inner.mapActionsInner(fromEither, Inner.actionsInner)->fromTuple
 
-		type actions = FieldVector.Actions.t<input, changeInner, actionsInner<change>>	
+		type actions = FieldVector.Actions.t<input, change, actionsInner<change>>	
 		let actions: actions = {
 			set: makeSet,
 			clear: () => #Clear,
-			inner: Inner.actionsInner->Inner.mapActionsInner(x => #Inner(fromEither(x)), _)->fromTuple,
+			inner: Inner.actionsInner->Inner.mapActionsInner(x => #Inner(fromEither(x)))->fromTuple,
 			validate: () => #Validate,
 		}
 
@@ -263,11 +263,11 @@ module Sum3 = {
     type actionsInner<'out> = P.structure<A.change => 'out, B.change => 'out, C.change => 'out>
     // let actionsInner: actionsInner<changeInner> = Inner.mapActionsInner(fromEither, Inner.actionsInner)->fromTuple
 
-		type actions = FieldVector.Actions.t<input, changeInner, actionsInner<change>>	
+		type actions = FieldVector.Actions.t<input, change, actionsInner<change>>	
 		let actions: actions = {
 			set: makeSet,
 			clear: () => #Clear,
-			inner: Inner.actionsInner->Inner.mapActionsInner(x => #Inner(fromEither(x)), _)->fromTuple,
+			inner: Inner.actionsInner->Inner.mapActionsInner(x => #Inner(fromEither(x)))->fromTuple,
 			validate: () => #Validate,
 		}
 
@@ -359,11 +359,11 @@ module Sum4 = {
     type actionsInner<'out> = P.structure<A.change => 'out, B.change => 'out, C.change => 'out, D.change => 'out>
     // let actionsInner: actionsInner<changeInner> = Inner.mapActionsInner(fromEither, Inner.actionsInner)->fromTuple
 
-		type actions = FieldVector.Actions.t<input, changeInner, actionsInner<change>>	
+		type actions = FieldVector.Actions.t<input, change, actionsInner<change>>	
 		let actions: actions = {
 			set: makeSet,
 			clear: () => #Clear,
-			inner: Inner.actionsInner->Inner.mapActionsInner(x => #Inner(fromEither(x)), _)->fromTuple,
+			inner: Inner.actionsInner->Inner.mapActionsInner(x => #Inner(fromEither(x)))->fromTuple,
 			validate: () => #Validate,
 		}
 
@@ -455,11 +455,11 @@ module Sum5 = {
     type actionsInner<'out> = P.structure<A.change => 'out, B.change => 'out, C.change => 'out, D.change => 'out, E.change => 'out>
     // let actionsInner: actionsInner<changeInner> = Inner.mapActionsInner(fromEither, Inner.actionsInner)->fromTuple
 
-		type actions = FieldVector.Actions.t<input, changeInner, actionsInner<change>>	
+		type actions = FieldVector.Actions.t<input, change, actionsInner<change>>	
 		let actions: actions = {
 			set: makeSet,
 			clear: () => #Clear,
-			inner: Inner.actionsInner->Inner.mapActionsInner(x => #Inner(fromEither(x)), _)->fromTuple,
+			inner: Inner.actionsInner->Inner.mapActionsInner(x => #Inner(fromEither(x)))->fromTuple,
 			validate: () => #Validate,
 		}
 
@@ -551,11 +551,11 @@ module Sum6 = {
     type actionsInner<'out> = P.structure<A.change => 'out, B.change => 'out, C.change => 'out, D.change => 'out, E.change => 'out, F.change => 'out>
     // let actionsInner: actionsInner<changeInner> = Inner.mapActionsInner(fromEither, Inner.actionsInner)->fromTuple
 
-		type actions = FieldVector.Actions.t<input, changeInner, actionsInner<change>>	
+		type actions = FieldVector.Actions.t<input, change, actionsInner<change>>	
 		let actions: actions = {
 			set: makeSet,
 			clear: () => #Clear,
-			inner: Inner.actionsInner->Inner.mapActionsInner(x => #Inner(fromEither(x)), _)->fromTuple,
+			inner: Inner.actionsInner->Inner.mapActionsInner(x => #Inner(fromEither(x)))->fromTuple,
 			validate: () => #Validate,
 		}
 

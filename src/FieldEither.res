@@ -14,6 +14,8 @@ module type Interface = {
 
 type error = [#Whole(string) | #Part]
 
+module Actions = FieldVector.Actions
+
 // the Tail module type is an extension of Field with some extras for
 // managing the recursive construction of FieldEither3,4,5...
 // Some elements of Field are baked in to include a non recursive
@@ -32,15 +34,16 @@ module type Tail = {
   let validateInner: (bool, contextInner, inner) => Dynamic.t<inner>
 
   type changeInner
+  let showChangeInner: changeInner => string
+
   // actionsInner is a collection of functions from the specific changes
   // to a particular output value.  This is a functor with mapActionsInner
   // which allows the actions to be lifted into their parents actions
   // when needed
   type actionsInner<'a>
   let actionsInner: actionsInner<changeInner>
-  let mapActionsInner: ('a => 'b, actionsInner<'a>) => actionsInner<'b>
+  let mapActionsInner: (actionsInner<'a>, 'a => 'b) => actionsInner<'b>
 
-  let showChangeInner: changeInner => string
   let toEnumInner: inner => Store.enum
   let reduceSet: (contextInner, Dynamic.t<inner>, Indexed.t<unit>, input) => Dynamic.t<inner>
   let reduceInner: (
@@ -107,10 +110,11 @@ module Either0 = {
 
   type actionsInner<'a> = unit
   let actionsInner: actionsInner<changeInner> = ()
-  let mapActionsInner = (_fn, _actions: actionsInner<'a>): actionsInner<'b> => ()
+  let mapActionsInner = (_actions: actionsInner<'a>, _fn): actionsInner<'b> => ()
 
-  type actions = unit
-  let actions: actions = ()
+  type actions<'change> = unit
+  let mapActions = (_actions, _fn) => ()
+  let actions: actions<change> = ()
 
   let showInner = (_inner: inner): string => ""
 
@@ -197,21 +201,24 @@ module Rec = {
       change->FieldVector.Change.bimap(showInput, showChangeInner, _)->FieldVector.Change.show
     let makeSet = input => #Set(input)
 
+    // A Nested tupe managing the "Inner" actions alone, for this head and tail
     type actionsInner<'a> = (Head.change => 'a, Tail.actionsInner<'a>)
     let actionsInner: actionsInner<changeInner> = (
       Either.left,
-      Tail.actionsInner->Tail.mapActionsInner(Either.right, _),
+      Tail.actionsInner->Tail.mapActionsInner(Either.right),
     )
-    let mapActionsInner = (fn, actions: actionsInner<'a>): actionsInner<'b> => {
+    let mapActionsInner = (actions: actionsInner<'a>, fn): actionsInner<'b> => {
       let (head, tail) = actions
-      (a => fn(head(a)), Tail.mapActionsInner(fn, tail))
+      (a => fn(head(a)), Tail.mapActionsInner(tail, fn))
     }
 
-    type actions = FieldVector.Actions.t<input, changeInner, actionsInner<change>>
-    let actions: actions = {
+    // Application of actionsInner into our own local Actions, for direct clients of FieldEither.
+    type actions<'change> = Actions.t<input, 'change, actionsInner<'change>>
+    let mapActions = (actions, fn) => Actions.trimap(actions, x => x, fn, mapActionsInner(_, fn))
+    let actions: actions<change> = {
       set: makeSet,
       clear: () => #Clear,
-      inner: actionsInner->mapActionsInner(x => #Inner(x), _),
+      inner: actionsInner->mapActionsInner(x => #Inner(x)),
       validate: () => #Validate,
     }
 

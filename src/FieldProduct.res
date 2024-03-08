@@ -1,6 +1,8 @@
 // shadow global Dynamic with the impl chosen by FT
 
 module Tuple = Tuple.Nested
+module Change = FieldVector.Change
+module Actions = FieldVector.Actions
 
 type error = [#Whole(string) | #Part]
 type resultValidate = Promise.t<Result.t<unit, string>>
@@ -115,20 +117,25 @@ module Product1 = {
       ->Dynamic.map(storeToStructure)
 
     type changeInner = PolyVariant.t<A.change>
+    let changeInnerToVector: changeInner => Vector.changeInner = PolyVariant.toEither
+    let changeInnerFromVector: Vector.changeInner => changeInner = PolyVariant.fromEither
 
-    type change = FieldVector.Change.t<input, changeInner>
-    let makeSet = FieldVector.Change.makeSet
-    let changeToVector = FieldVector.Change.bimap(toTuple, PolyVariant.toEither)
+    type change = Change.t<input, changeInner>
+    let makeSet = Change.makeSet
+    let changeToVector: change => Vector.change = Change.bimap(toTuple, changeInnerToVector)
+    let changeFromVector: Vector.change => change = Change.bimap(fromTuple, PolyVariant.fromEither)
 
     let showChange = (change) => change->changeToVector->Vector.showChange
 
-    type actions = Gen.structure<
-      A.change => change,
+    type actionsInner<'change> = Gen.structure<
+      A.actions<'change>,
     >
+    let mapActionsInner = (actions: actionsInner<'c>, fn: 'c => 'd): actionsInner<'d> => 
+      actions->toTuple->Vector.mapActionsInner(fn)->fromTuple
 
-    // FIXME: why is a/B reversed again?
-    let actions: actions =
-      (a => #Inner(#A(a)))->Gen.fromTuple
+    type actions<'change> = Actions.t<input, 'change, actionsInner<'change>>
+    let actions: actions<change> = Vector.actions->Actions.trimap(toTuple, changeFromVector, x => x->Vector.mapActionsInner(changeFromVector)->fromTuple)
+    let mapActions = (actions, fn) => actions->Actions.trimap(x => x, fn, mapActionsInner(_, fn))
 
     let reduce = (~context: context, store: Dynamic.t<t>, change: Indexed.t<change>): Dynamic.t<t> => {
       Vector.reduce(~context=context->contextToTuple, store->Dynamic.map(storeToTuple), change->Indexed.map(changeToVector))
@@ -173,6 +180,7 @@ module Product2 = {
     module A = A
     module B = B
     module Vector = FieldVector.Vector2.Make(I, A, B)
+
     type input = Gen.structure<A.input, B.input>
     type inner = Gen.structure<A.t, B.t>
     type output = Gen.structure<A.output, B.output>
@@ -233,22 +241,30 @@ module Product2 = {
 
     type changeInner = PolyVariant.t<B.change, A.change>
     let changeInnerToVector: changeInner => Vector.changeInner = PolyVariant.toEither
-    type change = FieldVector.Change.t<input, changeInner>
-    let makeSet = FieldVector.Change.makeSet
-    let changeToVector: change => Vector.change = FieldVector.Change.bimap(toTuple, changeInnerToVector)
+    let changeInnerFromVector: Vector.changeInner => changeInner = PolyVariant.fromEither
+
+    type change = Change.t<input, changeInner>
+    let makeSet = Change.makeSet
+    let changeToVector: change => Vector.change = Change.bimap(toTuple, changeInnerToVector)
+    let changeFromVector: Vector.change => change = Change.bimap(fromTuple, PolyVariant.fromEither)
 
     let showChange = (change) => change->changeToVector->Vector.showChange
 
-    type actions = Gen.structure<
-      A.change => change,
-      B.change => change
+    type actionsInner<'change> = Gen.structure<
+      A.actions<'change>,
+      B.actions<'change>
     >
+    let mapActionsInner = (actions: actionsInner<'c>, fn: 'c => 'd): actionsInner<'d> => 
+      actions->toTuple->Vector.mapActionsInner(fn)->fromTuple
 
-    // FIXME: why is a/B reversed again?
-    let actions: actions =
-      (a => #Inner(#A(a)),
-      b => #Inner(#B(b))
-      )->Gen.fromTuple
+    let actionsInner: actionsInner<changeInner> =
+      Vector.actionsInner
+      ->Vector.mapActionsInner(changeInnerFromVector)
+      ->fromTuple
+    
+    type actions<'change> = Actions.t<input, 'change, actionsInner<'change>>
+    let actions: actions<change> = Actions.make(actionsInner->mapActionsInner(x => #Inner(x)))
+    let mapActions = (actions: actions<'ch> , fn: 'ch => 'b): actions<'b> => actions->Actions.trimap(x => x, fn, mapActionsInner(_, fn))
 
     let reduce = (~context: context, store: Dynamic.t<t>, change: Indexed.t<change>): Dynamic.t<t> => {
       Vector.reduce(~context=context->contextToTuple, store->Dynamic.map(storeToTuple), change->Indexed.map(changeToVector))
@@ -331,23 +347,33 @@ module Product3 = {
       ->Dynamic.map(storeToStructure)
 
     type changeInner = PolyVariant.t<C.change, B.change, A.change>
+    let changeInnerToVector: changeInner => Vector.changeInner = PolyVariant.toEither
+    let changeInnerFromVector: Vector.changeInner => changeInner = PolyVariant.fromEither
 
-    type change = FieldVector.Change.t<input, changeInner>
-    let makeSet = FieldVector.Change.makeSet
-    let changeToVector = FieldVector.Change.bimap(toTuple, PolyVariant.toEither)
+    type change = Change.t<input, changeInner>
+    let makeSet = Change.makeSet
+    let changeToVector: change => Vector.change = Change.bimap(toTuple, changeInnerToVector)
+    let changeFromVector: Vector.change => change = Change.bimap(fromTuple, PolyVariant.fromEither)
+
     let showChange = (change) => change->changeToVector->Vector.showChange
 
-    type actions = Gen.structure<
-      A.change => change,
-      B.change => change,
-      C.change => change,
-    > 
+    type actionsInner<'change> = Gen.structure<
+      A.actions<'change>,
+      B.actions<'change>,
+      C.actions<'change>,
+    >
+    
+    let mapActionsInner = (actions: actionsInner<'c>, fn: 'c => 'd): actionsInner<'d> => 
+      actions->toTuple->Vector.mapActionsInner(fn)->fromTuple
 
-    let actions: actions =
-      (a => #Inner(#A(a)),
-      b => #Inner(#B(b)),
-      c => #Inner(#C(c))
-      )->Gen.fromTuple
+    let actionsInner: actionsInner<changeInner> =
+      Vector.actionsInner
+      ->Vector.mapActionsInner(changeInnerFromVector)
+      ->fromTuple
+    
+    type actions<'change> = Actions.t<input, 'change, actionsInner<'change>>
+    let actions: actions<change> = Actions.make(actionsInner->mapActionsInner(x => #Inner(x)))
+    let mapActions = (actions: actions<'ch>, fn: 'ch => 'b) => actions->Actions.trimap(x => x, fn, mapActionsInner(_, fn))
 
     // Cant move this into Vectors as it causes some types to "escape"
     // let const = T.make(const, const, const)
@@ -450,27 +476,34 @@ module Product4 = {
       ->Dynamic.map(storeToStructure)
 
     type changeInner = PolyVariant.t<D.change, C.change, B.change, A.change>
+    let changeInnerToVector: changeInner => Vector.changeInner = PolyVariant.toEither
+    let changeInnerFromVector: Vector.changeInner => changeInner = PolyVariant.fromEither
  
-    type change = FieldVector.Change.t<input, changeInner>
-    let makeSet = FieldVector.Change.makeSet
-    let changeToVector = FieldVector.Change.bimap(toTuple, PolyVariant.toEither)
+    type change = Change.t<input, changeInner>
+    let makeSet = Change.makeSet
+    let changeToVector: change => Vector.change = Change.bimap(toTuple, changeInnerToVector)
+    let changeFromVector: Vector.change => change = Change.bimap(fromTuple, PolyVariant.fromEither)
 
     let showChange = (change) => change->changeToVector->Vector.showChange
 
-    type actions = Gen.structure<
-      A.change => change,
-      B.change => change,
-      C.change => change,
-      D.change => change,
+    type actionsInner<'change> = Gen.structure<
+      A.actions<'change>,
+      B.actions<'change>,
+      C.actions<'change>,
+      D.actions<'change>,
     >
+    
+    let mapActionsInner = (actions: actionsInner<'c>, fn: 'c => 'd): actionsInner<'d> => 
+      actions->toTuple->Vector.mapActionsInner(fn)->fromTuple
 
-    let actions: actions =
-      (a => #Inner(#A(a)),
-      b => #Inner(#B(b)),
-      c => #Inner(#C(c)),
-      d => #Inner(#D(d))
-      )->Gen.fromTuple
+    let actionsInner: actionsInner<changeInner> =
+      Vector.actionsInner
+      ->Vector.mapActionsInner(changeInnerFromVector)
+      ->fromTuple
 
+    type actions<'change> = Actions.t<input, 'change, actionsInner<'change>>
+    let actions: actions<change> = Actions.make(actionsInner->mapActionsInner(x => #Inner(x)))
+    let mapActions = (actions: actions<'ch>, fn: 'ch => 'b) => actions->Actions.trimap(x => x, fn, mapActionsInner(_, fn))
 
     let reduce = (~context: context, store: Dynamic.t<t>, change: Indexed.t<change>): Dynamic.t<t> => {
       Vector.reduce(~context=context->contextToTuple, store->Dynamic.map(storeToTuple), change->Indexed.map(changeToVector))
@@ -571,28 +604,35 @@ module Product5 = {
       ->Dynamic.map(storeToStructure)
 
     type changeInner = PolyVariant.t<E.change, D.change, C.change, B.change, A.change>
+    let changeInnerToVector: changeInner => Vector.changeInner = PolyVariant.toEither
+    let changeInnerFromVector: Vector.changeInner => changeInner = PolyVariant.fromEither
 
-    type change = FieldVector.Change.t<input, changeInner>
-    let makeSet = FieldVector.Change.makeSet
-    let changeToVector = FieldVector.Change.bimap(toTuple, PolyVariant.toEither)
+    type change = Change.t<input, changeInner>
+    let makeSet = Change.makeSet
+    let changeToVector: change => Vector.change = Change.bimap(toTuple, changeInnerToVector)
+    let changeFromVector: Vector.change => change = Change.bimap(fromTuple, PolyVariant.fromEither)
 
     let showChange = (change) => change->changeToVector->Vector.showChange
 
-    type actions = Gen.structure<
-      A.change => change,
-      B.change => change,
-      C.change => change,
-      D.change => change,
-      E.change => change
+    type actionsInner<'change> = Gen.structure<
+      A.actions<'change>,
+      B.actions<'change>,
+      C.actions<'change>,
+      D.actions<'change>,
+      E.actions<'change>
     >
 
-    let actions: actions =
-      (a => #Inner(#A(a)),
-      b => #Inner(#B(b)),
-      c => #Inner(#C(c)),
-      d => #Inner(#D(d)),
-      e => #Inner(#E(e))
-      )->Gen.fromTuple
+    let mapActionsInner = (actions: actionsInner<'c>, fn: 'c => 'd): actionsInner<'d> => 
+      actions->toTuple->Vector.mapActionsInner(fn)->fromTuple
+
+    let actionsInner: actionsInner<changeInner> =
+      Vector.actionsInner
+      ->Vector.mapActionsInner(changeInnerFromVector)
+      ->fromTuple
+    
+    type actions<'change> = Actions.t<input, 'change, actionsInner<'change>>
+    let actions: actions<change> = Actions.make(actionsInner->mapActionsInner(x => #Inner(x)))
+    let mapActions = (actions: actions<'ch>, fn: 'ch => 'b) => actions->Actions.trimap(x => x, fn, mapActionsInner(_, fn))
 
     let reduce = (~context: context, store: Dynamic.t<t>, change: Indexed.t<change>): Dynamic.t<t> => {
       Vector.reduce(~context=context->contextToTuple, store->Dynamic.map(storeToTuple), change->Indexed.map(changeToVector))
@@ -693,30 +733,36 @@ module Product6 = {
       ->Dynamic.map(storeToStructure)
 
     type changeInner = PolyVariant.t<F.change, E.change, D.change, C.change, B.change, A.change>
+    let changeInnerToVector: changeInner => Vector.changeInner = PolyVariant.toEither
+    let changeInnerFromVector: Vector.changeInner => changeInner = PolyVariant.fromEither
  
-    type change = FieldVector.Change.t<input, changeInner>
-    let makeSet = FieldVector.Change.makeSet
-    let changeToVector = FieldVector.Change.bimap(toTuple, PolyVariant.toEither)
+    type change = Change.t<input, changeInner>
+    let makeSet = Change.makeSet
+    let changeToVector: change => Vector.change = Change.bimap(toTuple, changeInnerToVector)
+    let changeFromVector: Vector.change => change = Change.bimap(fromTuple, PolyVariant.fromEither)
 
     let showChange = (change) => change->changeToVector->Vector.showChange
 
-    type actions = Gen.structure<
-      A.change => change,
-      B.change => change,
-      C.change => change,
-      D.change => change,
-      E.change => change,
-      F.change => change,
+    type actionsInner<'change> = Gen.structure<
+      A.actions<'change>,
+      B.actions<'change>,
+      C.actions<'change>,
+      D.actions<'change>,
+      E.actions<'change>,
+      F.actions<'change>,
     >
 
-    let actions: actions =
-      (a => #Inner(#A(a)),
-      b => #Inner(#B(b)),
-      c => #Inner(#C(c)),
-      d => #Inner(#D(d)),
-      e => #Inner(#E(e)),
-      f => #Inner(#F(f))
-      )->Gen.fromTuple
+    let mapActionsInner = (actions: actionsInner<'c>, fn: 'c => 'd): actionsInner<'d> => 
+      actions->toTuple->Vector.mapActionsInner(fn)->fromTuple
+
+    let actionsInner: actionsInner<changeInner> =
+      Vector.actionsInner
+      ->Vector.mapActionsInner(changeInnerFromVector)
+      ->fromTuple
+    
+    type actions<'change> = Actions.t<input, 'change, actionsInner<'change>>
+    let actions: actions<change> = Actions.make(actionsInner->mapActionsInner(x => #Inner(x)))
+    let mapActions = (actions: actions<'ch>, fn: 'ch => 'b) => actions->Actions.trimap(x => x, fn, mapActionsInner(_, fn))
 
     let reduce = (~context: context, store: Dynamic.t<t>, change: Indexed.t<change>): Dynamic.t<t> => {
       Vector.reduce(~context=context->contextToTuple, store->Dynamic.map(storeToTuple), change->Indexed.map(changeToVector))
@@ -825,32 +871,37 @@ module Product7 = {
       ->Dynamic.map(storeToStructure)
 
     type changeInner = PolyVariant.t<G.change, F.change, E.change, D.change, C.change, B.change, A.change>
+    let changeInnerToVector: changeInner => Vector.changeInner = PolyVariant.toEither
+    let changeInnerFromVector: Vector.changeInner => changeInner = PolyVariant.fromEither
  
-    type change = FieldVector.Change.t<input, changeInner>
-    let makeSet = FieldVector.Change.makeSet
-    let changeToVector = FieldVector.Change.bimap(toTuple, PolyVariant.toEither)
+    type change = Change.t<input, changeInner>
+    let makeSet = Change.makeSet
+    let changeToVector: change => Vector.change = Change.bimap(toTuple, changeInnerToVector)
+    let changeFromVector: Vector.change => change = Change.bimap(fromTuple, PolyVariant.fromEither)
 
     let showChange = (change) => change->changeToVector->Vector.showChange
 
-    type actions = Gen.structure<
-      A.change => change,
-      B.change => change,
-      C.change => change,
-      D.change => change,
-      E.change => change,
-      F.change => change,
-      G.change => change,
+    type actionsInner<'change> = Gen.structure<
+      A.actions<'change>,
+      B.actions<'change>,
+      C.actions<'change>,
+      D.actions<'change>,
+      E.actions<'change>,
+      F.actions<'change>,
+      G.actions<'change>,
     >
 
-    let actions: actions =
-      (a => #Inner(#A(a)),
-      b => #Inner(#B(b)),
-      c => #Inner(#C(c)),
-      d => #Inner(#D(d)),
-      e => #Inner(#E(e)),
-      f => #Inner(#F(f)),
-      g => #Inner(#G(g))
-      )->Gen.fromTuple
+    let mapActionsInner = (actions: actionsInner<'c>, fn: 'c => 'd): actionsInner<'d> => 
+      actions->toTuple->Vector.mapActionsInner(fn)->fromTuple
+
+    let actionsInner: actionsInner<changeInner> =
+      Vector.actionsInner
+      ->Vector.mapActionsInner(changeInnerFromVector)
+      ->fromTuple
+    
+    type actions<'change> = Actions.t<input, 'change, actionsInner<'change>>
+    let actions: actions<change> = Actions.make(actionsInner->mapActionsInner(x => #Inner(x)))
+    let mapActions = (actions: actions<'ch> , fn: 'ch => 'b) => actions->Actions.trimap(x => x, fn, mapActionsInner(_, fn))
 
     let reduce = (~context: context, store: Dynamic.t<t>, change: Indexed.t<change>): Dynamic.t<t> => {
       Vector.reduce(~context=context->contextToTuple, store->Dynamic.map(storeToTuple), change->Indexed.map(changeToVector))

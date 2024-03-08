@@ -67,11 +67,17 @@ module Make: FieldIdentity = (T: T) => {
     }
   }
 
-  type actions = {
-    set: input => change,
-    clear: unit => change,
+  type actions<'change> = {
+    set: input => 'change,
+    clear: unit => 'change,
   }
-  let actions: actions = {
+
+  let mapActions = (actions: actions<'change>, fn: 'change => 'b) => {
+    set: input => input->actions.set->fn,
+    clear: () => actions.clear()->fn,
+  }
+
+  let actions: actions<change> = {
     set: input => #Set(input),
     clear: _ => #Clear,
   }

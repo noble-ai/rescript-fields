@@ -88,7 +88,7 @@ describe("UseField", () => {
             let field: Subject.t = Dirty({left, right})
             let subject: Rxjs.t<Rxjs.behaviorsubject, Rxjs.source<'a>, 'a> = Rxjs.BehaviorSubject.make(field)
             let changeOut: Rxjs.Subject.t<(int, 'change)> = Rxjs.Subject.makeEmpty()
-            let change = Subject.actions.left(#Set("q"))
+            let change = Subject.actions.inner.left.set("q")
 
             let res = applyChange(
               ~reduce=Subject.reduce(~context),

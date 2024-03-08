@@ -34,11 +34,29 @@ module type IString = {
 
 type change<'set> = [#Clear | #Reset | #Validate | #Set('set)]
 
-type actions<'set> = {
-  clear: () => change<'set>,
-  reset: () => change<'set>, 
-  validate: () => change<'set>,
-  set: 'set => change<'set>,
+module Actions = {
+  type t<'input, 'change> = {
+    clear: () => 'change,
+    reset: () => 'change, 
+    validate: () => 'change,
+    set: 'input => 'change,
+  }
+
+  let mapActions = (actions, fn) => {
+    {
+      clear: () => fn(actions.clear()),
+      reset: () => fn(actions.reset()),
+      validate: () => fn(actions.validate()),
+      set: input => fn(actions.set(input)),
+    }
+  }
+
+  let actions = {
+    clear: () => #Clear,
+    reset: () => #Reset,
+    validate: () => #Validate,
+    set: input => #Set(input),
+  }
 }
 
 module Make = (I: IString) => {
@@ -94,13 +112,9 @@ module Make = (I: IString) => {
     }
   }
 
-  type actions = actions<input>
-  let actions = {
-    clear: () => #Clear,
-    reset: () => #Reset,
-    validate: () => #Validate,
-    set: input => #Set(input),
-  }
+  type actions<'change> = Actions.t<input, 'change>
+  let mapActions = Actions.mapActions
+  let actions = Actions.actions
 
   let reduce = (~context: context, store: Dynamic.t<t>, change: Indexed.t<change>): Dynamic.t<
     t,

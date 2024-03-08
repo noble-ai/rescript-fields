@@ -30,11 +30,15 @@ module Field: Field.T = {
   let makeSet = input => input
   let showChange = (change: change) => change
 
-  type actions = {
-    set: input => change
+  type actions<'change> = {
+    set: input => 'change
   }
 
-  let actions: actions = {
+  let mapActions = (actions, fn) => {
+    {set: x => x->actions.set->fn }
+  }
+
+  let actions: actions<change> = {
     set: x => x
   }
 

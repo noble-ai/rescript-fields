@@ -48,8 +48,13 @@ module type T = {
   // Provide a type that specifies the changes you can make on this field.
   // So far this is a poly variant where some values may hold change types for children
   type change
-  type actions
-  let actions: actions
+  // Every field has a record of functions producing changes at this level.
+  // This type is opaque here so its a big of a hazard
+  type actions<'change>
+  let mapActions: (actions<'change>, 'change => 'b) => actions<'b>
+
+  // Without any conctext, we have actions producing our own changes
+  let actions: actions<change>
 
   // When a composite field is given a set change, we want to allow our children
   // to validate, but we do not have access [yet/ever] to their change action type

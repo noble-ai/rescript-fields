@@ -17,10 +17,26 @@ type context<'validate, 'empty> = {
 }
   
 type change = [#Set(string) | #Clear | #Validate]
-type actions = {
-  set: string => change,
-  clear: change,
-  validate: change,
+
+module Actions = {
+  type t<'change> = {
+    set: string => 'change,
+    clear: 'change,
+    validate: 'change,
+  }
+
+  let map = (actions, f) => {
+    set: x => f(actions.set(x)),
+    clear: f(actions.clear),
+    validate: f(actions.validate),
+  }
+
+  let actions = {
+    set: x => #Set(x),
+    clear: #Clear,
+    validate: #Validate,
+  }
+
 }
   
 type error = [#DoesNotParse | #External(string)]
@@ -35,7 +51,7 @@ module type Make = (I: IParse) => FieldParse
   and type context = context<validate<I.t>, string>
   and type t = Store.t<string, I.t, error>
   and type change = change
-  and type actions = actions
+  and type actions<'change> = Actions.t<'change>
   and type error = error
   and type inner = string
 
@@ -82,7 +98,7 @@ module Make: Make = (I: IParse) => {
   }
 
   type change = change
-  let makeSet = input => #Set(input)
+  let makeSet = Actions.actions.set
   let showChange = change =>
     switch change {
     | #Set(input) => `Set(${input})`
@@ -90,12 +106,9 @@ module Make: Make = (I: IParse) => {
     | #Validate => "Validate"
     }
 
-  type actions = actions
-  let actions = {
-    set: makeSet,
-    clear: #Clear,
-    validate: #Validate,
-  }
+  type actions<'change> = Actions.t<'change>
+  let mapActions = Actions.map
+  let actions = Actions.actions
 
   let reduce = (~context: context, store: Dynamic.t<t>, change: Indexed.t<change>): Dynamic.t<
     t,
