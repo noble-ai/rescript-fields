@@ -293,9 +293,9 @@
   integrity sha512-eF2rxCRulEKXHTRiDrDy6erMYWqNw4LPdQ8UQA4huuxaQsVeRPFl2oM8oDGxMFhJUWZf9McpLtJasDDZb/Bpeg==
 
 "@nobleai/rescript-documentation@^0.7.1":
-  version "0.7.1"
-  resolved "https://registry.yarnpkg.com/@nobleai/rescript-documentation/-/rescript-documentation-0.7.1.tgz#497f5caa00dd7fc39a1dc37ff6128bbca5d2ee1c"
-  integrity sha512-KnBp26SIlVaSuJuCYOCQbkcgIkUhjkUWQdkbYsbx9XShc+ZhI3/R/68FKrx45Filaeeo5C+wXoFsFac+HJmcyg==
+  version "0.7.2"
+  resolved "https://registry.yarnpkg.com/@nobleai/rescript-documentation/-/rescript-documentation-0.7.2.tgz#92b888c83a90420381fb9c0e925381fc39adfe47"
+  integrity sha512-bu0hsTqYv3KFXKHA4IIY1vmoj3g4fZv7CMw9A5JDApGBzlUMm1yCzUqcQFrKdkLsGFa5z0S2RGwO9H5gs/aG7Q==
   dependencies:
     "@nobleai/rescript-prelude" "^0.7.0"
     lodash "4.17.21"
@@ -1754,9 +1754,9 @@ requires-port@^1.0.0:
   integrity sha512-KigOCHcocU3XODJxsu8i/j8T9tzT4adHiecwORRQ0ZZFcp7ahwXuRU1m+yuO90C5ZUyGeGfocHDI14M3L3yDAQ==
 
 rescript-nodejs@^16.0.0:
-  version "16.0.0"
-  resolved "https://registry.yarnpkg.com/rescript-nodejs/-/rescript-nodejs-16.0.0.tgz#87b3e9f58d6544e145ac2c9753f754a34789a70b"
-  integrity sha512-1/SJmjH06xdeq1IFIIcKV6QKnidrav/gIc0Rw4GCUD0ceYPPZ5wDB51UFyk98in5N4gv8X/bTg6dVBMyRsC9tw==
+  version "16.1.0"
+  resolved "https://registry.yarnpkg.com/rescript-nodejs/-/rescript-nodejs-16.1.0.tgz#2278d8880d9e4a5c46cd845d5ac4ee2bd69277ee"
+  integrity sha512-RyXGIEsb8UhuShf5PwKcTkYNPz+cPQ0CZq74lbYCbCa5YFidbmiIWpQhCMtpsgP1PkLClhKGDkfZfmwwNOil4Q==
 
 rescript-webapi@^0.2.0:
   version "0.2.0"
