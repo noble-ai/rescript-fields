@@ -43,6 +43,10 @@ module type Tail = {
   type actionsInner<'a>
   let actionsInner: actionsInner<changeInner>
   let mapActionsInner: (actionsInner<'a>, 'a => 'b) => actionsInner<'b>
+  
+  type partition
+  @ocaml.doc("Takes the fields of a part instead of a part since we are having to deconstruct in the outer `split` to prepare inner values so why reconstruct")
+  let splitInner: (inner, changeInner => (), actionsInner<Promise.t<()>>, actionsInner<()>) => partition
 
   let toEnumInner: inner => Store.enum
   let reduceSet: (contextInner, Dynamic.t<inner>, Indexed.t<unit>, input) => Dynamic.t<inner>
@@ -115,7 +119,14 @@ module Either0 = {
   type actions<'change> = unit
   let mapActions = (_actions, _fn) => ()
   let actions: actions<change> = ()
+  
+  type pack = Pack.t<t, change, actions<Promise.t<()>>, actions<()>>
 
+  type partition = ()
+  let splitInner = (_, _, _, _) => {
+    ()
+  }
+ 
   let showInner = (_inner: inner): string => ""
 
   let show = (_store: t): string => "Either0"
@@ -202,25 +213,44 @@ module Rec = {
     let makeSet = input => #Set(input)
 
     // A Nested tupe managing the "Inner" actions alone, for this head and tail
-    type actionsInner<'a> = (Head.change => 'a, Tail.actionsInner<'a>)
+    type actionsInner<'change> = (Head.actions<'change>, Tail.actionsInner<'change>)
     let actionsInner: actionsInner<changeInner> = (
-      Either.left,
-      Tail.actionsInner->Tail.mapActionsInner(Either.right),
+      Head.actions->Head.mapActions(Either.left),
+      Tail.actionsInner->Tail.mapActionsInner(Either.right)
     )
+
     let mapActionsInner = (actions: actionsInner<'a>, fn): actionsInner<'b> => {
       let (head, tail) = actions
-      (a => fn(head(a)), Tail.mapActionsInner(tail, fn))
+      (head->Head.mapActions(fn), Tail.mapActionsInner(tail, fn))
     }
 
     // Application of actionsInner into our own local Actions, for direct clients of FieldEither.
     type actions<'change> = Actions.t<input, 'change, actionsInner<'change>>
     let mapActions = (actions, fn) => Actions.trimap(actions, x => x, fn, mapActionsInner(_, fn))
-    let actions: actions<change> = {
-      set: makeSet,
-      clear: () => #Clear,
-      inner: actionsInner->mapActionsInner(x => #Inner(x)),
-      validate: () => #Validate,
+    let actions: actions<change> = Actions.make(
+      actionsInner->mapActionsInner(x => #Inner(x))
+    )
+  
+    type pack = Pack.t<t, change, actions<Promise.t<()>>, actions<()>>
+
+    type partition = Either.t<Pack.t<Head.t, Head.change, Head.actions<Promise.t<()>>, Head.actions<()>>, Tail.partition>
+    let splitInner = (inner: inner, onChange: changeInner => (), actions: actionsInner<'a>, actions_: actionsInner<'a_>): partition => {
+      let (ah, at) = actions
+      let (ah_, at_) = actions_
+      let onChangeHead = x => x->Left->onChange
+      let onChangeTail = x => x->Right->onChange
+      inner->Either.bimap(
+        (field) => ({field, onChange: onChangeHead, actions: ah, actions_: ah_}: Pack.t<Head.t, Head.change, Head.actions<Promise.t<()>>, Head.actions<()>>),
+        (tail) => Tail.splitInner(tail, onChangeTail, at, at_),
+        _
+      )
     }
+
+    let split = (part: Pack.t<t, change, actions<Promise.t<()>>, actions<()>>): partition => {
+      let onChange = x => x->#Inner->part.onChange
+      splitInner( part.field->Store.inner, onChange, part.actions.inner, part.actions_.inner)
+    }
+
 
     let reduceSet = (
       context: contextInner,
@@ -370,7 +400,9 @@ module Either1 = {
       and type t = Store.t<either<A.t>, either<A.output>, error>
       and type changeInner = either<A.change>
       and type change = FieldVector.Change.t<either<A.input>, either<A.change>>
-      and type actionsInner<'a> = tuple<A.change => 'a>
+      and type actionsInner<'a> = tuple<A.actions<'a>>
+      and type actions<'change> = Actions.t<either<A.input>, 'change, tuple<A.actions<'change>>>
+      and type partition = either<Pack.t<A.t, A.change, A.actions<Promise.t<()>>, A.actions<()>>>
   ) => Rec.Make(I, A, Either0)
 }
 
@@ -391,7 +423,12 @@ module Either2 = {
       and type t = Store.t<either<A.t, B.t>, either<A.output, B.output>, error>
       and type changeInner = either<A.change, B.change>
       and type change = FieldVector.Change.t<either<A.input, B.input>, either<A.change, B.change>>
-      and type actionsInner<'a> = tuple<A.change => 'a, B.change => 'a>
+      and type actionsInner<'a> = tuple<A.actions<'a>, B.actions<'a>>
+      and type actions<'change> = Actions.t<either<A.input, B.input>, 'change, tuple<A.actions<'change>, B.actions<'change>>>
+      and type partition = either<
+        Pack.t<A.t, A.change, A.actions<Promise.t<()>>, A.actions<()>>,
+        Pack.t<B.t, B.change, B.actions<Promise.t<()>>, B.actions<()>>
+        >
   ) => Rec.Make(I, A, Either1.Make(I, B))
 }
 
@@ -415,25 +452,33 @@ module Either3 = {
         either<A.input, B.input, C.input>,
         either<A.change, B.change, C.change>,
       >
-      and type actionsInner<'a> = (
-        A.change => 'a,
-        Tuple.Nested.Tuple2.t<B.change => 'a, C.change => 'a>,
-      )
+      and type actionsInner<'a> = tuple<
+        A.actions<'a>,
+        B.actions<'a>,
+        C.actions<'a>
+      >
+      and type actions<'change> = Actions.t<either<A.input, B.input, C.input>, 'change, tuple<A.actions<'change>, B.actions<'change>, C.actions<'change>>>
+      and type partition = either<
+        Pack.t<A.t, A.change, A.actions<Promise.t<()>>, A.actions<()>>,
+        Pack.t<B.t, B.change, B.actions<Promise.t<()>>, B.actions<()>>,
+        Pack.t<C.t, C.change, C.actions<Promise.t<()>>, C.actions<()>>
+      >
   ) => Rec.Make(I, A, Either2.Make(I, B, C))
 }
 
 module Either4 = {
   type either<'a, 'b, 'c, 'd> = Either.Nested.t4<'a, 'b, 'c, 'd>
+  type tuple<'a, 'b, 'c, 'd> = Tuple.Nested.tuple4<'a, 'b, 'c, 'd>
   module Make = (I: Interface, A: Field.T, B: Field.T, C: Field.T, D: Field.T): (
     Tail
       with type input = either<A.input, B.input, C.input, D.input>
       and type inner = either<A.t, B.t, C.t, D.t>
       and type output = either<A.output, B.output, C.output, D.output>
-      and type contextInner = (A.context, Tuple.Nested.Tuple3.t<B.context, C.context, D.context>)
+      and type contextInner = tuple<A.context, B.context, C.context, D.context>
       and type context = Context.t<
         either<A.input, B.input, C.input, D.input>,
         FieldVector.validateOut<either<A.output, B.output, C.output, D.output>>,
-        (A.context, Tuple.Nested.Tuple3.t<B.context, C.context, D.context>),
+        tuple<A.context, B.context, C.context, D.context>
       >
       and type t = Store.t<
         either<A.t, B.t, C.t, D.t>,
@@ -445,28 +490,40 @@ module Either4 = {
         either<A.input, B.input, C.input, D.input>,
         either<A.change, B.change, C.change, D.change>,
       >
-      and type actionsInner<'a> = (
-        A.change => 'a,
-        Tuple.Nested.Tuple3.t<B.change => 'a, C.change => 'a, D.change => 'a>,
-      )
+      and type actionsInner<'a> = Tuple.Nested.Tuple4.t<
+        A.actions<'a>,
+        B.actions<'a>,
+        C.actions<'a>,
+        D.actions<'a>
+      >
+      and type actions<'change> = Actions.t<
+        either<A.input, B.input, C.input, D.input>,
+        'change,
+         tuple<A.actions<'change>, B.actions<'change>, C.actions<'change>, D.actions<'change>>>
+      and type partition = either<
+        Pack.t<A.t, A.change, A.actions<Promise.t<()>>, A.actions<()>>,
+        Pack.t<B.t, B.change, B.actions<Promise.t<()>>, B.actions<()>>,
+        Pack.t<C.t, C.change, C.actions<Promise.t<()>>, C.actions<()>>,
+        Pack.t<D.t, D.change, D.actions<Promise.t<()>>, D.actions<()>>
+      >
   ) => Rec.Make(I, A, Either3.Make(I, B, C, D))
 }
 
 module Either5 = {
   type either<'a, 'b, 'c, 'd, 'e> = Either.Nested.t5<'a, 'b, 'c, 'd, 'e>
+  type tuple<'a, 'b, 'c, 'd, 'e> = Tuple.Nested.tuple5<'a, 'b, 'c, 'd, 'e>
   module Make = (I: Interface, A: Field.T, B: Field.T, C: Field.T, D: Field.T, E: Field.T): (
     Tail
       with type input = either<A.input, B.input, C.input, D.input, E.input>
       and type inner = either<A.t, B.t, C.t, D.t, E.t>
       and type output = either<A.output, B.output, C.output, D.output, E.output>
-      and type contextInner = (
-        A.context,
-        Tuple.Nested.Tuple4.t<B.context, C.context, D.context, E.context>,
-      )
+      and type contextInner = tuple<
+        A.context, B.context, C.context, D.context, E.context
+      >
       and type context = Context.t<
         either<A.input, B.input, C.input, D.input, E.input>,
         FieldVector.validateOut<either<A.output, B.output, C.output, D.output, E.output>>,
-        (A.context, Tuple.Nested.Tuple4.t<B.context, C.context, D.context, E.context>),
+        tuple<A.context, B.context, C.context, D.context, E.context>,
       >
       and type t = Store.t<
         either<A.t, B.t, C.t, D.t, E.t>,
@@ -478,28 +535,38 @@ module Either5 = {
         either<A.input, B.input, C.input, D.input, E.input>,
         either<A.change, B.change, C.change, D.change, E.change>,
       >
-      and type actionsInner<'a> = (
-        A.change => 'a,
-        Tuple.Nested.Tuple4.t<B.change => 'a, C.change => 'a, D.change => 'a, E.change => 'a>,
-      )
+      and type actionsInner<'a> = tuple< 
+        A.actions<'a>,
+        B.actions<'a>,
+        C.actions<'a>,
+        D.actions<'a>,
+        E.actions<'a>
+      >
+      and type partition = either<
+        Pack.t<A.t, A.change, A.actions<Promise.t<()>>, A.actions<()>>,
+        Pack.t<B.t, B.change, B.actions<Promise.t<()>>, B.actions<()>>,
+        Pack.t<C.t, C.change, C.actions<Promise.t<()>>, C.actions<()>>,
+        Pack.t<D.t, D.change, D.actions<Promise.t<()>>, D.actions<()>>,
+        Pack.t<E.t, E.change, E.actions<Promise.t<()>>, E.actions<()>>
+      >
   ) => Rec.Make(I, A, Either4.Make(I, B, C, D, E))
 }
 
 module Either6 = {
   type either<'a, 'b, 'c, 'd, 'e, 'f> = Either.Nested.t6<'a, 'b, 'c, 'd, 'e, 'f>
+  type tuple<'a, 'b, 'c, 'd, 'e, 'f> = Tuple.Nested.tuple6<'a, 'b, 'c, 'd, 'e, 'f>
   module Make = (I: Interface, A: Field.T, B: Field.T, C: Field.T, D: Field.T, E: Field.T, F: Field.T): (
     Tail
       with type input = either<A.input, B.input, C.input, D.input, E.input, F.input>
       and type inner = either<A.t, B.t, C.t, D.t, E.t, F.t>
       and type output = either<A.output, B.output, C.output, D.output, E.output, F.output>
-      and type contextInner = (
-        A.context,
-        Tuple.Nested.Tuple5.t<B.context, C.context, D.context, E.context, F.context>,
-      )
+      and type contextInner = tuple<
+        A.context, B.context, C.context, D.context, E.context, F.context
+      >
       and type context = Context.t<
         either<A.input, B.input, C.input, D.input, E.input, F.input>,
         FieldVector.validateOut<either<A.output, B.output, C.output, D.output, E.output, F.output>>,
-        (A.context, Tuple.Nested.Tuple5.t<B.context, C.context, D.context, E.context, F.context>),
+        tuple<A.context, B.context, C.context, D.context, E.context, F.context>,
       >
       and type t = Store.t<
         either<A.t, B.t, C.t, D.t, E.t, F.t>,
@@ -511,15 +578,21 @@ module Either6 = {
         either<A.input, B.input, C.input, D.input, E.input, F.input>,
         either<A.change, B.change, C.change, D.change, E.change, F.change>,
       >
-      and type actionsInner<'a> = (
-        A.change => 'a,
-        Tuple.Nested.Tuple5.t<
-          B.change => 'a,
-          C.change => 'a,
-          D.change => 'a,
-          E.change => 'a,
-          F.change => 'a,
-        >,
-      )
+      and type actionsInner<'a> = tuple<
+          A.actions<'a>,
+          B.actions<'a>,
+          C.actions<'a>,
+          D.actions<'a>,
+          E.actions<'a>,
+          F.actions<'a>
+        >
+      and type partition = either<
+        Pack.t<A.t, A.change, A.actions<Promise.t<()>>, A.actions<()>>,
+        Pack.t<B.t, B.change, B.actions<Promise.t<()>>, B.actions<()>>,
+        Pack.t<C.t, C.change, C.actions<Promise.t<()>>, C.actions<()>>,
+        Pack.t<D.t, D.change, D.actions<Promise.t<()>>, D.actions<()>>,
+        Pack.t<E.t, E.change, E.actions<Promise.t<()>>, E.actions<()>>,
+        Pack.t<F.t, F.change, F.actions<Promise.t<()>>, F.actions<()>>
+      >
   ) => Rec.Make(I, A, Either5.Make(I, B, C, D, E, F))
 }

@@ -58,6 +58,9 @@ module Actions = {
     set: input => #Set(input),
   }
 }
+  
+type actions<'change> = Actions.t<input, 'change>
+type pack = Pack.t<t, change<input>, actions<Promise.t<()>>, actions<()>>
 
 module Make = (I: IString) => {
   type error = error
@@ -112,10 +115,13 @@ module Make = (I: IString) => {
     }
   }
 
+
   type actions<'change> = Actions.t<input, 'change>
   let mapActions = Actions.mapActions
   let actions = Actions.actions
-
+  
+  type pack = Pack.t<t, change, actions<Promise.t<()>>, actions<()>>
+  
   let reduce = (~context: context, store: Dynamic.t<t>, change: Indexed.t<change>): Dynamic.t<
     t,
   > => {

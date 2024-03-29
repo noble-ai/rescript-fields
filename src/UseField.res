@@ -122,6 +122,7 @@ module Make = (F: Field.T) => {
 
   type return = {
     field: F.t,
+    part: Pack.t<F.t, F.change, F.actions<Promise.t<()>>, F.actions<()>>,
     input: F.input,
     output: option<F.output>,
     reduce: reduce,
@@ -398,8 +399,24 @@ module Make = (F: Field.T) => {
         })
     }, [reduce])
 
+    let reducePromise_ = React.useMemo1(() => 
+      ch => reducePromise(ch)->Promise.const()
+    , [reducePromise])
+
+    // Mapping the top level actions through reduce/reducePromise makes a 
+    // tree of action functions that send their change all the way into the use machinery
+    let actions = F.actions->F.mapActions(reducePromise_)
+    let actions_ = actions->F.mapActions(Promise.void)
+    let part: Pack.t<F.t, F.change, F.actions<Promise.t<()>>, F.actions<()>> = {  
+      field,
+      onChange: reduce,
+      actions,
+      actions_
+    }
+
     {
       field,
+      part,
       input,
       output,
       reduce,

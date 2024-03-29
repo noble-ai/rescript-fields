@@ -46,42 +46,38 @@ let make = (~onSubmit) => {
     ~init={username: "", password: ""},
     (),
   )
-
+  let {username, password} = Field.split(field.part)
   <form onSubmit={field.handleSubmit(onSubmit)}>
-    {
-      let {username, password} = field.field->Field.inner
-      <div>
-			<input
-				value={username->FieldUsername.input}
-				onChange={e => {
-					let target = e->ReactEvent.Form.target
-					target["value"]->Field.actions.inner.username.set->field.reduce
-				}}
-			/>
-			{ password
-				->FieldUsername.printError
-				->Option.map(React.string)
-				->Option.or(React.null)
-			}
-			<input
-				type_="password"
-				value={password->FieldPassword.input}
-				onChange={e => {
-					let target = e->ReactEvent.Form.target
-					target["value"]->Field.actions.inner.password.set->field.reduce
-				}}
-				onBlur={(_) => Field.actions.inner.password.validate()->field.reduce}
-			 />
-				{ password
-					->FieldPassword.printError
-					->Option.map(React.string)
-					->Option.or(React.null)
-				}
-      </div>
-    }
-		<button
-			type_="submit"
-			>{"Sign In"->React.string}
-		</button>
+    {<div>
+      {
+        let {field, actions_} = username
+        <>
+          <input
+            value={field->FieldUsername.input}
+            onChange={e => {
+              let target = e->ReactEvent.Form.target
+              target["value"]->actions_.set
+            }}
+          />
+          {field->FieldUsername.printError->Option.map(React.string)->Option.or(React.null)}
+        </>
+      }
+      {
+        let {field, actions_} = password
+        <>
+          <input
+            type_="password"
+            value={field->FieldPassword.input}
+            onChange={e => {
+              let target = e->ReactEvent.Form.target
+              target["value"]->actions_.set
+            }}
+            onBlur={_ => actions_.validate()}
+          />
+          {field->FieldPassword.printError->Option.map(React.string)->Option.or(React.null)}
+        </>
+      }
+    </div>}
+    <button type_="submit"> {"Sign In"->React.string} </button>
   </form>
 }

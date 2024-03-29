@@ -1,47 +1,53 @@
-// shadow global Dynamic with the impl chosen by FT
-open FieldIdentity
-module Make = (T: T) => {
-  type context = array<T.t>
-  type input = T.t
-  type output = T.t
-  type error = unit
-  type inner = T.t
-  type t = Store.t<inner, output, error>
+()
+// // shadow global Dynamic with the impl chosen by FT
+// open FieldIdentity
 
-  let empty = context => context->Array.getUnsafe(0)
-  let init = (context: context) => context->empty->Store.Init
+// // FIXME: not a valid field
+// module Make = (T: T) => {
+//   type context = array<T.t>
+//   type input = T.t
+//   type output = T.t
+//   type error = unit
+//   type inner = T.t
+//   type t = Store.t<inner, output, error>
 
-  // TODO: should return #Valid based on a validateImmediate flag - AxM
-  let set = input => Store.Dirty(input)
+//   let empty = context => context->Array.getUnsafe(0)
+//   let init = (context: context) => context->empty->Store.Init
 
-  let validate = (
-    ~force=false,
-    context,
-    store: t,
-  ): Dynamic.t<t> => {
-    ignore(context)
-    ignore(force)
-    let input = store->Store.inner
-    Store.Valid(input, input)->Dynamic.return
-  }
+//   // TODO: should return #Valid based on a validateImmediate flag - AxM
+//   let set = input => Store.Dirty(input)
 
-  type change = T.t
-  let reduce = (
-    ~context: context,
-    _store: t,
-    change: Indexed.t<change>,
-  ): Dynamic.t<t> => {
-    ignore(context)
-    Store.Valid(change.value, change.value)->Dynamic.return
-  }
+//   let validate = (
+//     ~force=false,
+//     context,
+//     store: t,
+//   ): Dynamic.t<t> => {
+//     ignore(context)
+//     ignore(force)
+//     let input = store->Store.inner
+//     Store.Valid(input, input)->Dynamic.return
+//   }
 
-  let enum = Store.toEnum
-  let inner = Store.inner
-  let input = Store.inner
-  let error = Store.error
+//   type change = T.t
 
-  let output = Store.output
+//   type pack = Pack.t<t, change, actions<Promise.t<()>>, actions<()>>
 
-  let printError = _error => None // No invalid states
-}
+//   let reduce = (
+//     ~context: context,
+//     _store: t,
+//     change: Indexed.t<change>,
+//   ): Dynamic.t<t> => {
+//     ignore(context)
+//     Store.Valid(change.value, change.value)->Dynamic.return
+//   }
+
+//   let enum = Store.toEnum
+//   let inner = Store.inner
+//   let input = Store.inner
+//   let error = Store.error
+
+//   let output = Store.output
+
+//   let printError = _error => None // No invalid states
+// }
 

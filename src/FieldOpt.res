@@ -66,26 +66,28 @@ module Make = (F: Field.T) => {
     }
 
   type actions<'change> = {
-    none: () => 'change,
-    opt: (option<F.change>) => 'change,
-    some: (F.change) => 'change,
+    clear: () => 'change,
+    opt: option<F.input> => 'change,
+    inner: F.actions<'change>,
     validate: () => 'change,
   }
 
-  let mapActions = ({none, opt, some, validate}, fn) => {
-    none: () => none()->fn,
+  let mapActions = ({clear, opt, inner, validate}, fn) => {
+    clear: () => clear()->fn,
     opt: x => x->opt->fn,
-    some: x => x->some->fn,
+    inner: inner->F.mapActions(fn),
     validate: () => validate()->fn,
   }
 
   let actions: actions<change> = {
-    none: () => #None,
-    opt: x => #Opt(x),
-    some: x => #Some(x),
+    clear: () => #None,
+    opt: x => x->Option.map(F.makeSet)->#Opt,
+    inner: F.actions->F.mapActions(x => #Some(x)),
     validate: () => #Validate,
   }
-
+  
+  type pack = Pack.t<t, change, actions<Promise.t<()>>, actions<()>>
+  
   let reduce = (~context: context, store: Dynamic.t<t>, change: Indexed.t<change>): Dynamic.t<t> => {
     switch change.value {
     | #Opt(None)

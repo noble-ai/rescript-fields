@@ -2,7 +2,7 @@
 
 module Tuple = Tuple.Nested
 module Change = FieldVector.Change
-module Actions = FieldVector.Actions
+// module Actions = FieldVector.Actions
 
 type error = [#Whole(string) | #Part]
 type resultValidate = Promise.t<Result.t<unit, string>>
@@ -56,7 +56,47 @@ module Product1 = {
     }
   }
 
-  module Make = (I: Interface, Gen: Generic, A: Field.T) => {
+  module type T = {
+    include Field.T
+    type parted
+    let split: pack => parted
+  }
+
+  // giving the Make functor this
+  module type Make = (I: Interface, Gen: Generic, A: Field.T)
+   => T
+    with type input = Gen.structure<A.input>
+    and type inner = Gen.structure<A.t>
+    and type output = Gen.structure<A.output>
+    and type error = error
+    and type t = Store.t<Gen.structure<A.t>, Gen.structure<A.output>, error>
+    and type context = Context.t<Gen.structure<A.input>, validateOut<Gen.structure<A.output>>, Gen.structure<A.context>>
+    // and type changeInner = PolyVariant.t< A.change>
+    and type change = Change.t<Gen.structure<A.input>, PolyVariant.t<A.change>>
+    // and type actionsInner<'change> = Gen.structure<A.actions<'change>, B.actions<'change>, C.actions<'change>>
+    and type actions<'change> = FieldVector.Actions.t<Gen.structure<A.input>, 'change, Gen.structure<A.actions<'change>>>
+    and type pack = Pack.t<
+      Store.t<Gen.structure<A.t>, Gen.structure<A.output>, error>,
+      Change.t<Gen.structure<A.input>, PolyVariant.t<A.change>>,
+      FieldVector.Actions.t<
+        Gen.structure<A.input>,
+        Promise.t<()>,
+        Gen.structure<
+          A.actions<Promise.t<()>>,
+        >
+      >,
+      FieldVector.Actions.t<
+        Gen.structure<A.input>,
+        (),
+        Gen.structure<A.actions<()>>
+      >
+    >
+    and type parted = Gen.structure<
+        Pack.t<A.t, A.change, A.actions<Promise.t<()>>, A.actions<()>>,
+      >
+
+
+  module Make: Make = (I: Interface, Gen: Generic, A: Field.T) => {
     module A = A
     module Vector = FieldVector.Vector1.Make(I, A)
     type input = Gen.structure<A.input>
@@ -107,11 +147,6 @@ module Product1 = {
       }`
     }
 
-    let makeStore = (~validate, inner: Vector.inner): Dynamic.t<t> => {
-      Vector.makeStore(~validate, inner)
-      ->Dynamic.map(storeToStructure)
-    }
-
     let validate = (force, context: context, store: t): Dynamic.t<t> => 
       Vector.validate(force, context->contextToTuple, store->storeToTuple)
       ->Dynamic.map(storeToStructure)
@@ -123,7 +158,7 @@ module Product1 = {
     type change = Change.t<input, changeInner>
     let makeSet = Change.makeSet
     let changeToVector: change => Vector.change = Change.bimap(toTuple, changeInnerToVector)
-    let changeFromVector: Vector.change => change = Change.bimap(fromTuple, PolyVariant.fromEither)
+    // let changeFromVector: Vector.change => change = Change.bimap(fromTuple, PolyVariant.fromEither)
 
     let showChange = (change) => change->changeToVector->Vector.showChange
 
@@ -132,11 +167,29 @@ module Product1 = {
     >
     let mapActionsInner = (actions: actionsInner<'c>, fn: 'c => 'd): actionsInner<'d> => 
       actions->toTuple->Vector.mapActionsInner(fn)->fromTuple
+    let actionsInner: actionsInner<changeInner> =
+      Vector.actionsInner
+      ->Vector.mapActionsInner(changeInnerFromVector)
+      ->fromTuple
+ 
+    type actions<'change> = FieldVector.Actions.t<input, 'change, actionsInner<'change>>
+    let actions: actions<change> = FieldVector.Actions.make(actionsInner->mapActionsInner(x => #Inner(x)))
+    let mapActions = (actions, fn) => actions->FieldVector.Actions.trimap(x => x, fn, mapActionsInner(_, fn))
+  
+    type pack = Pack.t<t, change, actions<Promise.t<()>>, actions<()>>
+    type parted = Gen.structure<Pack.t<A.t, A.change, A.actions<Promise.t<()>>, A.actions<()>>>
 
-    type actions<'change> = Actions.t<input, 'change, actionsInner<'change>>
-    let actions: actions<change> = Vector.actions->Actions.trimap(toTuple, changeFromVector, x => x->Vector.mapActionsInner(changeFromVector)->fromTuple)
-    let mapActions = (actions, fn) => actions->Actions.trimap(x => x, fn, mapActionsInner(_, fn))
-
+    let split = (pack: pack): parted => {
+      let onChange: Vector.changeInner => unit = x => x->changeInnerFromVector->#Inner->pack.onChange
+      Vector.splitInner(
+        pack.field->Store.inner->toTuple,
+        onChange,
+        pack.actions.inner->toTuple,
+        pack.actions_.inner->toTuple
+      )
+      ->fromTuple
+    }
+    
     let reduce = (~context: context, store: Dynamic.t<t>, change: Indexed.t<change>): Dynamic.t<t> => {
       Vector.reduce(~context=context->contextToTuple, store->Dynamic.map(storeToTuple), change->Indexed.map(changeToVector))
       ->Dynamic.map(storeToStructure)
@@ -176,7 +229,49 @@ module Product2 = {
     }
   }
 
-  module Make = (I: Interface, Gen: Generic, A: Field.T, B: Field.T) => {
+  module type T = {
+    include Field.T
+    type parted
+    let split: pack => parted
+  }
+
+  // giving the Make functor this
+  module type Make = (I: Interface, Gen: Generic, A: Field.T, B: Field.T)
+   => T
+    with type input = Gen.structure<A.input, B.input>
+    and type inner = Gen.structure<A.t, B.t>
+    and type output = Gen.structure<A.output, B.output>
+    and type error = error
+    and type t = Store.t<Gen.structure<A.t, B.t>, Gen.structure<A.output, B.output>, error>
+    and type context = Context.t<Gen.structure<A.input, B.input>, validateOut<Gen.structure<A.output, B.output>>, Gen.structure<A.context, B.context>>
+    // and type changeInner = PolyVariant.t< B.change, A.change>
+    and type change = Change.t<Gen.structure<A.input, B.input>, PolyVariant.t<B.change, A.change>>
+    // and type actionsInner<'change> = Gen.structure<A.actions<'change>, B.actions<'change>, C.actions<'change>>
+    and type actions<'change> = FieldVector.Actions.t<Gen.structure<A.input, B.input>, 'change, Gen.structure<A.actions<'change>, B.actions<'change>>>
+    and type pack = Pack.t<
+      Store.t<Gen.structure<A.t, B.t>, Gen.structure<A.output, B.output>, error>,
+      Change.t<Gen.structure<A.input, B.input>, PolyVariant.t<B.change, A.change>>,
+      FieldVector.Actions.t<
+        Gen.structure<A.input, B.input>,
+        Promise.t<()>,
+        Gen.structure<
+          A.actions<Promise.t<()>>,
+          B.actions<Promise.t<()>>,
+        >
+      >,
+      FieldVector.Actions.t<
+        Gen.structure<A.input, B.input>,
+        (),
+        Gen.structure<A.actions<()>, B.actions<()>>
+      >
+    >
+    and type parted = Gen.structure<
+        Pack.t<A.t, A.change, A.actions<Promise.t<()>>, A.actions<()>>,
+        Pack.t<B.t, B.change, B.actions<Promise.t<()>>, B.actions<()>>,
+      >
+
+
+  module Make: Make = (I: Interface, Gen: Generic, A: Field.T, B: Field.T) => {
     module A = A
     module B = B
     module Vector = FieldVector.Vector2.Make(I, A, B)
@@ -230,11 +325,6 @@ module Product2 = {
       }`
     }
 
-    let makeStore = (~validate, inner: Vector.inner): Dynamic.t<t> => {
-      Vector.makeStore(~validate, inner)
-      ->Dynamic.map(storeToStructure)
-    }
-
     let validate = (force, context: context, store: t): Dynamic.t<t> => 
       Vector.validate(force, context->contextToTuple, store->storeToTuple)
       ->Dynamic.map(storeToStructure)
@@ -262,10 +352,28 @@ module Product2 = {
       ->Vector.mapActionsInner(changeInnerFromVector)
       ->fromTuple
     
-    type actions<'change> = Actions.t<input, 'change, actionsInner<'change>>
-    let actions: actions<change> = Actions.make(actionsInner->mapActionsInner(x => #Inner(x)))
-    let mapActions = (actions: actions<'ch> , fn: 'ch => 'b): actions<'b> => actions->Actions.trimap(x => x, fn, mapActionsInner(_, fn))
+    type actions<'change> = FieldVector.Actions.t<input, 'change, actionsInner<'change>>
+    let actions: actions<change> = FieldVector.Actions.make(actionsInner->mapActionsInner(x => #Inner(x)))
+    let mapActions = (actions: actions<'ch> , fn: 'ch => 'b): actions<'b> => actions->FieldVector.Actions.trimap(x => x, fn, mapActionsInner(_, fn))
+    
+    type pack = Pack.t<t, change, actions<Promise.t<()>>, actions<()>>
+    type parted = Gen.structure<
+      Pack.t<A.t, A.change, A.actions<Promise.t<()>>, A.actions<()>>,
+      Pack.t<B.t, B.change, B.actions<Promise.t<()>>, B.actions<()>>
+    >
 
+    let split = (pack: pack)
+      : parted => {
+      let onChange: Vector.changeInner => unit = x => x->changeInnerFromVector->#Inner->pack.onChange
+      Vector.splitInner(
+        pack.field->Store.inner->toTuple,
+        onChange,
+        pack.actions.inner->toTuple,
+        pack.actions_.inner->toTuple
+      )
+      ->fromTuple
+    }
+  
     let reduce = (~context: context, store: Dynamic.t<t>, change: Indexed.t<change>): Dynamic.t<t> => {
       Vector.reduce(~context=context->contextToTuple, store->Dynamic.map(storeToTuple), change->Indexed.map(changeToVector))
       ->Dynamic.map(storeToStructure)
@@ -303,9 +411,52 @@ module Product3 = {
       | Either.Right(ch) => Product2.PolyVariant.fromEither(ch) :> t<'c, 'b, 'a>
       }
     }
-}
+  }
 
-  module Make = (I: Interface, Gen: Generic, A: Field.T, B: Field.T, C: Field.T) => {
+  module type T = {
+    include Field.T
+    type parted
+    let split: pack => parted
+  }
+
+  // giving the Make functor this
+  module type Make = (I: Interface, Gen: Generic, A: Field.T, B: Field.T, C: Field.T)
+   => T
+    with type input = Gen.structure<A.input, B.input, C.input>
+    and type inner = Gen.structure<A.t, B.t, C.t>
+    and type output = Gen.structure<A.output, B.output, C.output>
+    and type error = error
+    and type t = Store.t<Gen.structure<A.t, B.t, C.t>, Gen.structure<A.output, B.output, C.output>, error>
+    and type context = Context.t<Gen.structure<A.input, B.input, C.input>, validateOut<Gen.structure<A.output, B.output, C.output>>, Gen.structure<A.context, B.context, C.context>>
+    // and type changeInner = PolyVariant.t<C.change, B.change, A.change>
+    and type change = Change.t<Gen.structure<A.input, B.input, C.input>, PolyVariant.t<C.change, B.change, A.change>>
+    // and type actionsInner<'change> = Gen.structure<A.actions<'change>, B.actions<'change>, C.actions<'change>>
+    and type actions<'change> = FieldVector.Actions.t<Gen.structure<A.input, B.input, C.input>, 'change, Gen.structure<A.actions<'change>, B.actions<'change>, C.actions<'change>>>
+    and type pack = Pack.t<
+      Store.t<Gen.structure<A.t, B.t, C.t>, Gen.structure<A.output, B.output, C.output>, error>,
+      Change.t<Gen.structure<A.input, B.input, C.input>, PolyVariant.t<C.change, B.change, A.change>>,
+      FieldVector.Actions.t<
+        Gen.structure<A.input, B.input, C.input>,
+        Promise.t<()>,
+        Gen.structure<
+          A.actions<Promise.t<()>>,
+          B.actions<Promise.t<()>>,
+          C.actions<Promise.t<()>>
+        >
+      >,
+      FieldVector.Actions.t<
+        Gen.structure<A.input, B.input, C.input>,
+        (),
+        Gen.structure<A.actions<()>, B.actions<()>, C.actions<()>>
+      >
+    >
+    and type parted = Gen.structure<
+        Pack.t<A.t, A.change, A.actions<Promise.t<()>>, A.actions<()>>,
+        Pack.t<B.t, B.change, B.actions<Promise.t<()>>, B.actions<()>>,
+        Pack.t<C.t, C.change, C.actions<Promise.t<()>>, C.actions<()>>
+      >
+
+  module Make : Make = (I: Interface, Gen: Generic, A: Field.T, B: Field.T, C: Field.T) => {
     module Vector = FieldVector.Vector3.Make(I, A, B, C)
     type input = Gen.structure<A.input, B.input, C.input>
     type inner = Gen.structure<A.t, B.t, C.t>
@@ -337,11 +488,6 @@ module Product3 = {
     let empty = (context): inner => context->contextToTuple->FieldVector.Context.inner->Vector.empty->fromTuple
     let init = (context: context): t => context->empty->Store.init
 
-    let makeStore = (~validate, inner: Vector.inner): Dynamic.t<t> => {
-      Vector.makeStore(~validate, inner)
-      ->Dynamic.map(storeToStructure)
-    }
-
     let validate = (force, context: context, store: t): Dynamic.t<t> => 
       Vector.validate(force, context->contextToTuple, store->storeToTuple)
       ->Dynamic.map(storeToStructure)
@@ -353,9 +499,15 @@ module Product3 = {
     type change = Change.t<input, changeInner>
     let makeSet = Change.makeSet
     let changeToVector: change => Vector.change = Change.bimap(toTuple, changeInnerToVector)
-    let changeFromVector: Vector.change => change = Change.bimap(fromTuple, PolyVariant.fromEither)
+    // let changeFromVector: Vector.change => change = Change.bimap(fromTuple, PolyVariant.fromEither)
 
     let showChange = (change) => change->changeToVector->Vector.showChange
+
+    // type pro = Gen.structure<
+    //   A.change => change,
+    //   B.change => change,
+    //   C.change => change
+    // >
 
     type actionsInner<'change> = Gen.structure<
       A.actions<'change>,
@@ -371,10 +523,27 @@ module Product3 = {
       ->Vector.mapActionsInner(changeInnerFromVector)
       ->fromTuple
     
-    type actions<'change> = Actions.t<input, 'change, actionsInner<'change>>
-    let actions: actions<change> = Actions.make(actionsInner->mapActionsInner(x => #Inner(x)))
-    let mapActions = (actions: actions<'ch>, fn: 'ch => 'b) => actions->Actions.trimap(x => x, fn, mapActionsInner(_, fn))
-
+    type actions<'change> = FieldVector.Actions.t<input, 'change, actionsInner<'change>>
+    let actions: actions<change> = FieldVector.Actions.make(actionsInner->mapActionsInner(x => #Inner(x)))
+    let mapActions = (actions: actions<'ch>, fn: 'ch => 'b) => actions->FieldVector.Actions.trimap(x => x, fn, mapActionsInner(_, fn))
+    
+    type pack = Pack.t<t, change, actions<Promise.t<()>>, actions<()>>
+    type parted = Gen.structure<
+        Pack.t<A.t, A.change, A.actions<Promise.t<()>>, A.actions<()>>,
+        Pack.t<B.t, B.change, B.actions<Promise.t<()>>, B.actions<()>>,
+        Pack.t<C.t, C.change, C.actions<Promise.t<()>>, C.actions<()>>
+      >
+    let split = (pack: pack) : parted => {
+      let onChange: Vector.changeInner => unit = x => x->changeInnerFromVector->#Inner->pack.onChange
+      Vector.splitInner(
+        pack.field->Store.inner->toTuple,
+        onChange,
+        pack.actions.inner->toTuple,
+        pack.actions_.inner->toTuple
+      )
+      ->fromTuple
+    }
+ 
     // Cant move this into Vectors as it causes some types to "escape"
     // let const = T.make(const, const, const)
     let reduce = (~context: context, store: Dynamic.t<t>, change: Indexed.t<change>): Dynamic.t<t> => {
@@ -433,8 +602,84 @@ module Product4 = {
       }
     }
   }
+  module type T = {
+    include Field.T
+    type parted
+    let split: pack => parted
+  }
 
-  module Make = (I: Interface, Gen: Generic, A: Field.T, B: Field.T, C: Field.T, D: Field.T) => {
+  module type Make = (I: Interface, Gen: Generic, A: Field.T, B: Field.T, C: Field.T, D: Field.T)
+   => T
+    with type input = Gen.structure<A.input, B.input, C.input, D.input>
+    and type inner = Gen.structure<A.t, B.t, C.t, D.t>
+    and type output = Gen.structure<A.output, B.output, C.output, D.output>
+    and type error = error
+    and type t = Store.t<
+      Gen.structure<A.t, B.t, C.t, D.t>,
+      Gen.structure<A.output, B.output, C.output, D.output>,
+      error
+    >
+    and type context = Context.t<
+      Gen.structure<A.input, B.input, C.input, D.input>,
+      validateOut<Gen.structure<A.output, B.output, C.output, D.output>>,
+      Gen.structure<A.context, B.context, C.context, D.context>
+    >
+    // and type changeInner = PolyVariant.t<C.change, B.change, A.change>
+    and type change = Change.t<
+      Gen.structure<A.input, B.input, C.input, D.input>,
+      PolyVariant.t<D.change, C.change, B.change, A.change>
+    >
+    // and type actionsInner<'change> = Gen.structure<A.actions<'change>, B.actions<'change>, C.actions<'change>>
+    and type actions<'change> = FieldVector.Actions.t<
+      Gen.structure<A.input, B.input, C.input, D.input>,
+      'change,
+      Gen.structure<
+        A.actions<'change>,
+        B.actions<'change>,
+        C.actions<'change>,
+        D.actions<'change>,
+      >
+    >
+    and type pack = Pack.t<
+      Store.t<
+        Gen.structure<A.t, B.t, C.t, D.t>,
+        Gen.structure<A.output, B.output, C.output, D.output>,
+        error
+      >,
+      Change.t<
+        Gen.structure<A.input, B.input, C.input, D.input>,
+        PolyVariant.t<D.change, C.change, B.change, A.change>
+      >,
+      FieldVector.Actions.t<
+        Gen.structure<A.input, B.input, C.input, D.input>,
+        Promise.t<()>,
+        Gen.structure<
+          A.actions<Promise.t<()>>,
+          B.actions<Promise.t<()>>,
+          C.actions<Promise.t<()>>,
+          D.actions<Promise.t<()>>,
+        >
+      >,
+      FieldVector.Actions.t<
+        Gen.structure<A.input, B.input, C.input, D.input>,
+        (),
+        Gen.structure<
+          A.actions<()>,
+          B.actions<()>,
+          C.actions<()>,
+          D.actions<()>,
+        >
+      >
+    >
+    and type parted = Gen.structure<
+        Pack.t<A.t, A.change, A.actions<Promise.t<()>>, A.actions<()>>,
+        Pack.t<B.t, B.change, B.actions<Promise.t<()>>, B.actions<()>>,
+        Pack.t<C.t, C.change, C.actions<Promise.t<()>>, C.actions<()>>,
+        Pack.t<D.t, D.change, D.actions<Promise.t<()>>, D.actions<()>>,
+      >
+
+
+  module Make: Make = (I: Interface, Gen: Generic, A: Field.T, B: Field.T, C: Field.T, D: Field.T) => {
     module Vector = FieldVector.Vector4.Make(I, A, B, C, D)
     type input = Gen.structure<A.input, B.input, C.input, D.input>
     type inner = Gen.structure<A.t, B.t, C.t, D.t>
@@ -466,11 +711,6 @@ module Product4 = {
     let empty = (context): inner => context->contextToTuple->FieldVector.Context.inner->Vector.empty->fromTuple
     let init = (context: context): t => context->empty->Store.init
 
-    let makeStore = (~validate, inner: Vector.inner): Dynamic.t<t> => {
-      Vector.makeStore(~validate, inner)
-      ->Dynamic.map(storeToStructure)
-    }
-
     let validate = (force, context: context, store: t): Dynamic.t<t> => 
       Vector.validate(force, context->contextToTuple, store->storeToTuple)
       ->Dynamic.map(storeToStructure)
@@ -501,10 +741,29 @@ module Product4 = {
       ->Vector.mapActionsInner(changeInnerFromVector)
       ->fromTuple
 
-    type actions<'change> = Actions.t<input, 'change, actionsInner<'change>>
-    let actions: actions<change> = Actions.make(actionsInner->mapActionsInner(x => #Inner(x)))
-    let mapActions = (actions: actions<'ch>, fn: 'ch => 'b) => actions->Actions.trimap(x => x, fn, mapActionsInner(_, fn))
+    type actions<'change> = FieldVector.Actions.t<input, 'change, actionsInner<'change>>
+    let actions: actions<change> = FieldVector.Actions.make(actionsInner->mapActionsInner(x => #Inner(x)))
+    let mapActions = (actions: actions<'ch>, fn: 'ch => 'b) => actions->FieldVector.Actions.trimap(x => x, fn, mapActionsInner(_, fn))
+    
+    type pack = Pack.t<t, change, actions<Promise.t<()>>, actions<()>>
+    type parted = Gen.structure<
+      Pack.t<A.t, A.change, A.actions<Promise.t<()>>, A.actions<()>>,
+      Pack.t<B.t, B.change, B.actions<Promise.t<()>>, B.actions<()>>,
+      Pack.t<C.t, C.change, C.actions<Promise.t<()>>, C.actions<()>>,
+      Pack.t<D.t, D.change, D.actions<Promise.t<()>>, D.actions<()>>
+    >
 
+    let split = (pack: pack): parted => {
+      let onChange: Vector.changeInner => unit = x => x->changeInnerFromVector->#Inner->pack.onChange
+      Vector.splitInner(
+        pack.field->Store.inner->toTuple,
+        onChange,
+        pack.actions.inner->toTuple,
+        pack.actions_.inner->toTuple
+      )
+      ->fromTuple
+    }
+ 
     let reduce = (~context: context, store: Dynamic.t<t>, change: Indexed.t<change>): Dynamic.t<t> => {
       Vector.reduce(~context=context->contextToTuple, store->Dynamic.map(storeToTuple), change->Indexed.map(changeToVector))
       ->Dynamic.map(storeToStructure)
@@ -560,9 +819,89 @@ module Product5 = {
       | Either.Right(ch) => Product4.PolyVariant.fromEither(ch) :> t<'e, 'd, 'c, 'b, 'a>
       }
     }
-}
+  }
 
-  module Make = (I: Interface, Gen: Generic, A: Field.T, B: Field.T, C: Field.T, D: Field.T, E: Field.T) => {
+  module type T = {
+    include Field.T
+    type parted
+    let split: pack => parted
+  }
+
+  module type Make = (I: Interface, Gen: Generic, A: Field.T, B: Field.T, C: Field.T, D: Field.T, E: Field.T)
+   => T
+    with type input = Gen.structure<A.input, B.input, C.input, D.input, E.input>
+    and type inner = Gen.structure<A.t, B.t, C.t, D.t, E.t>
+    and type output = Gen.structure<A.output, B.output, C.output, D.output, E.output>
+    and type error = error
+    and type t = Store.t<
+      Gen.structure<A.t, B.t, C.t, D.t, E.t>,
+      Gen.structure<A.output, B.output, C.output, D.output, E.output>,
+      error
+    >
+    and type context = Context.t<
+      Gen.structure<A.input, B.input, C.input, D.input, E.input>,
+      validateOut<Gen.structure<A.output, B.output, C.output, D.output, E.output>>,
+      Gen.structure<A.context, B.context, C.context, D.context, E.context>
+    >
+    // and type changeInner = PolyVariant.t<C.change, B.change, A.change>
+    and type change = Change.t<
+      Gen.structure<A.input, B.input, C.input, D.input, E.input>,
+      PolyVariant.t<E.change, D.change, C.change, B.change, A.change>
+    >
+    // and type actionsInner<'change> = Gen.structure<A.actions<'change>, B.actions<'change>, C.actions<'change>>
+    and type actions<'change> = FieldVector.Actions.t<
+      Gen.structure<A.input, B.input, C.input, D.input, E.input>,
+      'change,
+      Gen.structure<
+        A.actions<'change>,
+        B.actions<'change>,
+        C.actions<'change>,
+        D.actions<'change>,
+        E.actions<'change>,
+      >
+    >
+    and type pack = Pack.t<
+      Store.t<
+        Gen.structure<A.t, B.t, C.t, D.t, E.t>,
+        Gen.structure<A.output, B.output, C.output, D.output, E.output>,
+        error
+      >,
+      Change.t<
+        Gen.structure<A.input, B.input, C.input, D.input, E.input>,
+        PolyVariant.t<E.change, D.change, C.change, B.change, A.change>
+      >,
+      FieldVector.Actions.t<
+        Gen.structure<A.input, B.input, C.input, D.input, E.input>,
+        Promise.t<()>,
+        Gen.structure<
+          A.actions<Promise.t<()>>,
+          B.actions<Promise.t<()>>,
+          C.actions<Promise.t<()>>,
+          D.actions<Promise.t<()>>,
+          E.actions<Promise.t<()>>,
+        >
+      >,
+      FieldVector.Actions.t<
+        Gen.structure<A.input, B.input, C.input, D.input, E.input>,
+        (),
+        Gen.structure<
+          A.actions<()>,
+          B.actions<()>,
+          C.actions<()>,
+          D.actions<()>,
+          E.actions<()>,
+        >
+      >
+    >
+    and type parted = Gen.structure<
+        Pack.t<A.t, A.change, A.actions<Promise.t<()>>, A.actions<()>>,
+        Pack.t<B.t, B.change, B.actions<Promise.t<()>>, B.actions<()>>,
+        Pack.t<C.t, C.change, C.actions<Promise.t<()>>, C.actions<()>>,
+        Pack.t<D.t, D.change, D.actions<Promise.t<()>>, D.actions<()>>,
+        Pack.t<E.t, E.change, E.actions<Promise.t<()>>, E.actions<()>>,
+      >
+
+  module Make: Make = (I: Interface, Gen: Generic, A: Field.T, B: Field.T, C: Field.T, D: Field.T, E: Field.T) => {
     module Vector = FieldVector.Vector5.Make(I, A, B, C, D, E)
     type input = Gen.structure<A.input, B.input, C.input, D.input, E.input>
     type inner = Gen.structure<A.t, B.t, C.t, D.t, E.t>
@@ -593,11 +932,6 @@ module Product5 = {
     
     let empty = (context): inner => context->contextToTuple->FieldVector.Context.inner->Vector.empty->fromTuple
     let init = (context: context): t => context->empty->Store.init
-
-    let makeStore = (~validate, inner: Vector.inner): Dynamic.t<t> => {
-      Vector.makeStore(~validate, inner)
-      ->Dynamic.map(storeToStructure)
-    }
 
     let validate = (force, context: context, store: t): Dynamic.t<t> => 
       Vector.validate(force, context->contextToTuple, store->storeToTuple)
@@ -630,10 +964,31 @@ module Product5 = {
       ->Vector.mapActionsInner(changeInnerFromVector)
       ->fromTuple
     
-    type actions<'change> = Actions.t<input, 'change, actionsInner<'change>>
-    let actions: actions<change> = Actions.make(actionsInner->mapActionsInner(x => #Inner(x)))
-    let mapActions = (actions: actions<'ch>, fn: 'ch => 'b) => actions->Actions.trimap(x => x, fn, mapActionsInner(_, fn))
+    type actions<'change> = FieldVector.Actions.t<input, 'change, actionsInner<'change>>
+    let actions: actions<change> = FieldVector.Actions.make(actionsInner->mapActionsInner(x => #Inner(x)))
+    let mapActions = (actions: actions<'ch>, fn: 'ch => 'b) => actions->FieldVector.Actions.trimap(x => x, fn, mapActionsInner(_, fn))
+    
+    type pack = Pack.t<t, change, actions<Promise.t<()>>, actions<()>>
+    type parted = Gen.structure<
+        Pack.t<A.t, A.change, A.actions<Promise.t<()>>, A.actions<()>>,
+        Pack.t<B.t, B.change, B.actions<Promise.t<()>>, B.actions<()>>,
+        Pack.t<C.t, C.change, C.actions<Promise.t<()>>, C.actions<()>>,
+        Pack.t<D.t, D.change, D.actions<Promise.t<()>>, D.actions<()>>,
+        Pack.t<E.t, E.change, E.actions<Promise.t<()>>, E.actions<()>>
+      >
 
+    let split = (pack: pack)
+      : parted => {
+      let onChange: Vector.changeInner => unit = x => x->changeInnerFromVector->#Inner->pack.onChange
+      Vector.splitInner(
+        pack.field->Store.inner->toTuple,
+        onChange,
+        pack.actions.inner->toTuple,
+        pack.actions_.inner->toTuple
+      )
+      ->fromTuple
+    }
+ 
     let reduce = (~context: context, store: Dynamic.t<t>, change: Indexed.t<change>): Dynamic.t<t> => {
       Vector.reduce(~context=context->contextToTuple, store->Dynamic.map(storeToTuple), change->Indexed.map(changeToVector))
       ->Dynamic.map(storeToStructure)
@@ -689,9 +1044,94 @@ module Product6 = {
       | Either.Right(ch) => Product5.PolyVariant.fromEither(ch) :> t<'f, 'e, 'd, 'c, 'b, 'a>
       }
     }
-}
+  }
 
-  module Make = (I: Interface, Gen: Generic, A: Field.T, B: Field.T, C: Field.T, D: Field.T, E: Field.T, F: Field.T) => {
+  module type T = {
+    include Field.T
+    type parted
+    let split: pack => parted
+  }
+
+  module type Make = (I: Interface, Gen: Generic, A: Field.T, B: Field.T, C: Field.T, D: Field.T, E: Field.T, F: Field.T)
+   => T
+    with type input = Gen.structure<A.input, B.input, C.input, D.input, E.input, F.input>
+    and type inner = Gen.structure<A.t, B.t, C.t, D.t, E.t, F.t>
+    and type output = Gen.structure<A.output, B.output, C.output, D.output, E.output, F.output>
+    and type error = error
+    and type t = Store.t<
+      Gen.structure<A.t, B.t, C.t, D.t, E.t, F.t>,
+      Gen.structure<A.output, B.output, C.output, D.output, E.output, F.output>,
+      error
+    >
+    and type context = Context.t<
+      Gen.structure<A.input, B.input, C.input, D.input, E.input, F.input>,
+      validateOut<Gen.structure<A.output, B.output, C.output, D.output, E.output, F.output>>,
+      Gen.structure<A.context, B.context, C.context, D.context, E.context, F.context>
+    >
+    // and type changeInner = PolyVariant.t<C.change, B.change, A.change>
+    and type change = Change.t<
+      Gen.structure<A.input, B.input, C.input, D.input, E.input, F.input>,
+      PolyVariant.t<F.change, E.change, D.change, C.change, B.change, A.change>
+    >
+    // and type actionsInner<'change> = Gen.structure<A.actions<'change>, B.actions<'change>, C.actions<'change>>
+    and type actions<'change> = FieldVector.Actions.t<
+      Gen.structure<A.input, B.input, C.input, D.input, E.input, F.input>,
+      'change,
+      Gen.structure<
+        A.actions<'change>,
+        B.actions<'change>,
+        C.actions<'change>,
+        D.actions<'change>,
+        E.actions<'change>,
+        F.actions<'change>,
+      >
+    >
+    and type pack = Pack.t<
+      Store.t<
+        Gen.structure<A.t, B.t, C.t, D.t, E.t, F.t>,
+        Gen.structure<A.output, B.output, C.output, D.output, E.output, F.output>,
+        error
+      >,
+      Change.t<
+        Gen.structure<A.input, B.input, C.input, D.input, E.input, F.input>,
+        PolyVariant.t<F.change, E.change, D.change, C.change, B.change, A.change>
+      >,
+      FieldVector.Actions.t<
+        Gen.structure<A.input, B.input, C.input, D.input, E.input, F.input>,
+        Promise.t<()>,
+        Gen.structure<
+          A.actions<Promise.t<()>>,
+          B.actions<Promise.t<()>>,
+          C.actions<Promise.t<()>>,
+          D.actions<Promise.t<()>>,
+          E.actions<Promise.t<()>>,
+          F.actions<Promise.t<()>>,
+        >
+      >,
+      FieldVector.Actions.t<
+        Gen.structure<A.input, B.input, C.input, D.input, E.input, F.input>,
+        (),
+        Gen.structure<
+          A.actions<()>,
+          B.actions<()>,
+          C.actions<()>,
+          D.actions<()>,
+          E.actions<()>,
+          F.actions<()>,
+        >
+      >
+    >
+    and type parted = Gen.structure<
+        Pack.t<A.t, A.change, A.actions<Promise.t<()>>, A.actions<()>>,
+        Pack.t<B.t, B.change, B.actions<Promise.t<()>>, B.actions<()>>,
+        Pack.t<C.t, C.change, C.actions<Promise.t<()>>, C.actions<()>>,
+        Pack.t<D.t, D.change, D.actions<Promise.t<()>>, D.actions<()>>,
+        Pack.t<E.t, E.change, E.actions<Promise.t<()>>, E.actions<()>>,
+        Pack.t<F.t, F.change, F.actions<Promise.t<()>>, F.actions<()>>,
+      >
+
+
+  module Make: Make = (I: Interface, Gen: Generic, A: Field.T, B: Field.T, C: Field.T, D: Field.T, E: Field.T, F: Field.T) => {
     module Vector = FieldVector.Vector6.Make(I, A, B, C, D, E, F)
     type input = Gen.structure<A.input, B.input, C.input, D.input, E.input, F.input>
     type inner = Gen.structure<A.t, B.t, C.t, D.t, E.t, F.t>
@@ -722,11 +1162,6 @@ module Product6 = {
 
     let set = (x: input): t => x->toTuple->Vector.set->storeToStructure
     let showInput = (x: input) => x->toTuple->Vector.showInput
-
-    let makeStore = (~validate, inner: Vector.inner): Dynamic.t<t> => {
-      Vector.makeStore(~validate, inner)
-      ->Dynamic.map(storeToStructure)
-    }
 
     let validate = (force, context: context, store: t): Dynamic.t<t> => 
       Vector.validate(force, context->contextToTuple, store->storeToTuple)
@@ -760,10 +1195,32 @@ module Product6 = {
       ->Vector.mapActionsInner(changeInnerFromVector)
       ->fromTuple
     
-    type actions<'change> = Actions.t<input, 'change, actionsInner<'change>>
-    let actions: actions<change> = Actions.make(actionsInner->mapActionsInner(x => #Inner(x)))
-    let mapActions = (actions: actions<'ch>, fn: 'ch => 'b) => actions->Actions.trimap(x => x, fn, mapActionsInner(_, fn))
+    type actions<'change> = FieldVector.Actions.t<input, 'change, actionsInner<'change>>
+    let actions: actions<change> = FieldVector.Actions.make(actionsInner->mapActionsInner(x => #Inner(x)))
+    let mapActions = (actions: actions<'ch>, fn: 'ch => 'b) => actions->FieldVector.Actions.trimap(x => x, fn, mapActionsInner(_, fn))
+    
+    type pack = Pack.t<t, change, actions<Promise.t<()>>, actions<()>>
+    type parted = Gen.structure<
+        Pack.t<A.t, A.change, A.actions<Promise.t<()>>, A.actions<()>>,
+        Pack.t<B.t, B.change, B.actions<Promise.t<()>>, B.actions<()>>,
+        Pack.t<C.t, C.change, C.actions<Promise.t<()>>, C.actions<()>>,
+        Pack.t<D.t, D.change, D.actions<Promise.t<()>>, D.actions<()>>,
+        Pack.t<E.t, E.change, E.actions<Promise.t<()>>, E.actions<()>>,
+        Pack.t<F.t, F.change, F.actions<Promise.t<()>>, F.actions<()>>
+      >
 
+    let split = (pack: pack): parted => {
+      let onChange: Vector.changeInner => unit = x => x->changeInnerFromVector->#Inner->pack.onChange
+      Vector.splitInner(
+        pack.field->Store.inner->toTuple,
+        onChange,
+        pack.actions.inner->toTuple,
+        pack.actions_.inner->toTuple
+      )
+      ->fromTuple
+    }
+ 
+ 
     let reduce = (~context: context, store: Dynamic.t<t>, change: Indexed.t<change>): Dynamic.t<t> => {
       Vector.reduce(~context=context->contextToTuple, store->Dynamic.map(storeToTuple), change->Indexed.map(changeToVector))
       ->Dynamic.map(storeToStructure)
@@ -829,7 +1286,95 @@ module Product7 = {
     }
   }
 
-  module Make = (I: Interface, Gen: Generic, A: Field.T, B: Field.T, C: Field.T, D: Field.T, E: Field.T, F: Field.T, G: Field.T) => {
+  module type T = {
+    include Field.T
+    type parted
+    let split: pack => parted
+  }
+
+  module type Make = (I: Interface, Gen: Generic, A: Field.T, B: Field.T, C: Field.T, D: Field.T, E: Field.T, F: Field.T, G: Field.T)
+   => T
+    with type input = Gen.structure<A.input, B.input, C.input, D.input, E.input, F.input, G.input>
+    and type inner = Gen.structure<A.t, B.t, C.t, D.t, E.t, F.t, G.t>
+    and type output = Gen.structure<A.output, B.output, C.output, D.output, E.output, F.output, G.output>
+    and type error = error
+    and type t = Store.t<
+      Gen.structure<A.t, B.t, C.t, D.t, E.t, F.t, G.t>,
+      Gen.structure<A.output, B.output, C.output, D.output, E.output, F.output, G.output>,
+      error
+    >
+    and type context = Context.t<
+      Gen.structure<A.input, B.input, C.input, D.input, E.input, F.input, G.input>,
+      validateOut<Gen.structure<A.output, B.output, C.output, D.output, E.output, F.output, G.output>>,
+      Gen.structure<A.context, B.context, C.context, D.context, E.context, F.context, G.context>
+    >
+    // and type changeInner = PolyVariant.t<C.change, B.change, A.change>
+    and type change = Change.t<
+      Gen.structure<A.input, B.input, C.input, D.input, E.input, F.input, G.input>,
+      PolyVariant.t<G.change, F.change, E.change, D.change, C.change, B.change, A.change>
+    >
+    // and type actionsInner<'change> = Gen.structure<A.actions<'change>, B.actions<'change>, C.actions<'change>>
+    and type actions<'change> = FieldVector.Actions.t<
+      Gen.structure<A.input, B.input, C.input, D.input, E.input, F.input, G.input>,
+      'change,
+      Gen.structure<
+        A.actions<'change>,
+        B.actions<'change>,
+        C.actions<'change>,
+        D.actions<'change>,
+        E.actions<'change>,
+        F.actions<'change>,
+        G.actions<'change>,
+      >
+    >
+    and type pack = Pack.t<
+      Store.t<
+        Gen.structure<A.t, B.t, C.t, D.t, E.t, F.t, G.t>,
+        Gen.structure<A.output, B.output, C.output, D.output, E.output, F.output, G.output>,
+        error
+      >,
+      Change.t<
+        Gen.structure<A.input, B.input, C.input, D.input, E.input, F.input, G.input>,
+        PolyVariant.t<G.change, F.change, E.change, D.change, C.change, B.change, A.change>
+      >,
+      FieldVector.Actions.t<
+        Gen.structure<A.input, B.input, C.input, D.input, E.input, F.input, G.input>,
+        Promise.t<()>,
+        Gen.structure<
+          A.actions<Promise.t<()>>,
+          B.actions<Promise.t<()>>,
+          C.actions<Promise.t<()>>,
+          D.actions<Promise.t<()>>,
+          E.actions<Promise.t<()>>,
+          F.actions<Promise.t<()>>,
+          G.actions<Promise.t<()>>
+        >
+      >,
+      FieldVector.Actions.t<
+        Gen.structure<A.input, B.input, C.input, D.input, E.input, F.input, G.input>,
+        (),
+        Gen.structure<
+          A.actions<()>,
+          B.actions<()>,
+          C.actions<()>,
+          D.actions<()>,
+          E.actions<()>,
+          F.actions<()>,
+          G.actions<()>,
+        >
+      >
+    >
+    and type parted = Gen.structure<
+        Pack.t<A.t, A.change, A.actions<Promise.t<()>>, A.actions<()>>,
+        Pack.t<B.t, B.change, B.actions<Promise.t<()>>, B.actions<()>>,
+        Pack.t<C.t, C.change, C.actions<Promise.t<()>>, C.actions<()>>,
+        Pack.t<D.t, D.change, D.actions<Promise.t<()>>, D.actions<()>>,
+        Pack.t<E.t, E.change, E.actions<Promise.t<()>>, E.actions<()>>,
+        Pack.t<F.t, F.change, F.actions<Promise.t<()>>, F.actions<()>>,
+        Pack.t<G.t, G.change, G.actions<Promise.t<()>>, G.actions<()>>,
+      >
+
+  module Make: Make = (I: Interface, Gen: Generic, A: Field.T, B: Field.T, C: Field.T, D: Field.T, E: Field.T, F: Field.T, G: Field.T) => {
     module Vector = FieldVector.Vector7.Make(I, A, B, C, D, E, F, G)
     type input = Gen.structure<A.input, B.input, C.input, D.input, E.input, F.input, G.input>
     type inner = Gen.structure<A.t, B.t, C.t, D.t, E.t, F.t, G.t>
@@ -861,11 +1406,6 @@ module Product7 = {
     let set = (x: input): t => x->toTuple->Vector.set->storeToStructure
     let showInput = (x: input) => x->toTuple->Vector.showInput
 
-    let makeStore = (~validate, inner: Vector.inner): Dynamic.t<t> => {
-      Vector.makeStore(~validate, inner)
-      ->Dynamic.map(storeToStructure)
-    }
-
     let validate = (force, context: context, store: t): Dynamic.t<t> => 
       Vector.validate(force, context->contextToTuple, store->storeToTuple)
       ->Dynamic.map(storeToStructure)
@@ -877,7 +1417,7 @@ module Product7 = {
     type change = Change.t<input, changeInner>
     let makeSet = Change.makeSet
     let changeToVector: change => Vector.change = Change.bimap(toTuple, changeInnerToVector)
-    let changeFromVector: Vector.change => change = Change.bimap(fromTuple, PolyVariant.fromEither)
+    // let changeFromVector: Vector.change => change = Change.bimap(fromTuple, PolyVariant.fromEither)
 
     let showChange = (change) => change->changeToVector->Vector.showChange
 
@@ -899,10 +1439,32 @@ module Product7 = {
       ->Vector.mapActionsInner(changeInnerFromVector)
       ->fromTuple
     
-    type actions<'change> = Actions.t<input, 'change, actionsInner<'change>>
-    let actions: actions<change> = Actions.make(actionsInner->mapActionsInner(x => #Inner(x)))
-    let mapActions = (actions: actions<'ch> , fn: 'ch => 'b) => actions->Actions.trimap(x => x, fn, mapActionsInner(_, fn))
+    type actions<'change> = FieldVector.Actions.t<input, 'change, actionsInner<'change>>
+    let actions: actions<change> = FieldVector.Actions.make(actionsInner->mapActionsInner(x => #Inner(x)))
+    let mapActions = (actions: actions<'ch> , fn: 'ch => 'b) => actions->FieldVector.Actions.trimap(x => x, fn, mapActionsInner(_, fn))
+  
+    type pack = Pack.t<t, change, actions<Promise.t<()>>, actions<()>>
+    type parted =  Gen.structure<
+      Pack.t<A.t, A.change, A.actions<Promise.t<()>>, A.actions<()>>,
+      Pack.t<B.t, B.change, B.actions<Promise.t<()>>, B.actions<()>>,
+      Pack.t<C.t, C.change, C.actions<Promise.t<()>>, C.actions<()>>,
+      Pack.t<D.t, D.change, D.actions<Promise.t<()>>, D.actions<()>>,
+      Pack.t<E.t, E.change, E.actions<Promise.t<()>>, E.actions<()>>,
+      Pack.t<F.t, F.change, F.actions<Promise.t<()>>, F.actions<()>>,
+      Pack.t<G.t, G.change, G.actions<Promise.t<()>>, G.actions<()>>
+    >
 
+    let split = (pack: pack) : parted => {
+      let onChange: Vector.changeInner => unit = x => x->changeInnerFromVector->#Inner->pack.onChange
+      Vector.splitInner(
+        pack.field->Store.inner->toTuple,
+        onChange,
+        pack.actions.inner->toTuple,
+        pack.actions_.inner->toTuple
+      )
+      ->fromTuple
+    }
+ 
     let reduce = (~context: context, store: Dynamic.t<t>, change: Indexed.t<change>): Dynamic.t<t> => {
       Vector.reduce(~context=context->contextToTuple, store->Dynamic.map(storeToTuple), change->Indexed.map(changeToVector))
       ->Dynamic.map(storeToStructure)

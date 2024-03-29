@@ -41,7 +41,9 @@ module Field: Field.T = {
   let actions: actions<change> = {
     set: x => x
   }
-
+  
+  type pack = Pack.t<t, change, actions<Promise.t<()>>, actions<()>>
+    
   let reduce = (~context, store: Dynamic.t<t>, _change: Indexed.t<'ch>): Dynamic.t<t> => {
     ignore(context)
     // Wrap store in index from change

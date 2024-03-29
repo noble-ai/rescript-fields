@@ -54,6 +54,11 @@ module Actions = {
   type t<'input, 'change, 'inner> = {
     set: 'input => 'change,
     clear: () => 'change,
+    @ocaml.doc("Identity fields allow you to specify an empy value at the field and context level.
+    In many places we have clearable inputs and want to allow this to reset the value.
+    So instead of pattern matching on the change value, you can pass the optional value here as convenience.")
+    opt: option<'input> => 'change,
+
     inner: 'inner,
     validate: () => 'change,
   }
@@ -61,6 +66,7 @@ module Actions = {
   let make = (actionsInner) => {
     set: input => #Set(input),
     clear: () => #Clear,
+    opt: input => input->Option.map(x => #Set(x))->Option.or(#Clear),
     inner: actionsInner,
     validate: () => #Validate,
   }
@@ -68,6 +74,7 @@ module Actions = {
   let trimap = (actions, fnInput, fn, fnInner) => {
     set: input => input->fnInput->actions.set->fn,
     clear: () => actions.clear()->fn,
+    opt: x => x->Option.map(fnInput)->actions.opt->fn,
     inner: actions.inner->fnInner,
     validate: () => actions.validate()->fn
   }
@@ -123,6 +130,13 @@ module type Tail = {
   type actionsInner<'change>
   let mapActionsInner: (actionsInner<'change>, ('change => 'b)) => actionsInner<'b>
   let actionsInner: actionsInner<changeInner>
+
+  type actions<'change>
+    
+  @ocaml.doc("partition is opaque here but will be a composition of Pack.t") // TODO: Why?
+  // TODO: type can be specified here? - AxM
+  type partition
+  let splitInner: (inner, changeInner => (), actionsInner<Promise.t<()>>, actionsInner<()>) => partition
 
   let reduceChannel: (
     ~contextInner: contextInner,
@@ -189,8 +203,14 @@ module Vector0 = {
   let actionsInner: actionsInner<changeInner> = ()
 
   // Both our root actions and inner actions produce "change"
-  type actions = Actions.t<input, change, actionsInner<change>>
-  let actions: actions = Actions.make(actionsInner)
+  type actions<'change> = Actions.t<input, 'change, actionsInner<change>>
+  let actions: actions<change> = Actions.make(actionsInner)
+
+  type partition = ()
+  let splitInner = (_, _, _, _) => {
+    ()
+  }
+
 
   // let toChange = (_, _): change => ()
 
@@ -325,8 +345,26 @@ module VectorRec = {
     let mapActionsInner = ((head, tail), fn) => (head->Head.mapActions(fn), tail->Tail.mapActionsInner(fn))
     let actionsInner: actionsInner<changeInner> = (Head.actions->Head.mapActions((x): changeInner => Left(x)), Tail.actionsInner->Tail.mapActionsInner((x): changeInner => Right(x)))
 
-    type actions = Actions.t<input, change, actionsInner<change>>
-    let actions: actions = Actions.make(actionsInner->mapActionsInner((x): change => #Inner(x)))
+    type actions<'change> = Actions.t<input, 'change, actionsInner<'change>>
+    let mapActions = (actions, fn) => actions->Actions.trimap(x => x, fn, mapActionsInner(_, fn))
+    let actions: actions<change> = Actions.make(actionsInner->mapActionsInner((x): change => #Inner(x)))
+    
+    type partition = (Pack.t<Head.t, Head.change, Head.actions<Promise.t<()>>, Head.actions<()>>, Tail.partition)
+    let splitInner = (inner: inner, onChange: changeInner => (), actions: actionsInner<Promise.t<()>>, actions_: actionsInner<()>): partition => {
+      let (field, it) = inner 
+      let (ah, at) = actions
+      let (ah_, at_) = actions_
+      let onChangeHead: Head.change => () = (x) => x->Either.Left->onChange
+      let onChangeTail = (x) => x->Either.Right->onChange
+      let head: Pack.t<Head.t, Head.change, 'a, 'a_> = {field: field, onChange: onChangeHead, actions: ah, actions_: ah_}
+      ( head
+      , Tail.splitInner(it, onChangeTail, at, at_)
+      )
+    }
+
+    let split = (part: Pack.t<t, change, actions<Promise.t<()>>, actions<()>>): partition => {
+      splitInner( part.field->Store.inner, (x) => x->#Inner->part.onChange, part.actions.inner, part.actions_.inner)
+    }
 
     let reduceField = (inner, change, reduce) => {
       // These individual field setters return a different type based on the field

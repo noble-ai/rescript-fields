@@ -21,22 +21,21 @@ type change = [#Set(string) | #Clear | #Validate]
 module Actions = {
   type t<'change> = {
     set: string => 'change,
-    clear: 'change,
-    validate: 'change,
+    clear: () => 'change,
+    validate: () => 'change,
   }
 
-  let map = (actions, f) => {
-    set: x => f(actions.set(x)),
-    clear: f(actions.clear),
-    validate: f(actions.validate),
+  let map = (actions, fn) => {
+    set: x => x->actions.set->fn,
+    clear: () => actions.clear()->fn,
+    validate: () => actions.validate()->fn, 
   }
 
   let actions = {
     set: x => #Set(x),
-    clear: #Clear,
-    validate: #Validate,
+    clear: () => #Clear,
+    validate: () => #Validate,
   }
-
 }
   
 type error = [#DoesNotParse | #External(string)]
@@ -109,7 +108,9 @@ module Make: Make = (I: IParse) => {
   type actions<'change> = Actions.t<'change>
   let mapActions = Actions.map
   let actions = Actions.actions
-
+  
+  type pack = Pack.t<t, change, actions<Promise.t<()>>, actions<()>>
+  
   let reduce = (~context: context, store: Dynamic.t<t>, change: Indexed.t<change>): Dynamic.t<
     t,
   > => {

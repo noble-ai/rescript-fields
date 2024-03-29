@@ -31,7 +31,57 @@ let filterGrace = (a: array<'t>) => {
   a->Array.slice(0, a->Array.length - 1)
 }
 
-module Make = (I: IArray, F: Field.T) => {
+type actions<'finput, 'factions, 'change> = {
+  set: array<'finput> => 'change,
+  clear: () => 'change,
+  opt: option<array<'finput>> => 'change,
+  index: (int) => 'factions,
+  add: [#Some('finput) | #Empty] => 'change,
+  remove: int => 'change,
+  reset: () => 'change,
+}
+
+  module type T = {
+    include Field.T
+    type parted
+    let split: pack => parted
+  }
+  
+  type error = [#Whole(string) | #Part]
+
+  // giving the Make functor this
+  module type Make = (I: IArray, F: Field.T) => T
+    with type input = array<F.input>
+    and type inner = array<F.t>
+    and type output = array<F.output> 
+    and type error = error
+    and type t = Store.t<array<F.t>, array<F.output>, error>
+    and type context = Context.structure<F.output, F.context>
+    and type change = [
+      | #Set(array<F.input>)
+      | #Index(int, F.change)
+      | #Add([#Some(F.input) | #Empty])
+      | #Remove(int)
+      | #Clear
+      | #Reset
+    ]
+    and type actions<'change> = actions<F.input, F.actions<'change>, 'change>
+    and type pack = Pack.t<
+      Store.t<array<F.t>, array<F.output>, error>,
+      [
+        | #Set(array<F.input>)
+        | #Index(int, F.change)
+        | #Add([#Some(F.input) | #Empty])
+        | #Remove(int)
+        | #Clear
+        | #Reset
+      ],
+      actions<F.input, F.actions<Promise.t<()>>, Promise.t<()>>,
+      actions<F.input, F.actions<()>, ()>,
+    >
+    and type parted = array<Pack.t<F.t, F.change, F.actions<Promise.t<()>>, F.actions<()>>>
+
+module Make: Make = (I: IArray, F: Field.T) => {
   module I = I(F)
   module Element = F
   type context = Context.structure<Element.output, Element.context>
@@ -42,7 +92,7 @@ module Make = (I: IArray, F: Field.T) => {
   }
 
   type output = array<Element.output>
-  type error = [#Whole(string) | #Part]
+  type error = error
   type inner = array<Element.t>
   type t = Store.t<inner, output, error>
 
@@ -146,22 +196,38 @@ module Make = (I: IArray, F: Field.T) => {
     }
   }
 
-  type actions = {
-    set: input => change,
-    index: (int, F.change) => change,
-    add: [#Some(F.input) | #Empty] => change,
-    remove: int => change,
-    clear: change,
-    reset: change,
+  type actions<'change> = actions<F.input, F.actions<'change>, 'change>
+  let mapActions: (actions<'ch>, 'ch => 'b) => actions<'b> = (actions, fn) => {
+    set: input => input->actions.set->fn,
+    clear: () => actions.clear()->fn,
+    opt: input => input->actions.opt->fn,
+    index: (i) => actions.index(i)->F.mapActions(fn),
+    add: input => input->actions.add->fn,
+    remove: i => i->actions.remove->fn,
+    reset: () => actions.reset()->fn
   }
 
-  let actions = {
-    set: makeSet,
-    index: (i, change) => #Index(i, change),
+  let actions: actions<change> = {
+    set: (i) => #Set(i),
+    clear: () => #Clear,
+    opt: (i) => i->Option.map(makeSet)->Option.or(#Clear),
+    index: (i) => F.actions->F.mapActions(x => #Index(i, x)),
     add: input => #Add(input),
     remove: i => #Remove(i),
-    clear: #Clear,
-    reset: #Reset,
+    reset: () => #Reset,
+  }
+  
+  type pack = Pack.t<t, change, actions<Promise.t<()>>, actions<()>>
+  type parted = array<Pack.t<F.t, F.change, F.actions<Promise.t<()>>, F.actions<()>>>
+  let split = (pack: pack): parted => {
+    pack.field
+    ->Store.inner
+    ->Array.mapi( (field, i): Pack.t<F.t, F.change, F.actions<Promise.t<()>>, F.actions<()>> => {
+      field,
+      onChange: x => #Index(i, x)->pack.onChange,
+      actions: pack.actions.index(i), 
+      actions_: pack.actions_.index(i)
+    })
   }
 
   let enum = Store.toEnum
@@ -173,7 +239,7 @@ module Make = (I: IArray, F: Field.T) => {
       ]
     }`
   }
-
+    
   let reduce = (~context: context, store: Rxjs.t<'c, 's, t>, change: Indexed.t<change>): Rxjs.t<'c, 's, t> => {
     switch change.value {
     | #Set(input) =>

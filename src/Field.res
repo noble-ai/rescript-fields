@@ -4,6 +4,7 @@ You'll see this Field.T in the Module Functions which asserts
 that a module passed to the function has each of these types and values.
 ")
 
+
 module type T = {
   // A field is passed a context to its validate and reduce methods
   // and it can be any shape of your choosing.
@@ -56,6 +57,9 @@ module type T = {
   // Without any conctext, we have actions producing our own changes
   let actions: actions<change>
 
+  @ocaml.doc("All fields have a pack so that the Pack decompsition system can go all the way to leaves, instead of running out just above in the last product/sum.")
+  type pack = Pack.t<t, change, actions<Promise.t<()>>, actions<()>>
+
   // When a composite field is given a set change, we want to allow our children
   // to validate, but we do not have access [yet/ever] to their change action type
   // to send to their reduce function.  So instead, provide an explicit setValidate
@@ -75,7 +79,7 @@ module type T = {
 
   // Accessors for input, output, etc via the Field
 
-  // just return our children for digging
+  // just return our children for splitging
   let inner: t => inner
 
   // in leaf fields this is usually just return inner

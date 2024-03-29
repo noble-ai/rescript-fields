@@ -33,10 +33,15 @@ let showChange = (change: change) => {
   }
 }
 
-type actions = { set: input => change }
-let actions: actions = { 
+type actions<'change> = { set: input => 'change }
+let mapActions: (actions<'a>, 'a => 'b) => actions<'b> = (actions, fn) => {
+  set: input => input->actions.set->fn
+}
+let actions: actions<change> = { 
   set: input => #Set(input)
 }
+  
+type pack = Pack.t<t, change, actions<Promise.t<()>>, actions<()>>
 
 let reduce = (
   ~context: context,

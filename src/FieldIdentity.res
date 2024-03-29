@@ -19,6 +19,15 @@ module type T = {
 type contextEmpty<'a> = {empty?: 'a}
 type setClear<'a> = [#Clear | #Set('a)]
 
+type actions<'input, 'change> = {
+  set: 'input => 'change,
+  clear: unit => 'change,
+  @ocaml.doc("Identity fields allow you to specify an empy value at the field and context level.
+    In many places we have clearable inputs and want to allow this to reset the value.
+    So instead of pattern matching on the change value, you can pass the optional value here as convenience.")
+  opt: option<'input> => 'change,
+}
+
 // Make a module type for the functor to be able to connect types outward
 module type FieldIdentity = (T: T) =>
   Field.T
@@ -28,7 +37,13 @@ module type FieldIdentity = (T: T) =>
     and type t = Store.t<T.t, T.t, unit>
     and type change = setClear<T.t>
     and type context = contextEmpty<T.t>
-
+    and type actions<'change> = actions<T.t, 'change>
+    and type pack = Pack.t<
+      Store.t<T.t, T.t, unit>,
+      setClear<T.t>,
+      actions<T.t, Promise.t<()>>,
+      actions<T.t, ()>
+    >
 
 module Make: FieldIdentity = (T: T) => {
   module T = T
@@ -67,21 +82,25 @@ module Make: FieldIdentity = (T: T) => {
     }
   }
 
-  type actions<'change> = {
-    set: input => 'change,
-    clear: unit => 'change,
-  }
+  type actions<'change> = actions<input, 'change>
 
   let mapActions = (actions: actions<'change>, fn: 'change => 'b) => {
     set: input => input->actions.set->fn,
     clear: () => actions.clear()->fn,
+    opt: i => i->actions.opt->fn,
   }
 
   let actions: actions<change> = {
     set: input => #Set(input),
     clear: _ => #Clear,
+    opt: x => switch x {
+      | None => #Clear
+      | Some(x) => #Set(x)
+    }
   }
-
+  
+  type pack = Pack.t<t, change, actions<Promise.t<()>>, actions<()>>
+  
   let reduce = (
     ~context: context,
     _store: Dynamic.t<t>,

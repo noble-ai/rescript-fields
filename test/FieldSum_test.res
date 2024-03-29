@@ -14,7 +14,7 @@ module Gen = {
 
 type structure<'a, 'b> = Left('a) | Right('b)
 
-module Subject = Sum2.Field(
+module Subject = Sum2.Make(
   {
     type t<'a, 'b> = structure<'a, 'b>
     let toSum = (t: t<'a, 'b>) => {

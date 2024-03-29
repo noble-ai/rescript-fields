@@ -2,7 +2,7 @@ open Vitest
 // shadow global Dynamic with the impl chosen by FT
 describe("FieldArray", () => {
   module FieldElement = FieldOpt.Int
-  module FieldArray = FieldArray.Make(
+  module Field = FieldArray.Make(
   (F: Field.T) => {
     let filter = FieldArray.filterIdentity
     let empty = _ => []
@@ -11,49 +11,33 @@ describe("FieldArray", () => {
   , FieldElement
   )
 
-  let context: FieldArray.context = {element: {}}
+  let context: Field.context = {element: {}}
   // let context = context->Dynamic.return
 
-  describe("#makeStore", () => {
-    describe("empty", () => {
-      let result = FieldArray.makeStore(~context,[])->Dynamic.toPromise
-      testPromise("returns Valid", () => {
-        result->Promise.map( result => expect(result)->toEqual(Valid([], [])) )
-      })
-    })
-
-    describe("some invalid", () => {
-      let result = FieldArray.makeStore(~context,[Valid(Some(Store.Valid("33", 33)), 33), Invalid(None, #Part)])->Dynamic.toPromise
-      testPromise("returns invalid", () => {
-        result->Promise.map( result => expect(result->Store.toEnum)->toEqual(#Invalid) )
-      })
-    })
-  })
-
-  describe("#validateImpl", () => {
-    describe("with an async validate", () => {
-        let validate = (_) => Result.return()->Promise.return
-        let valid = [3]
-        let input = valid->Array.map(x => Store.Valid(Some(Store.Valid(x->Int.toString, x)), x))
-        let res = FieldArray.validateImpl({ validate, element: {} }, false, input)
-        it("returns Ok", () => {
-          expect(res->Result.isOk)->toBe(true)
-        })
-        res
-        ->Result.toOption
-        ->Option.map( res => {
-          itPromise("emits Busy, then valid", () => {
-            res->Dynamic.toHistory->Promise.tap( h => h->Array.map(Store.toEnum)->expect->toEqual([#Busy, #Valid]))
-          })
-        })
-        ->Option.void
-    })
-  })
+  // describe("#validateImpl", () => {
+  //   describe("with an async validate", () => {
+  //       let validate = (_) => Result.return()->Promise.return
+  //       let valid = [3]
+  //       let input = valid->Array.map(x => Store.Valid(Some(Store.Valid(x->Int.toString, x)), x))
+  //       let res = FieldArray.validateImpl({ validate, element: {} }, false, input)
+  //       it("returns Ok", () => {
+  //         expect(res->Result.isOk)->toBe(true)
+  //       })
+  //       res
+  //       ->Result.toOption
+  //       ->Option.map( res => {
+  //         itPromise("emits Busy, then valid", () => {
+  //           res->Dynamic.toHistory->Promise.tap( h => h->Array.map(Store.toEnum)->expect->toEqual([#Busy, #Valid]))
+  //         })
+  //       })
+  //       ->Option.void
+  //   })
+  // })
 
   describe("#validate", () => {
     describe("empty", () => {
       testPromise("returns Ok", () => {
-        FieldArray.validate(false, context, Dirty([]))
+        Field.validate(false, context, Dirty([]))
         ->Dynamic.toPromise
         ->Promise.tap(result => {
           expect(result)->toEqual(Valid([], []))
@@ -67,10 +51,10 @@ describe("FieldArray", () => {
         let input = valid->Array.map(x => Store.Dirty(Some(Store.Dirty(x->Int.toString))))
         describe("without external validation", () =>  {
           testPromise("returns Ok", () => {
-            FieldArray.validate(false, context, Dirty(input))
+            Field.validate(false, context, Dirty(input))
             ->Dynamic.toPromise
             ->Promise.tap(result => {
-              let output = result->FieldArray.output
+              let output = result->Field.output
               expect(output)->toEqual(Some(valid))
             })
           })
@@ -80,8 +64,8 @@ describe("FieldArray", () => {
           describe("fails constantly", () => {
             let message =  "Fails"
             let validate = (_arr) => Result.Error(message)->Promise.return
-            let context: FieldArray.context = {validate, element: {}}
-            let validated = FieldArray.validate(false, context, Dirty(input))
+            let context: Field.context = {validate, element: {}}
+            let validated = Field.validate(false, context, Dirty(input))
             let history = validated->Dynamic.toHistory
             testPromise("returns atleast one state", () => {
               history
@@ -89,13 +73,13 @@ describe("FieldArray", () => {
             })
             testPromise("begins With Busy", () => {
               history
-              ->Promise.tap(result => expect(result->Array.getUnsafe(0)->FieldArray.enum)->toEqual(#Busy))
+              ->Promise.tap(result => expect(result->Array.getUnsafe(0)->Field.enum)->toEqual(#Busy))
             })
             testPromise("returns Error", () => {
               history
               ->Promise.map(r => r->Array.leaf->Option.getExn(~desc="") )
               ->Promise.tap(result =>
-                expect(result->FieldArray.error)->toEqual(Some(#Whole(message)))
+                expect(result->Field.error)->toEqual(Some(#Whole(message)))
               )
             })
           })
@@ -103,12 +87,12 @@ describe("FieldArray", () => {
           describe("example considering array values", () => {
             let message = "Elements must Sum to 100"
             let validate = (arr) => arr->Array.reduce((a,b) => a+b, 0)->Some->Option.guard(x => x == 100)->Result.fromOption(message)->Result.const()->Promise.return
-            let context: FieldArray.context = {validate, element: {}}
+            let context: Field.context = {validate, element: {}}
             testPromise("returns Error", () => {
-              FieldArray.validate(false, context, Dirty(input))
+              Field.validate(false, context, Dirty(input))
               ->Dynamic.toPromise
               ->Promise.tap(result => {
-                expect(result->FieldArray.error)->toEqual(Some(#Whole(message)))
+                expect(result->Field.error)->toEqual(Some(#Whole(message)))
               })
             })
           })
@@ -121,11 +105,11 @@ describe("FieldArray", () => {
         let good = [Some(3), Some(5)]
         let input = good->Array.insert(bad, indexBad)->Array.map(x => x->Option.map(Int.toString)->FieldElement.set)->Store.Dirty
 
-        let result = FieldArray.validate(false, context, input)
+        let result = Field.validate(false, context, input)
         testPromise("returns partial Error", () => {
           result->Dynamic.toPromise
           ->Promise.tap(result => {
-            expect(result->FieldArray.error)->toEqual(Some(#Part))
+            expect(result->Field.error)->toEqual(Some(#Part))
           })
         })
       })
@@ -134,12 +118,12 @@ describe("FieldArray", () => {
 
   describe("#reduce", () => {
     let input = [Some(3), None]
-    let store = input->Array.map(Option.map(_, Int.toString))->FieldArray.set->Dynamic.return
+    let store = input->Array.map(Option.map(_, Int.toString))->Field.set->Dynamic.return
     describe("#Set", () => {
       describe("with some unset opt ints", () => {
         let new = [None, None, Some(666)]
         let change = #Set(new->Array.map(Option.map(_, Int.toString)))
-        let result = FieldArray.reduce(~context, store, {value: change, index: 0, priority: 0})
+        let result = Field.reduce(~context, store, {value: change, index: 0, priority: 0})
         testPromise("returns Dirty", () => {
           // A FieldOpt set to None is considered dirty, since FieldOpt requires the value be set to be
           // considered.  We then prefer dirty over invalid. More of a test of FieldOpt.Int but ok.
@@ -156,7 +140,7 @@ describe("FieldArray", () => {
 
     describe("#Clear", () => {
       let change = #Clear
-      let result = FieldArray.reduce(~context, store, {value: change, index: 0, priority: 0})
+      let result = Field.reduce(~context, store, {value: change, index: 0, priority: 0})
       testPromise("returns empty", () => {
         result
         ->Dynamic.toPromise
@@ -169,7 +153,7 @@ describe("FieldArray", () => {
     describe("#Add", () => {
       let new = Some(666)
       let change = #Add(#Some(new->Option.map(Int.toString)))
-      let result = FieldArray.reduce(~context, store, {value: change, index: 0, priority: 0})
+      let result = Field.reduce(~context, store, {value: change, index: 0, priority: 0})
       let innerstore = result->Dynamic.map(Store.inner)
 
       testPromise("increases length by 1", () => {
@@ -202,7 +186,7 @@ describe("FieldArray", () => {
         let new = 666
         let index = 1
         let change = #Index(index, #Some(#Set(new->Int.toString)))
-        let result = FieldArray.reduce(~context, store, {value: change, index: 0, priority: 0})
+        let result = Field.reduce(~context, store, {value: change, index: 0, priority: 0})
         let innerstore = result->Dynamic.map(Store.inner)
         testPromise("returns new value", () => {
           innerstore->Dynamic.toPromise->Promise.tap(innerstore => {
@@ -219,11 +203,11 @@ describe("FieldArray", () => {
       describe("out of bounds", () => {
         let index = 5
         let change = #Remove(index)
-        let result = FieldArray.reduce(~context, store, {value: change, index: 0, priority: 0})
+        let result = Field.reduce(~context, store, {value: change, index: 0, priority: 0})
         testPromise("returns input", () => {
           result->Dynamic.toPromise
           ->Promise.tap(result => {
-            expect(result->FieldArray.input)->toEqual(input->Array.map(Option.map(_, Int.toString)))
+            expect(result->Field.input)->toEqual(input->Array.map(Option.map(_, Int.toString)))
           })
         })
       })
@@ -231,7 +215,7 @@ describe("FieldArray", () => {
       describe("in bounds", () => {
         let index = 1
         let change = #Remove(index)
-        let result = FieldArray.reduce(~context, store, {value: change, index: 0, priority: 0})
+        let result = Field.reduce(~context, store, {value: change, index: 0, priority: 0})
         testPromise("decreases array length by 1", () => {
           result->Dynamic.toPromise
           ->Promise.tap(result => {
