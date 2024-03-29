@@ -337,9 +337,9 @@
     rescript "^10.1"
 
 "@nobleai/rescript-rxjs@^7.5.14":
-  version "7.5.14"
-  resolved "https://registry.yarnpkg.com/@nobleai/rescript-rxjs/-/rescript-rxjs-7.5.14.tgz#a5a1704361f60abec125e86859f4770bdbcaf008"
-  integrity sha512-Znbe3yG7hQ2u3IZ2P+cnzlGZf1kK9HKwAT2JqBZ4t9vi9QlhpswsZZEXKTzv7wGkAab0HJ6NJci8tW3DmWDkSw==
+  version "7.5.15"
+  resolved "https://registry.yarnpkg.com/@nobleai/rescript-rxjs/-/rescript-rxjs-7.5.15.tgz#309d4b534bfd9697424d28c12711943a6e4be724"
+  integrity sha512-dc4Zazqldn+5plPZLOIqFbe5zWXO0ZACQVdq1kTCbpdMXz/dAadaiXrb/rPCcNSBoWQO/0a56hl8rYHtNLfBzQ==
 
 "@nobleai/rescript-testing-library@^0.1.0":
   version "0.1.0"
