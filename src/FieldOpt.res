@@ -87,7 +87,21 @@ module Make = (F: Field.T) => {
   }
   
   type pack = Pack.t<t, change, actions<Promise.t<()>>, actions<()>>
-  
+  type parted = option<
+    Pack.t<F.t, F.change, F.actions<Promise.t<()>>, F.actions<()>>,
+  >
+
+  let split = (pack: pack): parted => {
+    pack.field
+    ->Store.inner
+    ->Option.map( (field): Pack.t<F.t, F.change, F.actions<Promise.t<()>>, F.actions<()>> => {
+      field,
+      onChange: x => x->#Some->pack.onChange,
+      actions: pack.actions.inner, 
+      actions_: pack.actions_.inner
+    })
+  }
+
   let reduce = (~context: context, store: Dynamic.t<t>, change: Indexed.t<change>): Dynamic.t<t> => {
     switch change.value {
     | #Opt(None)
