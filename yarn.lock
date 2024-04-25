@@ -318,10 +318,10 @@
     numeral "^2.0.6"
     rescript "^10.1"
 
-"@nobleai/rescript-prelude@^0.13.3":
-  version "0.13.3"
-  resolved "https://registry.yarnpkg.com/@nobleai/rescript-prelude/-/rescript-prelude-0.13.3.tgz#b55a3dab6386d386928f694c59157fbbdc002103"
-  integrity sha512-/xVPklQTr3LCO2ctBLZIYsa9hNVcI0CwQCD127gkMH3puHZhAGxCoB3AD41d6etb/Cy5SRyCHdRXuNbBaeBcHg==
+"@nobleai/rescript-prelude@^0.13.5":
+  version "0.13.5"
+  resolved "https://registry.yarnpkg.com/@nobleai/rescript-prelude/-/rescript-prelude-0.13.5.tgz#30969674096e05a008ac86194aab48d4e8acd4bf"
+  integrity sha512-FoKtWs7Op5wDLdYC0he8Bv/5WbiDa1yEMK0Glt7LCnJTt5+15vZ7owb53XYSTDjH4Y16YmN/uoJhyzMPx78A2Q==
   dependencies:
     rescript "^10.1"
 
