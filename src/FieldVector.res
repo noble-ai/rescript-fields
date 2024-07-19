@@ -78,6 +78,7 @@ module Actions = {
     inner: actions.inner->fnInner,
     validate: () => actions.validate()->fn
   }
+
 }
 
 // we want to apply a const function to a bunch of vector channels,
@@ -109,42 +110,45 @@ module type Interface = {
   let validateImmediate: bool
 }
 
+// This is a selection of Field.T with some "Inner" additions to allow recursion
+// Did not include Field.T to avoid implementing things in FieldVector0 that noone needs - AxM
 module type Tail = {
   type contextInner
 
   type input
+  type t
   type inner
   type output
-  type t
   let showInput: input => string
   let inner: t => inner
   let set: input => t
   let empty: contextInner => inner
   let hasEnum: (inner, Store.enum) => bool
   let toResultInner: inner => result<output, Store.enum>
-  let validateInner: (contextInner, inner) => Dynamic.t<inner>
+  let validateInner: (contextInner, inner) => Rxjs.t<Rxjs.foreign, Rxjs.void, inner>
 
-  type changeInner
-  let showChangeInner: changeInner => string
+  // type changeInner
+  // let showChangeInner: changeInner => string
 
   type actionsInner<'change>
   let mapActionsInner: (actionsInner<'change>, ('change => 'b)) => actionsInner<'b>
-  let actionsInner: actionsInner<changeInner>
+  // let actionsInner: actionsInner<changeInner>
 
-  type actions<'change>
-    
-  @ocaml.doc("partition is opaque here but will be a composition of Pack.t") // TODO: Why?
+  @ocaml.doc("partition is opaque here but will be a composition of Form.t") // TODO: Why?
   // TODO: type can be specified here? - AxM
   type partition
-  let splitInner: (inner, changeInner => (), actionsInner<Promise.t<()>>, actionsInner<()>) => partition
+  let splitInner: (inner, actionsInner<()>) => partition
 
-  let reduceChannel: (
-    ~contextInner: contextInner,
-    Dynamic.t<inner>,
-    Indexed.t<unit>,
-    changeInner,
-  ) => Dynamic.t<inner>
-  let reduceSet: (contextInner, Dynamic.t<inner>, Indexed.t<unit>, input) => Dynamic.t<inner>
+  let makeDynInner: (contextInner, Rxjs.Observable.t<input>) => 
+    Dyn.t<Close.t<Form.t<inner, actionsInner<()>>>>
+
+//   let reduceChannel: (
+//     ~contextInner: contextInner,
+//     Rxjs.t<Rxjs.foreign, Rxjs.void,inner>,
+//     Indexed.t<unit>,
+//     changeInner,
+//   ) => Rxjs.t<Rxjs.foreign, Rxjs.void,inner>
+//   let reduceSet: (contextInner, Rxjs.t<Rxjs.foreign, Rxjs.void,inner>, Indexed.t<unit>, input) => Rxjs.t<Rxjs.foreign, Rxjs.void,inner>
   let toInputInner: inner => input
   let printErrorInner: inner => array<option<string>>
   let showInner: inner => array<string>
@@ -178,8 +182,8 @@ module Vector0 = {
   let hasEnum = (_x, e) => e == #Valid
 
   let toResultInner = (): result<output, Store.enum> => Ok()
-  let validateInner = (_context, inner: inner): Dynamic.t<inner> => empty()->Dynamic.return
-  let validate = (_force, _context: context, store: t): Dynamic.t<t> => init()->Dynamic.return
+  let validateInner = (_context, _inner: inner): Rxjs.t<Rxjs.foreign, Rxjs.void,inner> => empty()->Dynamic.return
+  let validate = (_force, _context: context, _store: t): Rxjs.t<Rxjs.foreign, Rxjs.void,t> => init()->Dynamic.return
 
   let inner = _ => ()
   let showInner = (_) => []
@@ -192,33 +196,73 @@ module Vector0 = {
   
   let show = (_store: t): string => `Vector0`
 
-  type changeInner = ()
-  let showChangeInner = (_ch: changeInner) => `()`
+  // type changeInner = ()
+  // let showChangeInner = (_ch: changeInner) => `()`
 
-  type change = Change.t<input, changeInner> 
-  let showChange = change => change->Change.bimap(_ => "()", _ => "()", _)->Change.show
+  // type change = Change.t<input, changeInner> 
+  // let makeSet = input => #Set(input)
+  // let showChange = change => change->Change.bimap(_ => "()", _ => "()", _)->Change.show
 
   type actionsInner<'change> = ()
-  let mapActionsInner = (actionsInner, fn) => ()
-  let actionsInner: actionsInner<changeInner> = ()
+  let mapActionsInner = (_actionsInner, _fn) => ()
+  // let actionsInner: actionsInner<changeInner> = ()
 
   // Both our root actions and inner actions produce "change"
-  type actions<'change> = Actions.t<input, 'change, actionsInner<change>>
-  let actions: actions<change> = Actions.make(actionsInner)
+  type actions<'change> = Actions.t<input, 'change, actionsInner<'change>>
+  // let actions: actions<change> = Actions.make(actionsInner)
+  let mapActions = (actions, fn) => actions->Actions.trimap(x=>x, mapActionsInner(fn), fn)
 
   type partition = ()
-  let splitInner = (_, _, _, _) => {
+  let splitInner = (_, _) => {
     ()
   }
 
+  let makeDynInner = (_context: contextInner, set: Rxjs.Observable.t<input>)
+    : Dyn.t<Close.t<Form.t<inner, actionsInner<()>>>>
+  => {
+    let pack: Form.t<'f, 'a> = { field: (), actions: ()}
+    let close = () => ()
+    let first: Close.t<'fa> = {pack, close} 
+    let dyn = 
+          set
+          ->Dynamic.map( (_): Close.t<Form.t<'f, 'a>> => {pack: { field: (), actions: ()}, close})
+          ->Dynamic.map(Dynamic.return)
+    {first, dyn}
+  }
 
-  // let toChange = (_, _): change => ()
+  let makeDyn = (context: context, set: Rxjs.Observable.t<input>, val: option<Rxjs.Observable.t<()>>)
+      : Dyn.t<Close.t<Form.t<t, actions<()>>>>
+    => {
+    let field = init(context)
+
+    let anything = Rxjs.Subject.makeEmpty()
+    let complete = Rxjs.Subject.makeEmpty()
+
+    let actions: actions<()> = {
+      set: Rxjs.next(anything),
+      clear: Rxjs.next(anything), 
+      opt: (_) => (),
+      validate: Rxjs.next(anything),
+      inner: (),
+    }
+
+    let close = Rxjs.next(complete)
 
   // We're counting on these streams producing values, so we cant just return the existing inner/store Dynamics - AxM
-  let reduceChannel = (~contextInner, store, _change, _ch: changeInner): Dynamic.t<inner> => ()->Dynamic.return
-  let reduceSet = (_contextInner, inner: Dynamic.t<inner>, _change: Indexed.t<unit>, _input): Dynamic.t<inner> => ()->Dynamic.return
-  let reduce = (~context: context, store: Dynamic.t<t>, _change: Indexed.t<change>): Dynamic.t<t> => init()->Dynamic.return
+    let first: Close.t<Form.t<'f, 'a>> = {pack: {field, actions}, close}
 
+
+    let dyn = 
+      val
+      ->Option.map( Rxjs.merge3(set, _ , anything))
+      ->Option.or( Rxjs.merge2(set, anything))
+      ->Dynamic.map((_): Close.t<Form.t<t, actions<()>>> => {pack: { field, actions }, close})
+      ->Dynamic.map(Dynamic.return)
+      ->Rxjs.pipe(Rxjs.takeUntil(complete))
+      ->Rxjs.toObservable
+
+    {first, dyn}
+  }
 }
 
 module VectorRec = {
@@ -289,7 +333,7 @@ module VectorRec = {
       (outputresult(Head.output, Head.enum, _), Tail.toResultInner)->napply(inner)->allResult
     }
 
-    let makeStore = (~validate, inner: inner): Dynamic.t<t> => {
+    let makeStore = (~validate, inner: inner): Rxjs.t<Rxjs.foreign, Rxjs.void,t> => {
       // TODO: These predicated values are computed up front
       // so these promises are made, and then thrown away
       // Should predicate take a thunk for lazy evaluation? - AxM
@@ -306,7 +350,7 @@ module VectorRec = {
       ->Result.resolve(~ok=x => x, ~err=resolveErr(inner))
     }
 
-    let validateInner = (context: contextInner, inner: inner): Dynamic.t<inner> => {
+    let validateInner = (context: contextInner, inner: inner): Rxjs.t<Rxjs.foreign, Rxjs.void,inner> => {
       let (head, tail) = inner
       let (contextHead, contextTail) = context
       let head = Head.validate(true, contextHead, head)
@@ -314,13 +358,13 @@ module VectorRec = {
       (head, tail)->Dynamic.combineLatest2
     }
 
-    let validateImpl = (context: context, store: t): Dynamic.t<t> => {
+    let validateImpl = (context: context, store: t): Rxjs.t<Rxjs.foreign, Rxjs.void,t> => {
       let validate = validateOut(~validate=context.validate, ~immediate=true)
 
       validateInner(context.inner, store->Store.inner)->Dynamic.bind(makeStore(~validate))
     }
 
-    let validate = (force, context: context, store: t): Dynamic.t<t> => {
+    let validate = (force, context: context, store: t): Rxjs.t<Rxjs.foreign, Rxjs.void,t> => {
       if !force && store->Store.toEnum == #Valid {
         store->Dynamic.return
       } else {
@@ -328,132 +372,110 @@ module VectorRec = {
       }
     }
 
-    type changeInner = Either.t<Head.change, Tail.changeInner>
-    let showChangeInner = (ch: changeInner) =>
-      switch ch {
-      | Left(a) => `Head(${a->Head.showChange})`
-      | Right(b) => `Tail(${b->Tail.showChangeInner})`
-      }
-
-    type change = Change.t<input, changeInner>
-    let makeSet = input => #Set(input)
-
-    let showChange = (change: change): string =>
-      change->Change.bimap(showInput, showChangeInner, _)->Change.show
-
     type actionsInner<'change> = (Head.actions<'change>, Tail.actionsInner<'change>)
     let mapActionsInner = ((head, tail), fn) => (head->Head.mapActions(fn), tail->Tail.mapActionsInner(fn))
-    let actionsInner: actionsInner<changeInner> = (Head.actions->Head.mapActions((x): changeInner => Left(x)), Tail.actionsInner->Tail.mapActionsInner((x): changeInner => Right(x)))
 
     type actions<'change> = Actions.t<input, 'change, actionsInner<'change>>
     let mapActions = (actions, fn) => actions->Actions.trimap(x => x, fn, mapActionsInner(_, fn))
-    let actions: actions<change> = Actions.make(actionsInner->mapActionsInner((x): change => #Inner(x)))
     
-    type partition = (Pack.t<Head.t, Head.change, Head.actions<Promise.t<()>>, Head.actions<()>>, Tail.partition)
-    let splitInner = (inner: inner, onChange: changeInner => (), actions: actionsInner<Promise.t<()>>, actions_: actionsInner<()>): partition => {
+    type partition = (Form.t<Head.t, Head.actions<()>>, Tail.partition)
+    let splitInner = (inner: inner, actions: actionsInner<()>): partition => {
       let (field, it) = inner 
       let (ah, at) = actions
-      let (ah_, at_) = actions_
-      let onChangeHead: Head.change => () = (x) => x->Either.Left->onChange
-      let onChangeTail = (x) => x->Either.Right->onChange
-      let head: Pack.t<Head.t, Head.change, 'a, 'a_> = {field: field, onChange: onChangeHead, actions: ah, actions_: ah_}
+      let head: Form.t<Head.t, 'a> = {field: field, actions: ah}
       ( head
-      , Tail.splitInner(it, onChangeTail, at, at_)
+      , Tail.splitInner(it, at)
       )
     }
 
-    let split = (part: Pack.t<t, change, actions<Promise.t<()>>, actions<()>>): partition => {
-      splitInner( part.field->Store.inner, (x) => x->#Inner->part.onChange, part.actions.inner, part.actions_.inner)
+    let split = (part: Form.t<t, actions<()>>): partition => {
+      splitInner( part.field->Store.inner, part.actions.inner)
     }
 
-    let reduceField = (inner, change, reduce) => {
-      // These individual field setters return a different type based on the field
-      // So some functor trickery to share this code.. not going to bother now
-      inner
-      ->Dynamic.map(((head, _)) => head)
-      ->reduce(change)
-      ->Dynamic.withLatestFrom(inner)
-      // Each A.reduce call may emit a series of states
-      // but we can know that only the last one is valid?
-      // store can also be producing new values via changes to other fields
-      // which can go from valid to invalid or back
-      // makeStore can also emit numerous values, but only when a is valid
-      // So its only the last event here that causes numerous events.
-      // so the type of product doesnt change the result
-      // still, since this is now Dynamic and not promise,
-      // these conditions could change,
-      // but we dont know what the interaction between these things means yet
-      // so use a concat "bind" to keep them separate
-      ->Dynamic.map(((head, (_, tail))) => (head, tail))
+  let makeDynInner = (context: contextInner, set: Rxjs.Observable.t<input>)
+    : Dyn.t<Close.t<Form.t<inner, actionsInner<()>>>>
+    => {
+    let setHead = set->Dynamic.map(Tuple.Nested.head)
+    let setTail = set->Dynamic.map(Tuple.Nested.rest)
+    let (contextHead, contextTail) = context 
+    // let (inputHead, inputTail) = input->Option.distribute2
+    let {first: firstHead, dyn: firstDyn} = Head.makeDyn(contextHead, setHead, None)
+    let {first: firstTail, dyn: tailDyn} = Tail.makeDynInner(contextTail, setTail)
+
+    let first: Close.t<Form.t<'f, 'a>> = {
+      pack: {
+        field: (firstHead.pack.field, firstTail.pack.field),
+        actions: (firstHead.pack.actions, firstTail.pack.actions)
+        },
+      close: () => {firstHead.close(); firstTail.close()}
     }
 
-    let reduceChannel = (
-      ~contextInner: contextInner,
-      store,
-      change: Indexed.t<unit>,
-      ch: changeInner,
-    ) => {
-      let (contextA, contextB) = contextInner
-      switch ch {
-      | Left(ch) => reduceField(store, change->Indexed.const(ch), Head.reduce(~context=contextA))
-      | Right(ch) => {
-          let storehead = store->Dynamic.map(((head, _)) => head)
-          let store = store->Dynamic.map(((_, tail)) => tail)
-          Tail.reduceChannel(~contextInner=contextB, store, change, ch)
-          ->Dynamic.withLatestFrom(storehead)
-          ->Dynamic.map(((tail, head)) => (head, tail))
-        }
-      }
-    }
 
-    let reduceSet = (
-      context: contextInner,
-      inner: Dynamic.t<inner>,
-      change: Indexed.t<unit>,
-      input,
-    ): Dynamic.t<inner> => {
-      let (contextHead, contextTail) = context
-      let (inputHead, inputTail) = input
-      let changeHead = change->Indexed.map(_ => Head.makeSet(inputHead))
-      let storeHead = inner->Dynamic.map(((head, _)) => head)
-      let storeTail = inner->Dynamic.map(((_, tail)) => tail)
+    let dyn = Dynamic.combineLatest2((firstDyn, tailDyn))
+    ->Dynamic.map( ((head, tail)) => {
+      Dynamic.combineLatest2((head, tail))
+      ->Dynamic.map( ((head, tail)): Close.t<Form.t<'f, 'a>> => {
+      pack: {
+        field: (head.pack.field, tail.pack.field),
+        actions: (head.pack.actions, tail.pack.actions)
+      },
+      close: () => {head.close(); tail.close()}
+    })
+    })
+    ->Dynamic.startWith(Dynamic.return(first))
 
-      let head = Head.reduce(~context=contextHead, storeHead, changeHead)
-      let tail = Tail.reduceSet(contextTail, storeTail, change, inputTail)
+    {first, dyn}
+  }
 
-      (head, tail)->Dynamic.combineLatest2
-    }
+  let makeDyn = (context: context, setOuter: Rxjs.Observable.t<input>, valOuter: option<Rxjs.Observable.t<()>>)
+    : Dyn.t<Close.t<Form.t<t, actions<()>>>>
+    => {
+    let field = init(context.inner)
+    
+    let complete = Rxjs.Subject.makeEmpty()
+    let clear = Rxjs.Subject.makeEmpty()
+    let opt = Rxjs.Subject.makeEmpty()
+    let valInner = Rxjs.Subject.makeEmpty()
+    let val = valOuter->Option.map(Rxjs.merge2(_, valInner))->Option.or(valInner->Rxjs.toObservable)
 
-    let reduce = (~context: context, store: Dynamic.t<t>, change: Indexed.t<change>): Dynamic.t<
-      t,
-    > => {
-      switch change.value {
-      | #Set(input) => {
-          let inner = store->Dynamic.map(Store.inner)
-          reduceSet(context.inner, inner, change->Indexed.const(), input)->Dynamic.bind(
-            makeStore(~validate=validateOut(~validate=context.validate, ~immediate=true)),
-          )
-        }
-      | #Clear => context.inner->init->Dynamic.return
-      | #Inner(ch) => {
-          let validate: option<validate> = context.validate
-          let validate = validateOut(~validate, ~immediate=I.validateImmediate)
-          let storeInner = store->Dynamic.map(Store.inner)
-          reduceChannel(
-            ~contextInner=context.inner,
-            storeInner,
-            change->Indexed.const(),
-            ch,
-          )->Dynamic.bind(makeStore(~validate))
-        }
-      | #Validate =>
-        store
-        ->Dynamic.take(1)
-        ->Dynamic.bind(store => {
-          validate(false, context, store)
-        })
-      }
-    }
+    let setInner: Rxjs.t<'csi, 'ssi, input> = Rxjs.Subject.makeEmpty()
+    let set = Rxjs.merge2(setOuter, setInner)
+
+    let fnValidate = validateOut(~validate=context.validate, ~immediate=I.validateImmediate)
+    let {first: firstInner, dyn: dynInner} = makeDynInner(context.inner, set)
+
+    let actionsFirst: actions<()> = {
+      set: Rxjs.next(setInner),
+      clear: Rxjs.next(clear),
+      // reset: Rxjs.next(reset),
+      opt: Rxjs.next(opt),
+      validate: Rxjs.next(valInner),
+      inner: firstInner.pack.actions, 
+    } 
+
+    let close = Rxjs.next(complete)
+
+    let first: Close.t<Form.t<'f, 'a>> = {pack: { field, actions: actionsFirst }, close}
+
+    let dyn = 
+      dynInner
+      ->Dynamic.map(Dynamic.switchMap(_, (inner: Close.t<Form.t<'fa, 'ai>>) => 
+      makeStore(~validate=fnValidate, inner.pack.field)
+      ->Dynamic.map( (field): Close.t<Form.t<'f, actions<()>>> => {
+        pack: {
+          field,
+          actions: {
+            ...actionsFirst,
+            inner: inner.pack.actions,
+          }
+        },
+        close
+      })
+    ))
+    ->Rxjs.pipe(Rxjs.takeUntil(complete))
+
+    {first, dyn}
+  }
 
     let toInputInner = (inner: inner) => (Head.input, Tail.toInputInner)->Tuple.Tuple2.napply(inner)
     let input = (store: t) =>

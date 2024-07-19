@@ -1,230 +1,338 @@
 open Vitest
-// shadow global Dynamic with the impl chosen by FT
+
+let applyCurrent = (dyn, current) => Dynamic.tap(dyn, x => current.contents = x)
+
 describe("FieldArray", () => {
-  module FieldElement = FieldOpt.Int
-  module Field = FieldArray.Make(
-  (F: Field.T) => {
-    let filter = FieldArray.filterIdentity
-    let empty = _ => []
-    let validateImmediate = true
-  }
-  , FieldElement
-  )
 
-  let context: Field.context = {element: {}}
-  // let context = context->Dynamic.return
+  describe("element FieldOpt.Int", () => {
+    module FieldElement = FieldOpt.Int
+    module Subject = FieldArray.Make(
+    (F: Field.T) => {
+      let filter = FieldArray.filterIdentity
+      let empty = _ => []
+      let validateImmediate = true
+    }
+    , FieldElement
+    )
 
-  // describe("#validateImpl", () => {
-  //   describe("with an async validate", () => {
-  //       let validate = (_) => Result.return()->Promise.return
-  //       let valid = [3]
-  //       let input = valid->Array.map(x => Store.Valid(Some(Store.Valid(x->Int.toString, x)), x))
-  //       let res = FieldArray.validateImpl({ validate, element: {} }, false, input)
-  //       it("returns Ok", () => {
-  //         expect(res->Result.isOk)->toBe(true)
-  //       })
-  //       res
-  //       ->Result.toOption
-  //       ->Option.map( res => {
-  //         itPromise("emits Busy, then valid", () => {
-  //           res->Dynamic.toHistory->Promise.tap( h => h->Array.map(Store.toEnum)->expect->toEqual([#Busy, #Valid]))
-  //         })
-  //       })
-  //       ->Option.void
-  //   })
-  // })
+    describe("context default", () => {
+      let context: Subject.context = {element: {}}
 
-  describe("#validate", () => {
-    describe("empty", () => {
-      testPromise("returns Ok", () => {
-        Field.validate(false, context, Dirty([]))
-        ->Dynamic.toPromise
-        ->Promise.tap(result => {
-          expect(result)->toEqual(Valid([], []))
+      describe("makeDyn", () => {
+        let test = () => {
+          let set = Rxjs.Subject.makeEmpty()
+          let val = Rxjs.Subject.makeEmpty()
+          let {first, dyn} = Subject.makeDyn(context, set->Rxjs.toObservable, val->Rxjs.toObservable->Some)
+          let current: ref<'a> = {contents: first}
+
+          let actions = first.pack->Form.actions
+
+          let res = dyn->Dynamic.switchSequence->applyCurrent(current)->Dynamic.toPromise
+
+          let x: Subject.inputElement = Some("3")
+          actions.add(None)
+          actions.add(Some(x))
+          actions.reset()
+          set->Rxjs.next([Some("3"), Some("4"), Some("5")])
+
+          Promise.sleep(500)->Promise.tap(_ => current.contents.close())->Promise.void
+          res
+        }
+
+        itPromise("set", () => {
+          test()->Promise.tap(res => {
+            // Console.log2("res", res)
+            expect(res->Close.pack->Form.field->Subject.output)->toEqual(Some([3,4,5]))
+          })
         })
       })
-    })
 
-    describe("non-empty", () => {
-      describe("all valid", () => {
-        let valid = [3, 4, 5]
-        let input = valid->Array.map(x => Store.Dirty(Some(Store.Dirty(x->Int.toString))))
-        describe("without external validation", () =>  {
+      describe("#validate", () => {
+        describe("empty", () => {
           testPromise("returns Ok", () => {
-            Field.validate(false, context, Dirty(input))
+            Subject.validate(false, context, Dirty([]))
             ->Dynamic.toPromise
             ->Promise.tap(result => {
-              let output = result->Field.output
-              expect(output)->toEqual(Some(valid))
+              expect(result)->toEqual(Valid([], []))
             })
           })
         })
 
-        describe("with external validation, failing", () => {
-          describe("fails constantly", () => {
-            let message =  "Fails"
-            let validate = (_arr) => Result.Error(message)->Promise.return
-            let context: Field.context = {validate, element: {}}
-            let validated = Field.validate(false, context, Dirty(input))
-            let history = validated->Dynamic.toHistory
-            testPromise("returns atleast one state", () => {
-              history
-              ->Promise.tap(x => x->Array.length->expect->toBeGreaterThanInt(0))
+        describe("non-empty", () => {
+          describe("all valid", () => {
+            let valid = [3, 4, 5]
+            let input = valid->Array.map(x => Store.Dirty(Some(Store.Dirty(x->Int.toString))))
+            describe("without external validation", () =>  {
+              testPromise("returns Ok", () => {
+                Subject.validate(false, context, Dirty(input))
+                ->Dynamic.toPromise
+                ->Promise.tap(result => {
+                  let output = result->Subject.output
+                  expect(output)->toEqual(Some(valid))
+                })
+              })
             })
-            testPromise("begins With Busy", () => {
-              history
-              ->Promise.tap(result => expect(result->Array.getUnsafe(0)->Field.enum)->toEqual(#Busy))
-            })
-            testPromise("returns Error", () => {
-              history
-              ->Promise.map(r => r->Array.leaf->Option.getExn(~desc="") )
-              ->Promise.tap(result =>
-                expect(result->Field.error)->toEqual(Some(#Whole(message)))
-              )
-            })
-          })
 
-          describe("example considering array values", () => {
-            let message = "Elements must Sum to 100"
-            let validate = (arr) => arr->Array.reduce((a,b) => a+b, 0)->Some->Option.guard(x => x == 100)->Result.fromOption(message)->Result.const()->Promise.return
-            let context: Field.context = {validate, element: {}}
-            testPromise("returns Error", () => {
-              Field.validate(false, context, Dirty(input))
-              ->Dynamic.toPromise
-              ->Promise.tap(result => {
-                expect(result->Field.error)->toEqual(Some(#Whole(message)))
+            describe("with external validation, failing", () => {
+              describe("fails constantly", () => {
+                let message =  "Fails"
+                let validate = (_arr) => Result.Error(message)->Promise.return
+                let context: Subject.context = {validate, element: {}}
+                let validated = Subject.validate(false, context, Dirty(input))
+                let history = validated->Dynamic.toHistory
+                testPromise("returns atleast one state", () => {
+                  history
+                  ->Promise.tap(x => x->Array.length->expect->toBeGreaterThanInt(0))
+                })
+                testPromise("begins With Busy", () => {
+                  history
+                  ->Promise.tap(result => expect(result->Array.getUnsafe(0)->Subject.enum)->toEqual(#Busy))
+                })
+                testPromise("returns Error", () => {
+                  history
+                  ->Promise.map(r => r->Array.leaf->Option.getExn(~desc="") )
+                  ->Promise.tap(result =>
+                    expect(result->Subject.error)->toEqual(Some(#Whole(message)))
+                  )
+                })
+              })
+
+              describe("example considering array values", () => {
+                let message = "Elements must Sum to 100"
+                let validate = (arr) => arr->Array.reduce((a,b) => a+b, 0)->Some->Option.guard(x => x == 100)->Result.fromOption(message)->Result.const()->Promise.return
+                let context: Subject.context = {validate, element: {}}
+                testPromise("returns Error", () => {
+                  Subject.validate(false, context, Dirty(input))
+                  ->Dynamic.toPromise
+                  ->Promise.tap(result => {
+                    expect(result->Subject.error)->toEqual(Some(#Whole(message)))
+                  })
+                })
               })
             })
           })
-        })
-      })
 
-      describe("some valid", () => {
-        let indexBad = 1
-        let bad = None
-        let good = [Some(3), Some(5)]
-        let input = good->Array.insert(bad, indexBad)->Array.map(x => x->Option.map(Int.toString)->FieldElement.set)->Store.Dirty
+          describe("some valid", () => {
+            let indexBad = 1
+            let bad = None
+            let good = [Some(3), Some(5)]
+            let input = good->Array.insert(bad, indexBad)->Array.map(x => x->Option.map(Int.toString)->FieldElement.set)->Store.Dirty
 
-        let result = Field.validate(false, context, input)
-        testPromise("returns partial Error", () => {
-          result->Dynamic.toPromise
-          ->Promise.tap(result => {
-            expect(result->Field.error)->toEqual(Some(#Part))
+            let result = Subject.validate(false, context, input)
+            testPromise("returns partial Error", () => {
+              result->Dynamic.toPromise
+              ->Promise.tap(result => {
+                expect(result->Subject.error)->toEqual(Some(#Part))
+              })
+            })
           })
         })
       })
     })
   })
 
-  describe("#reduce", () => {
-    let input = [Some(3), None]
-    let store = input->Array.map(Option.map(_, Int.toString))->Field.set->Dynamic.return
-    describe("#Set", () => {
-      describe("with some unset opt ints", () => {
-        let new = [None, None, Some(666)]
-        let change = #Set(new->Array.map(Option.map(_, Int.toString)))
-        let result = Field.reduce(~context, store, {value: change, index: 0, priority: 0})
-        testPromise("returns Dirty", () => {
-          // A FieldOpt set to None is considered dirty, since FieldOpt requires the value be set to be
-          // considered.  We then prefer dirty over invalid. More of a test of FieldOpt.Int but ok.
-          result->Dynamic.toPromise
-          ->Promise.tap(result => {
-            expect(result->Store.toEnum)->toEqual(#Dirty)
-          })
-        })
-      })
-      // test("returns new value", () => {
-      //   expect(result)->toEqual(new)
-      // })
-    })
+  describe("element FieldString", () => {
+    module FieldElement = FieldString.Make({ let validateImmediate = true })
+    module Subject = FieldArray.Make(
+      (F: Field.T) => {
+        let filter = FieldArray.filterIdentity
+        let empty = _ => []
+        let validateImmediate = true
+      }
+      , FieldElement
+    )
 
-    describe("#Clear", () => {
-      let change = #Clear
-      let result = Field.reduce(~context, store, {value: change, index: 0, priority: 0})
-      testPromise("returns empty", () => {
-        result
-        ->Dynamic.toPromise
-        ->Promise.tap(result => {
-          expect(result)->toEqual(Valid([], []))
-        })
-      })
-    })
+    describe("context validation", () => {
+      let context = (): Subject.context => {
+        let delay: ref<int> = {contents: 100}
 
-    describe("#Add", () => {
-      let new = Some(666)
-      let change = #Add(#Some(new->Option.map(Int.toString)))
-      let result = Field.reduce(~context, store, {value: change, index: 0, priority: 0})
-      let innerstore = result->Dynamic.map(Store.inner)
+        let validateArr = (_x: Array.t<FieldString.output>) => {
+          let d = delay.contents
+          delay.contents = delay.contents - 10
+          Promise.sleep(d)->Promise.map(_ => Ok())
+        }  
 
-      testPromise("increases length by 1", () => {
-        innerstore
-        ->Dynamic.toPromise
-        ->Promise.tap(innerstore =>{
-          expect(innerstore->Array.length)->toEqual(input->Array.length + 1)
-        })
-      })
-
-      testPromise("appends new value ", () => {
-        innerstore
-        ->Dynamic.map(innerstore => Array.getUnsafe(innerstore, innerstore->Array.length - 1))
-        ->Dynamic.toPromise
-        ->Promise.tap(last => {
-          expect(last->FieldElement.input)->toEqual(new->Option.map(x => x->Int.toString))
-        })
-      })
-
-      testPromise("leaves prefix unmodified", () => {
-        innerstore->Dynamic.toPromise->Promise.tap(innerstore => {
-          let prefix = innerstore->Array.slice(0, innerstore->Array.length - 1)
-          expect(prefix)->toEqual(input->Array.map(x => x->Option.map(Int.toString)->FieldElement.set))
-        })
-      })
-    })
-
-    describe("#Index", () => {
-      describe("simple", () => {
-        let new = 666
-        let index = 1
-        let change = #Index(index, #Some(#Set(new->Int.toString)))
-        let result = Field.reduce(~context, store, {value: change, index: 0, priority: 0})
-        let innerstore = result->Dynamic.map(Store.inner)
-        testPromise("returns new value", () => {
-          innerstore->Dynamic.toPromise->Promise.tap(innerstore => {
-            expect(innerstore->Array.getUnsafe(index))->toEqual(
-              Valid(Some(Valid(new->Int.toString, new)), new),
-            )
+        // Each validation is a bit quicker than the last so the responses come back out of order
+        let validateString = (_x: FieldString.output) => {
+            let d = delay.contents
+            delay.contents = delay.contents - 10
+            Promise.sleep(d)->Promise.map(_ => Ok())
           }
-          )
+        {validate: validateArr, element: {validate: validateString}}
+      }
+
+      describe("#makeDyn", () => {
+        describe("set external", () => {
+          let test = () => {
+            let set = Rxjs.Subject.makeEmpty()
+            let {first, dyn} = Subject.makeDyn(context(), set->Rxjs.toObservable, None)
+            let current: ref<'ab> = {contents: first}
+
+            let res = dyn->Dynamic.switchSequence->applyCurrent(current)->Dynamic.toPromise
+
+            Rxjs.next(set, ["set"])
+            Promise.sleep(500)->Promise.tap(_ => current.contents.close())->Promise.void
+            res
+          }
+
+          itPromise("sets", () => {
+            test()->Promise.tap(res => res->Close.pack->Form.field->Subject.input->expect->toEqual(["set"]))
+          })
+        })
+
+        describe("set action", () => {
+          let test = () => {
+            let set = Rxjs.Subject.makeEmpty()
+            let {first, dyn} = Subject.makeDyn(context(), set->Rxjs.toObservable, None)
+            let current: ref<'ab> = {contents: first}
+
+            let res = dyn->Dynamic.switchSequence->applyCurrent(current)->Dynamic.toPromise
+
+            first.pack.actions.set(["set"])
+            Promise.sleep(500)->Promise.tap(_ => current.contents.close())->Promise.void
+
+            res
+          }
+
+          itPromise("sets", () => {
+            test()->Promise.tap(res => res->Close.pack->Form.field->Subject.input->expect->toEqual(["set"]))
+          })
+        })
+
+        describe("add", () => {
+          let test = (values) => {
+            let set = Rxjs.Subject.makeEmpty()
+            let {first,dyn} = Subject.makeDyn(context(), set->Rxjs.toObservable, None)
+            let current: ref<'ab> = {contents: first}
+
+            let res = dyn->Dynamic.switchSequence->applyCurrent(current)->Dynamic.toPromise
+
+            values->Array.forEach(first.pack.actions.add)
+
+            Promise.sleep(500)->Promise.tap(_ => current.contents.close())->Promise.void
+            res
+          }
+
+          itPromise("adds", () => {
+            test([None, Some("add")])->Promise.tap(res => res->Close.pack->Form.field->Subject.input->expect->toEqual(["", "add"]))
+          })
+        })
+
+        describe("remove", () => {
+          let test = () => {
+            let set = Rxjs.Subject.makeEmpty()
+            let {first, dyn} = Subject.makeDyn(context(), set->Rxjs.toObservable, None)
+            let current: ref<'ab> = {contents: first}
+
+            let res = dyn->Dynamic.switchSequence->applyCurrent(current)->Dynamic.toPromise
+
+            first.pack.actions.add(None)
+            first.pack.actions.add(Some("add"))
+            first.pack.actions.remove(0)
+
+            Promise.sleep(500)->Promise.tap(_ => current.contents.close())->Promise.void
+            res
+          }
+
+          itPromise("removes", () => {
+            test()->Promise.tap(res => res->Close.pack->Form.field->Subject.input->expect->toEqual(["add"]))
+          })
+        })
+
+        describe("opt", () => {
+          let test = (opt) => {
+            let set = Rxjs.Subject.makeEmpty()
+            let {first, dyn} = Subject.makeDyn(context(), set->Rxjs.toObservable, None)
+            let current: ref<'ab> = {contents: first}
+
+            let res = dyn->Dynamic.switchSequence->applyCurrent(current)->Dynamic.toPromise
+
+            first.pack.actions.set(["set", "set2"])
+            first.pack.actions.opt(opt)
+
+            Promise.sleep(500)->Promise.tap(_ => current.contents.close())->Promise.void
+            res
+          }
+
+          describe("some", () => {
+            itPromise("sets", () => {
+              test(Some(["opt", "opt2"]))->Promise.tap(res => res->Close.pack->Form.field->Subject.input->expect->toEqual(["opt", "opt2"]))
+            })
+          })
+          describe("none", () => {
+            itPromise("clears", () => {
+              test(None)->Promise.tap(res => res->Close.pack->Form.field->Subject.input->expect->toEqual([]))
+            })
+          })
+        })
+
+        describe("index", () => {
+          let test = () => {
+            let set = Rxjs.Subject.makeEmpty()
+            let {first, dyn} = Subject.makeDyn(context(), set->Rxjs.toObservable, None)
+            let current: ref<'ab> = {contents: first}
+
+            // This share prevents the observable from emitting everything twice?
+            let res = dyn->Dynamic.switchSequence->applyCurrent(current)->Dynamic.toPromise
+
+            first.pack.actions.set(["set0", "set1", "set2"])
+              
+            Promise.sleep(500)
+            ->Promise.tap(_ => current.contents.pack.actions.index(0)->Option.forEach(index => index.set("index") ))
+            ->Promise.delay(~ms=500)
+            ->Promise.tap(_ => current.contents.close())
+            ->Promise.void
+
+            res
+          }
+
+          itPromise("indexes", () => {
+            test()->Promise.tap(res => res->Close.pack->Form.field->Subject.input->expect->toEqual(["index", "set1", "set2"]))
+          })
+        })
+
+        describe("clear", () => {
+          let test = () => {
+            let set = Rxjs.Subject.makeEmpty()
+            let {first, dyn} = Subject.makeDyn(context(), set->Rxjs.toObservable, None)
+            let current: ref<'ab> = {contents: first}
+
+            let res = dyn->Dynamic.switchSequence->applyCurrent(current)->Dynamic.toHistory
+
+            first.pack.actions.set(["set", "set2"])
+            first.pack.actions.clear()
+
+            Promise.sleep(500)->Promise.tap(_ => current.contents.close())->Promise.void
+            res
+          }
+
+          itPromise("clears", () => {
+            test()->Promise.tap(res => res->Array.leaf->Option.getUnsafe->Close.pack->Form.field->Subject.input->expect->toEqual([]))
+          })
+        })
+
+        describe("reset", () => {
+          let test = () => {
+            let set = Rxjs.Subject.makeEmpty()
+            let {first, dyn} = Subject.makeDyn(context(), set->Rxjs.toObservable, None)
+            let current: ref<'ab> = {contents: first}
+
+            let res = dyn->Dynamic.switchSequence->applyCurrent(current)->Dynamic.toPromise
+
+            first.pack.actions.set(["set", "set2"])
+            first.pack.actions.reset()
+
+            Promise.sleep(500)->Promise.tap(_ => current.contents.close())->Promise.void
+
+            res
+          }
+
+          itPromise("resets", () => {
+            test()->Promise.tap(res => res->Close.pack->Form.field->Subject.input->expect->toEqual([]))
+          })
         })
       })
     })
 
-    describe("#Remove", () => {
-      describe("out of bounds", () => {
-        let index = 5
-        let change = #Remove(index)
-        let result = Field.reduce(~context, store, {value: change, index: 0, priority: 0})
-        testPromise("returns input", () => {
-          result->Dynamic.toPromise
-          ->Promise.tap(result => {
-            expect(result->Field.input)->toEqual(input->Array.map(Option.map(_, Int.toString)))
-          })
-        })
-      })
-
-      describe("in bounds", () => {
-        let index = 1
-        let change = #Remove(index)
-        let result = Field.reduce(~context, store, {value: change, index: 0, priority: 0})
-        testPromise("decreases array length by 1", () => {
-          result->Dynamic.toPromise
-          ->Promise.tap(result => {
-            let inner = result->Store.inner
-            expect(inner->Array.length)->toEqual(input->Array.length - 1)
-          })
-        })
-        // TODO check other elements
-      })
-    })
   })
 })

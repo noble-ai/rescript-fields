@@ -49,7 +49,7 @@ module type Make = (I: IParse) => FieldParse
   and type output = I.t
   and type context = context<validate<I.t>, string>
   and type t = Store.t<string, I.t, error>
-  and type change = change
+  // and type change = change
   and type actions<'change> = Actions.t<'change>
   and type error = error
   and type inner = string
@@ -71,7 +71,7 @@ module Make: Make = (I: IParse) => {
   // TODO: should return #Valid based on validateImmediate flag
   let set = Store.dirty
 
-  let validate = (force, context: context, store: t): Dynamic.t<t> => {
+  let validate = (force, context: context, store: t): Rxjs.t<Rxjs.foreign, Rxjs.void,t> => {
     ignore(context)
     ignore(force)
     let inner = store->Store.inner
@@ -96,49 +96,113 @@ module Make: Make = (I: IParse) => {
     }
   }
 
-  type change = change
-  let makeSet = Actions.actions.set
-  let showChange = change =>
-    switch change {
-    | #Set(input) => `Set(${input})`
-    | #Clear => "Clear"
-    | #Validate => "Validate"
-    }
+  // type change = change
+  // let makeSet = Actions.actions.set
+  // let showChange = change =>
+  //   switch change {
+  //   | #Set(input) => `Set(${input})`
+  //   | #Clear => "Clear"
+  //   | #Validate => "Validate"
+  //   }
 
   type actions<'change> = Actions.t<'change>
   let mapActions = Actions.map
-  let actions = Actions.actions
-  
-  type pack = Pack.t<t, change, actions<Promise.t<()>>, actions<()>>
-  
-  let reduce = (~context: context, store: Dynamic.t<t>, change: Indexed.t<change>): Dynamic.t<
-    t,
-  > => {
-    ignore(context)
-    switch change.value {
-    | #Clear => context->init->Dynamic.return
-    | #Set(input) =>
-      input
-      ->Store.dirty
-      ->(
-        x =>
-          if I.validateImmediate {
-            validate(false, context, x)
-          } else {
-            x->Dynamic.return
-          }
-      )
+  // let actions = Actions.actions
 
-    // ->Dynamic.map(x => change->Indexed.map(_ => x))
-    | #Validate =>
-      store
-      ->Dynamic.take(1)
-      ->Dynamic.bind(store => {
-        validate(false, context, store)
-      })
-    // ->Dynamic.map(x => change->Indexed.map(_ => x))
+  let maybeValidate = (context, state)  =>
+      if I.validateImmediate {
+        validate(false, context, state)
+      } else {
+        state->Dynamic.return
+      }
+
+  let makeDyn = (context: context, setOuter: Rxjs.Observable.t<input>, valOuter: option<Rxjs.Observable.t<()>> )
+      : Dyn.t<Close.t<Form.t<t, actions<()>>>>
+    => {
+    let field = init()
+
+    let complete = Rxjs.Subject.makeEmpty()
+    let close = Rxjs.next(complete)
+
+    let state = Rxjs.Subject.makeBehavior(field)
+    let setInner = Rxjs.Subject.makeEmpty()
+    let clear = Rxjs.Subject.makeEmpty()
+    let valInner = Rxjs.Subject.makeEmpty()
+
+    let actions: actions<()> = {
+      set: Rxjs.next(setInner),
+      clear: Rxjs.next(clear),
+      validate: Rxjs.next(valInner),
     }
+
+    let first: Close.t<Form.t<'f, 'a>> = {pack: { field, actions }, close}
+    
+    let set = Rxjs.merge2(setOuter, setInner)
+    let val = valOuter->Option.map(Rxjs.merge2(_, valInner))->Option.or(valInner->Rxjs.toObservable)
+
+    let set = set->Dynamic.map(input => {
+        input
+        ->Store.dirty
+        ->maybeValidate(context, _)
+      })
+
+    let clear = clear->Dynamic.map(_ => context->init->Dynamic.return)
+       // ->maybeValidate(context, _)
+
+    let validate = val 
+      ->Dynamic.withLatestFrom(state)
+      ->Dynamic.map(((_, field)) => validate(false, context, field))
+
+    let changes = Rxjs.merge3(set, clear, validate) 
+      changes 
+      ->Dynamic.switchSequence
+      ->Rxjs.subscribe_({
+        next: (. field) => Rxjs.next(state, field),
+        error: (. err) => Rxjs.error(state, err),
+        complete: (. ) => Rxjs.complete(state)
+      })
+
+    let dyn = 
+      changes 
+      ->Dynamic.map((field) => 
+        field
+        // ->Dynamic.log("parse field")
+        ->Dynamic.map( (field): Close.t<Form.t<t, 'b>> => {pack: {field, actions}, close})
+      )
+      ->Rxjs.toObservable
+      ->Rxjs.pipe(Rxjs.takeUntil(complete))
+
+    {first, dyn}
   }
+ 
+  // let reduce = (~context: context, store: Rxjs.t<Rxjs.foreign, Rxjs.void,t>, change: Indexed.t<change>): Rxjs.t<Rxjs.foreign, Rxjs.void,
+  //   t,
+  // > => {
+  //   ignore(context)
+  //   switch change.value {
+  //   | #Clear => context->init->Dynamic.return
+  //   | #Set(input) =>
+  //     input
+  //     ->Store.dirty
+  //     ->(
+  //       x =>
+  //         if I.validateImmediate {
+  //           validate(false, context, x)
+  //         } else {
+  //           x->Dynamic.return
+  //         }
+  //     )
+
+  //   // ->Dynamic.map(x => change->Indexed.map(_ => x))
+  //   | #Validate =>
+  //     store
+  //     ->Dynamic.take(1)
+  //     ->Dynamic.bind(store => {
+  //       validate(false, context, store)
+  //     })
+  //   // ->Dynamic.map(x => change->Indexed.map(_ => x))
+  //   }
+  // }
 
   let enum = Store.toEnum
   let inner = Store.inner

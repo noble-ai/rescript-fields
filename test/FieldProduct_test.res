@@ -1,6 +1,4 @@
 open Vitest
-// prefer shadowing Dynamic
-open FieldProduct
 
 module Gen2 = {
 	@deriving(accessors)
@@ -13,30 +11,270 @@ module Gen2 = {
 }
 
 module FieldString = FieldString.Make({
-  let validateImmediate = false
+  let validateImmediate = true
 })
 
 
 describe("FieldProduct", () => {
 	describe("Product2", () => {
-	module Subject = Product2.Make({
-			let validateImmediate = false
-		}, Gen2, FieldString, FieldString);
+		describe("validate immediate", () => {
+			module Subject = FieldProduct.Product2.Make({
+				let validateImmediate = true 
+			}, Gen2, FieldString, FieldString)
 
-		let context: Subject.context = {
-			inner: {
-				left: { },
-				right: { }
-			}
-		}
+			describe("context default", () => {
+				let context: Subject.context = {
+					inner: {
+						left: { },
+						right: { }
+					}
+				}
 
-		let left: FieldString.t = Valid("a", "a")
-		let right: FieldString.t = Valid("b", "b")
-		let store: Subject.t = Dirty({ left: left, right: right })
-		describe("#Validate", () => {
-			let res = Subject.validate(false, context, store)
-			itPromise("resolves to a valid Subject.t", () => {
-				res->Dynamic.toPromise->Promise.map( v => expect(v)->toEqual(Valid({ left: left, right: right }, {left: "a", right: "b" })) )
+				describe("#Validate", () => {
+					let left: FieldString.t = Valid("a", "a")
+					let right: FieldString.t = Valid("b", "b")
+					let store: Subject.t = Dirty({ left: left, right: right })
+					let res = Subject.validate(false, context, store)
+					itPromise("resolves to a valid Subject.t", () => {
+						res->Dynamic.toPromise->Promise.map( v => expect(v)->toEqual(Valid({ left: left, right: right }, {left: "a", right: "b" })) )
+					})
+				})
+
+				describe("#makeDyn", () => {
+					describe("setOuter", () => {
+						let set = Rxjs.Subject.makeEmpty()
+						let val = Rxjs.Subject.makeEmpty()
+
+						let {first, dyn} = Subject.makeDyn(context, set->Rxjs.toObservable, val->Rxjs.toObservable->Some)
+						let current: ref<'a> = {contents: first}
+
+						let res = dyn->Dynamic.switchSequence->FieldArray_test.applyCurrent(current)->Dynamic.toPromise
+
+						set->Rxjs.next({left: "haha", right: "nono"})
+						current.contents.close()
+
+						itPromise("applies value", () => {
+							res->Promise.tap(res => res->Close.pack->Form.field->Subject.input->expect->toEqual({left: "haha", right: "nono"}))
+						})
+					})
+				})
+			})
+
+			describe("context validate", () => {
+				// Delay each validation progressively less so they all overlap
+				let delay: ref<int> = {contents: 100}
+				let context: Subject.context = {
+					validate: (_x: Subject.output) => {
+						let d = delay.contents
+						delay.contents = delay.contents - 10
+						Promise.sleep(d)->Promise.map(_ => Ok())
+					},
+					inner: {
+						left: { },
+						right: { }
+					}
+				}	
+
+				describe("#makeDyn", () => {
+					describe("setOuter", () => {
+						let set = Rxjs.Subject.makeEmpty()
+						let val = Rxjs.Subject.makeEmpty()
+
+						let {first, dyn} = Subject.makeDyn(context, set->Rxjs.toObservable, val->Rxjs.toObservable->Some)
+						let current: ref<'a> = {contents: first}
+
+						let res = dyn->Dynamic.switchSequence->FieldArray_test.applyCurrent(current)->Dynamic.toPromise
+
+						set->Rxjs.next({left: "haha", right: "nono"})
+						set->Rxjs.next({left: "nono", right: "haha"})
+						Promise.sleep(100)->Promise.tap(_ => current.contents.close())->Promise.void
+
+						itPromise("applies last", () => {
+							res->Promise.tap(res => res->Close.pack->Form.field->Subject.input->expect->toEqual({left: "nono", right: "haha"}))
+						})
+					})
+				})
+			})
+
+			describe("context validate nested", () => {
+				// Delay each validation progressively less so they all overlap
+				// cant have mroe than 10 validations w this setting
+				// but default timeout is 5s so watch out increasing it
+				let delay: ref<int> = {contents: 100}
+				let validate = (_x: Subject.output) => {
+						let d = delay.contents
+						delay.contents = delay.contents - 10
+						Promise.sleep(d)->Promise.map(_ => Ok())
+					}
+
+				let validateString = (_x: FieldString.output) => {
+						// Console.log2("validateString", x)
+						let d = delay.contents
+						delay.contents = delay.contents - 10
+						Promise.sleep(d)->Promise.map(_ => Ok())
+					}
+
+				let context: Subject.context = {
+					validate: validate,
+					inner: {
+						left: { validate: validateString },
+						right: { validate: validateString }
+					}
+				}	
+
+				describe("#makeDyn", () => {
+					describe("setOuter", () => {
+						let set = Rxjs.Subject.makeEmpty()
+						let val = Rxjs.Subject.makeEmpty()
+
+						let {first, dyn} = Subject.makeDyn(context, set->Rxjs.toObservable, val->Rxjs.toObservable->Some)
+						let current: ref<'a> = {contents: first}
+
+						let res = dyn->Dynamic.switchSequence->FieldArray_test.applyCurrent(current)->Dynamic.toPromise
+
+						// let hist = dyn->Dynamic.toHistory
+						set->Rxjs.next({left: "haha", right: "nono"})
+						set->Rxjs.next({left: "nono", right: "haha"})
+						// Needs to be long enough for
+						Promise.sleep(1000)->Promise.tap(_ => current.contents.close())->Promise.void
+
+						// hist->Promise.tap(hist => {
+						// 	hist->Array.map(x => x->Tuple.fst2->Form.field->Subject.show)
+						// 	->Console.log2("hist", _)
+						// })->Promise.void
+
+						let field = res->Promise.map(res => res->Close.pack->Form.field)
+						itPromise("applies last", () => {
+							field->Promise.tap(field => field->Subject.input->expect->toEqual({left: "nono", right: "haha"}))
+						})
+						itPromise("resolves to valid", () => {
+							field->Promise.tap(field => field->Subject.enum->expect->toEqual(#Valid))
+						})
+					})
+				})
+			})
+		})
+		describe("validate deferred", () => {
+			module Subject = FieldProduct.Product2.Make({
+				let validateImmediate = false 
+			}, Gen2, FieldString, FieldString);
+
+			describe("context default", () => {
+				let context: Subject.context = {
+					inner: {
+						left: { },
+						right: { }
+					}
+				}
+
+				describe("#makeDyn", () => {
+					describe("setOuter", () => {
+						let set = Rxjs.Subject.makeEmpty()
+						let val = Rxjs.Subject.makeEmpty()
+
+						let {first, dyn} = Subject.makeDyn(context, set->Rxjs.toObservable, val->Rxjs.toObservable->Some)
+						let current: ref<'a> = {contents: first}
+
+						let res = dyn->Dynamic.switchSequence->FieldArray_test.applyCurrent(current)->Dynamic.toPromise
+
+						set->Rxjs.next({left: "haha", right: "nono"})
+						current.contents.close()
+
+						itPromise("applies value", () => {
+							res->Promise.tap(res => res->Close.pack->Form.field->Subject.input->expect->toEqual({left: "haha", right: "nono"}))
+						})
+					})
+				})
+			})
+
+			describe("context validate", () => {
+				// Delay each validation progressively less so they all overlap
+				let delay: ref<int> = {contents: 100}
+				let context: Subject.context = {
+					validate: (_x: Subject.output) => {
+						let d = delay.contents
+						delay.contents = delay.contents - 10
+						Promise.sleep(d)->Promise.map(_ => Ok())
+					},
+					inner: {
+						left: { },
+						right: { }
+					}
+				}	
+
+				describe("#makeDyn", () => {
+					describe("setOuter", () => {
+						let set = Rxjs.Subject.makeEmpty()
+						let val = Rxjs.Subject.makeEmpty()
+
+						let {first, dyn} = Subject.makeDyn(context, set->Rxjs.toObservable, val->Rxjs.toObservable->Some)
+						let current: ref<'a> = {contents: first}
+
+						let res = dyn->Dynamic.switchSequence->FieldArray_test.applyCurrent(current)->Dynamic.toPromise
+
+						set->Rxjs.next({left: "haha", right: "nono"})
+						set->Rxjs.next({left: "nono", right: "haha"})
+						Promise.sleep(100)->Promise.tap(_ => current.contents.close())->Promise.void
+
+						itPromise("applies last", () => {
+							res->Promise.tap(res => res->Close.pack->Form.field->Subject.input->expect->toEqual({left: "nono", right: "haha"}))
+						})
+					})
+				})
+			})
+
+			describe("context validate nested", () => {
+				// Delay each validation progressively less so they all overlap
+				let delay: ref<int> = {contents: 100}
+				let validate = (_x: Subject.output) => {
+						let d = delay.contents
+						delay.contents = delay.contents - 10
+						Promise.sleep(d)->Promise.map(_ => Ok())
+					}
+
+				let validateString = (_x: FieldString.output) => {
+						// Console.log2("validateString", x)
+						let d = delay.contents
+						delay.contents = delay.contents - 10
+						Promise.sleep(d)->Promise.map(_ => Ok())
+					}
+
+				let context: Subject.context = {
+					validate: validate,
+					inner: {
+						left: { validate: validateString },
+						right: { validate: validateString }
+					}
+				}	
+
+				describe("#makeDyn", () => {
+					describe("setOuter", () => {
+						let set = Rxjs.Subject.makeEmpty()
+						let val = Rxjs.Subject.makeEmpty()
+
+						let {first, dyn} = Subject.makeDyn(context, set->Rxjs.toObservable, val->Rxjs.toObservable->Some)
+						let current: ref<'a> = {contents: first}
+
+						let res = dyn->Dynamic.switchSequence->FieldArray_test.applyCurrent(current)->Dynamic.toPromise
+
+						// let hist = dyn->Dynamic.toHistory
+						set->Rxjs.next({left: "haha", right: "nono"})
+						set->Rxjs.next({left: "nono", right: "haha"})
+						Promise.sleep(100)->Promise.tap(_ => current.contents.close())->Promise.void
+
+						// hist->Promise.tap(hist => {
+						// 	hist->Array.map(x => x->Tuple.fst2->Form.field->Subject.show)->Console.log2("hist", _)
+						// })->Promise.void
+
+						let field = res->Promise.map(res => res->Close.pack->Form.field)
+						itPromise("applies last", () => {
+							field->Promise.tap(field => field->Subject.input->expect->toEqual({left: "nono", right: "haha"}))
+						})
+						itPromise("resolves to dirty", () => {
+							field->Promise.tap(field => field->Subject.enum->expect->toEqual(#Dirty))
+						})
+					})
+				})
 			})
 		})
 	})

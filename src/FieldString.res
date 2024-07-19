@@ -2,7 +2,7 @@
 
 type error = [#Empty | #TooShort | #TooLong | #External(string)]
 
-type validate = string => Promise.t<Result.t<string, error>>
+type validate = string => Promise.t<Result.t<(), error>>
 
 type context = {validate?: validate}
 
@@ -13,7 +13,7 @@ let length = (~min: option<int>=?, ~max: option<int>=?, ()): validate =>
       #TooShort->Result.Error
     | a if max->Option.map(max => a->String.length > max)->Option.or(false) =>
       #TooLong->Result.Error
-    | _ => Result.Ok(str)
+    | _ => Result.Ok()
     }->Promise.return
   }
 
@@ -43,12 +43,10 @@ module Actions = {
   }
 
   let mapActions = (actions, fn) => {
-    {
-      clear: () => fn(actions.clear()),
-      reset: () => fn(actions.reset()),
-      validate: () => fn(actions.validate()),
-      set: input => fn(actions.set(input)),
-    }
+    clear: () => fn(actions.clear()),
+    reset: () => fn(actions.reset()),
+    validate: () => fn(actions.validate()),
+    set: input => fn(actions.set(input)),
   }
 
   let actions = {
@@ -60,7 +58,7 @@ module Actions = {
 }
   
 type actions<'change> = Actions.t<input, 'change>
-type pack = Pack.t<t, change<input>, actions<Promise.t<()>>, actions<()>>
+type pack = Form.t<t, actions<()>>
 
 module Make = (I: IString) => {
   type error = error
@@ -80,32 +78,36 @@ module Make = (I: IString) => {
   // TODO: could return #Valid?
   let set = Store.dirty
 
-  let validate = (force: bool, context: context, store: t): Dynamic.t<t> => {
+  let validate = (force: bool, context: context, store: t): Rxjs.t<Rxjs.foreign, Rxjs.void,t> => {
     ignore(force)
-    let _ = context // shut up unused warning
+    // let _ = context // shut up unused warning
 
+    // Console.log2("String validate", store->Store.toEnum)
     // TODO: Should this be hanlded here or in Product - AxM
     switch store {
     | Init(input)
     | Dirty(input) =>
       switch context.validate {
       | None => Store.valid(input, input)->Dynamic.return
-      | Some(validate) => validate(input)
-        ->Rxjs.fromPromise
-        ->Dynamic.map(res => {
+      | Some(validate) => {
+        validate(input)
+        ->Promise.map(res => {
+          // Console.log(`FieldString validate "${input}"`)
           switch res {
           | Ok(_) => Store.valid(input, input)
           | Error(err) => Store.invalid(input, err)
           }
         })
+        ->Rxjs.fromPromise
         ->Dynamic.startWith(Store.busy(input))
+      }
       }
     | _ => Dynamic.return(store)
     }
   }
 
   type change = change<input>
-  let makeSet = input => #Set(input)
+  // let makeSet = input => #Set(input)
   let showChange = (change: change) => {
     switch change {
     | #Clear => "Clear"
@@ -115,32 +117,8 @@ module Make = (I: IString) => {
     }
   }
 
-
   type actions<'change> = Actions.t<input, 'change>
   let mapActions = Actions.mapActions
-  let actions = Actions.actions
-  
-  type pack = Pack.t<t, change, actions<Promise.t<()>>, actions<()>>
-  
-  let reduce = (~context: context, store: Dynamic.t<t>, change: Indexed.t<change>): Dynamic.t<
-    t,
-  > => {
-    switch change.value {
-    | #Clear => init(context)->Dynamic.return
-    | #Reset => init(context)->Dynamic.return
-    | #Validate => store
-      ->Dynamic.take(1)
-      ->Rxjs.pipe(
-        Rxjs.mergeMap(store => Store.dirty(store->Store.inner)->validate(false, context, _)),
-      )
-    | #Set(input) =>
-      if I.validateImmediate {
-        Store.dirty(input)->validate(false, context, _)
-      } else {
-        Store.dirty(input)->Dynamic.return
-      }
-    }
-  }
 
   let enum = Store.toEnum
   let inner = Store.inner
@@ -152,7 +130,90 @@ module Make = (I: IString) => {
     `FieldString{
 		validateImmediate: ${I.validateImmediate ? "true" : "false"},
 		state: ${store->enum->Store.enumToPretty},
+    input: ${store->input},
+    output: ${store->output->Option.or("None")}
 	}`
+  }
+
+
+  let makeDyn = (context: context, setOuter: Rxjs.Observable.t<input>, valOuter: option<Rxjs.Observable.t<()>>)
+      : Dyn.t<Close.t<Form.t<t, actions<()>>>>
+    => {
+    let field = init(context)
+
+    let complete = Rxjs.Subject.makeEmpty()
+    let clear = Rxjs.Subject.makeEmpty()
+    let reset = Rxjs.Subject.makeEmpty()
+    let setInner = Rxjs.Subject.makeEmpty()
+    let valInner = Rxjs.Subject.makeEmpty()
+
+    let set = Rxjs.merge2(setOuter, setInner)
+
+    let state = Rxjs.Subject.makeBehavior(field)
+
+    let actions: actions<()> = {
+      clear: Rxjs.next(clear),
+      reset: Rxjs.next(reset),
+      validate: Rxjs.next(valInner),
+      set: Rxjs.next(setInner)
+    }
+
+    // For testing, you need to close EVERYTHING including the set to get the observable to close.
+    // FIXME: can this be more aggressive? - AxM
+    let close = Rxjs.next(complete)
+
+    let first: Close.t<Form.t<'f, 'a>> = {pack: {field, actions}, close}
+
+    let val = 
+          valOuter
+          ->Option.map(Rxjs.merge2(_, valInner))
+          ->Option.or(valInner->Rxjs.toObservable)
+
+    let clear =
+          clear
+          ->Dynamic.map(_ => if I.validateImmediate {
+              init(context)->validate(false, context, _)
+            } else {
+              init(context)->Dynamic.return
+            }
+          ) 
+
+    let reset = 
+          reset
+          ->Dynamic.map(_ => init(context)->Dynamic.return)
+
+    let val = 
+          val 
+          ->Dynamic.withLatestFrom(state)
+          ->Dynamic.map(((_, state)) => state->validate(true, context, _))
+    
+    let set = set
+      ->Dynamic.map(input => {
+          if I.validateImmediate {
+            // Console.log2("FieldString set", input)
+            Store.dirty(input)->validate(false, context, _)
+          } else {
+            Store.dirty(input)->Dynamic.return
+          }
+        })
+
+    Rxjs.merge4( clear, reset, val, set)
+      ->Dynamic.switchSequence
+      ->Rxjs.subscribe_({
+        next: (. x) => Rxjs.next(state, x),
+        error: (. _err) => (),
+        complete: (. ) => ()
+      })
+
+
+    let dyn = 
+      Rxjs.merge4(clear, reset, val, set)
+      ->Dynamic.map(Dynamic.map(_, (field): Close.t<Form.t<t, 'b>> => {pack: {field, actions}, close}))
+      ->Dynamic.startWith(Dynamic.return(first))
+      ->Rxjs.pipe(Rxjs.takeUntil(complete))
+      // ->Dynamic.mapLog("field string", x => x->Tuple.fst2->Form.field->show)
+
+    {first, dyn}
   }
 
   let printError = (store: t) => {

@@ -21,7 +21,7 @@
 //     ~force=false,
 //     context,
 //     store: t,
-//   ): Dynamic.t<t> => {
+//   ): Rxjs.t<Rxjs.foreign, Rxjs.void,t> => {
 //     ignore(context)
 //     ignore(force)
 //     let input = store->Store.inner
@@ -30,13 +30,13 @@
 
 //   type change = T.t
 
-//   type pack = Pack.t<t, change, actions<Promise.t<()>>, actions<()>>
+//   type pack = Form.t<t, change, actions<Promise.t<()>>, actions<()>>
 
 //   let reduce = (
 //     ~context: context,
 //     _store: t,
 //     change: Indexed.t<change>,
-//   ): Dynamic.t<t> => {
+//   ): Rxjs.t<Rxjs.foreign, Rxjs.void,t> => {
 //     ignore(context)
 //     Store.Valid(change.value, change.value)->Dynamic.return
 //   }

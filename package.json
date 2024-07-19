@@ -1,6 +1,6 @@
 {
   "name": "@nobleai/rescript-fields",
-  "version": "0.2.6",
+  "version": "1.0.0-beta.1",
   "description": "Elaborate form validation system for Rescript",
   "files": [
     "README.md",
@@ -10,6 +10,7 @@
     "src/**/*.res",
     "src/**/*.resi"
   ],
+  "namespace": true,
   "scripts": {
     "build": "rescript build",
     "start": "rescript build -w",
@@ -34,8 +35,8 @@
   "devDependencies": {
     "@nobleai/rescript-documentation": "^0.7.1",
     "@nobleai/rescript-lodash": "^4.17.21",
-    "@nobleai/rescript-prelude": "^0.13.6",
-    "@nobleai/rescript-rxjs": "^7.5.14",
+    "@nobleai/rescript-prelude": "^0.13.7",
+    "@nobleai/rescript-rxjs": "7.5.18",
     "@nobleai/rescript-testing-library": "^0.1.0",
     "@nobleai/rescript-vitest": "^0.30.3",
     "@rescript/react": "^0.11.0",
@@ -44,19 +45,21 @@
     "@testing-library/react": "^14.0.0",
     "@testing-library/react-hooks": "^8.0.1",
     "@testing-library/user-event": "^14.4.3",
+    "@vitest/browser": "^1.5.2",
     "jsdom": "^24.0.0",
-    "react": "^18.2.0",
-    "react-dom": "^18.2.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
     "rescript": "^10.0.0",
     "rxjs": "^7.5.5",
     "vite": "^4.3.9",
-    "vitest": "^1.3.1"
+    "vitest": "^1.3.1",
+    "webdriverio": "^8.36.1"
   },
   "peerDependencies": {
     "@nobleai/rescript-prelude": "^0.12.6",
     "@nobleai/rescript-rxjs": "^7.5.14",
     "@rescript/react": "^0.11.0",
-    "react": "^18.2.0",
+    "react": "^18.3.1",
     "rxjs": "^7.5.5"
   }
 }

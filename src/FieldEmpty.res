@@ -26,9 +26,9 @@ module Field: Field.T = {
     Store.valid(inner, inner)->Dynamic.return
   }
 
-  type change = input
-  let makeSet = input => input
-  let showChange = (change: change) => change
+  // type change = input
+  // let makeSet = input => input
+  // let showChange = (change: change) => change
 
   type actions<'change> = {
     set: input => 'change
@@ -38,18 +38,49 @@ module Field: Field.T = {
     {set: x => x->actions.set->fn }
   }
 
-  let actions: actions<change> = {
-    set: x => x
-  }
+  // let actions: actions<change> = {
+  //   set: x => x
+  // }
   
-  type pack = Pack.t<t, change, actions<Promise.t<()>>, actions<()>>
-    
-  let reduce = (~context, store: Dynamic.t<t>, _change: Indexed.t<'ch>): Dynamic.t<t> => {
-    ignore(context)
-    // Wrap store in index from change
-    store
-    // ->Dynamic.map( store => change->Indexed.map(_ => store))
+  let makeDyn = (_context: context, setOuter: Rxjs.t<'cs, 'ss, input>, val: option<Rxjs.Observable.t<()>> )
+      : Dyn.t<Close.t<Form.t<t, actions<()>>>>
+    => {
+    let setInner = Rxjs.Subject.makeEmpty()
+    let complete = Rxjs.Subject.makeEmpty()
+    let close = Rxjs.next(complete)
+
+    let actions: actions<()> = {
+      set: Rxjs.next(setInner)
+    }
+
+    let field = init()
+    let first: Close.t<Form.t<t, actions<()>>> = {pack: { field, actions }, close}
+
+    let val = val->Option.or(Rxjs.Subject.makeEmpty()->Rxjs.toObservable)
+
+    let dyn = 
+      Rxjs.merge2(
+        setOuter->Dynamic.map(_ => field),
+        val->Dynamic.map(_ => field)
+      )
+      ->Dynamic.map((field): Close.t<Form.t<t, actions<()>>> => {pack: { field, actions }, close})
+      ->Rxjs.toObservable
+      // Complete closes each particular event observable
+      ->Rxjs.pipe(Rxjs.takeUntil(complete))
+      ->Dynamic.map(Dynamic.return)
+      // Complete closes the  observable of obserservables
+      ->Rxjs.pipe(Rxjs.takeUntil(complete))
+
+      { first, dyn }
   }
+
+ 
+  // let reduce = (~context, store: Rxjs.t<Rxjs.foreign, Rxjs.void,t>, _change: Indexed.t<'ch>): Rxjs.t<Rxjs.foreign, Rxjs.void,t> => {
+  //   ignore(context)
+  //   // Wrap store in index from change
+  //   store
+  //   // ->Dynamic.map( store => change->Indexed.map(_ => store))
+  // }
   
   // Inner is the immediate store values of children
   let inner = Store.inner

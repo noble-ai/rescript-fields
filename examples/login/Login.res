@@ -36,43 +36,48 @@ module Form = UseField.Make(Field)
 
 @react.component
 let make = (~onSubmit) => {
-  let field = Form.use(
+  let form = Form.use(. 
     ~context={
       inner: {
         username: {validate: FieldString.length(~min=2, ())},
         password: {validate: FieldString.length(~min=2, ())},
       },
     },
-    ~init={username: "", password: ""},
-    (),
+    ~init=Some({username: "", password: ""}),
+    ~validateInit=false,
   )
-  let {username, password} = Field.split(field.part)
-  <form onSubmit={field.handleSubmit(onSubmit)}>
+
+  let handleSubmit = React.useMemo1( () => {
+    (_) => form.field->Field.output->Option.map(onSubmit)->Option.void
+  }, [form.field->Field.output])
+
+  let {username, password} = Field.split(form)
+  <form onSubmit={handleSubmit}>
     {<div>
       {
-        let {field, actions_} = username
+        let {field, actions} = username
         <>
           <input
             value={field->FieldUsername.input}
             onChange={e => {
               let target = e->ReactEvent.Form.target
-              target["value"]->actions_.set
+              target["value"]->actions.set
             }}
           />
           {field->FieldUsername.printError->Option.map(React.string)->Option.or(React.null)}
         </>
       }
       {
-        let {field, actions_} = password
+        let {field, actions} = password
         <>
           <input
             type_="password"
             value={field->FieldPassword.input}
             onChange={e => {
               let target = e->ReactEvent.Form.target
-              target["value"]->actions_.set
+              target["value"]->actions.set
             }}
-            onBlur={_ => actions_.validate()}
+            onBlur={_ => actions.validate()}
           />
           {field->FieldPassword.printError->Option.map(React.string)->Option.or(React.null)}
         </>

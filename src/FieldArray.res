@@ -21,7 +21,7 @@ let length = (~len, arr) => {
 module type IArray = (F: Field.T) =>
 {
   let filter: array<F.t> => array<F.t>
-  let empty: Context.structure<F.output, F.context> => array<F.t>
+  let empty: Context.structure<F.output, F.context> => array<F.input>
   let validateImmediate: bool
 }
 
@@ -31,20 +31,42 @@ let filterGrace = (a: array<'t>) => {
   a->Array.slice(0, a->Array.length - 1)
 }
 
-type actions<'finput, 'factions, 'change> = {
-  set: array<'finput> => 'change,
-  clear: () => 'change,
-  opt: option<array<'finput>> => 'change,
-  index: (int) => 'factions,
-  add: [#Some('finput) | #Empty] => 'change,
-  remove: int => 'change,
-  reset: () => 'change,
+type actions<'finput, 'factions, 'out> = {
+  set: array<'finput> => 'out,
+  add: option<'finput> => 'out,
+  remove: int => 'out,
+  opt: option<array<'finput>> => 'out,
+  clear: () => 'out,
+  reset: () => 'out,
+  index: (int) => option<'factions>,
+}
+  
+let changeElements = (make: (int, 'input) => 'out) => {
+  (. change: Rxjs.t<'class, 'source, 'change>): Rxjs.t<'co, 'so, array<'out>> => {
+    Rxjs.Observable.make(observer => {
+      let children = ref([])
+      let sub = change->Rxjs.subscribe({
+        next: (. change: 'change) => {
+          children.contents = switch change {
+            | #Add(input) => children.contents->Array.length->make(input)->Array.append(children.contents, _)
+            | #Remove(index) => children.contents->Array.remove(index)
+            | #Set(input) => input->Array.mapi( (x, i) => make(i, Some(x)))
+          }
+          observer.next(. children.contents)
+        },
+        error:observer.error,
+        complete:observer.complete,
+      })
+      Some(() => Rxjs.unsubscribe(sub))
+    })
+  }
 }
 
   module type T = {
     include Field.T
+    type inputElement
     type parted
-    let split: pack => parted
+    let split: Form.t<t, actions<()>> => parted
   }
   
   type error = [#Whole(string) | #Part]
@@ -52,40 +74,21 @@ type actions<'finput, 'factions, 'change> = {
   // giving the Make functor this
   module type Make = (I: IArray, F: Field.T) => T
     with type input = array<F.input>
+    and type inputElement = F.input
     and type inner = array<F.t>
     and type output = array<F.output> 
     and type error = error
     and type t = Store.t<array<F.t>, array<F.output>, error>
     and type context = Context.structure<F.output, F.context>
-    and type change = [
-      | #Set(array<F.input>)
-      | #Index(int, F.change)
-      | #Add([#Some(F.input) | #Empty])
-      | #Remove(int)
-      | #Clear
-      | #Reset
-    ]
     and type actions<'change> = actions<F.input, F.actions<'change>, 'change>
-    and type pack = Pack.t<
-      Store.t<array<F.t>, array<F.output>, error>,
-      [
-        | #Set(array<F.input>)
-        | #Index(int, F.change)
-        | #Add([#Some(F.input) | #Empty])
-        | #Remove(int)
-        | #Clear
-        | #Reset
-      ],
-      actions<F.input, F.actions<Promise.t<()>>, Promise.t<()>>,
-      actions<F.input, F.actions<()>, ()>,
-    >
-    and type parted = array<Pack.t<F.t, F.change, F.actions<Promise.t<()>>, F.actions<()>>>
+    and type parted = array<Form.t<F.t, F.actions<()>>>
 
 module Make: Make = (I: IArray, F: Field.T) => {
   module I = I(F)
   module Element = F
   type context = Context.structure<Element.output, Element.context>
 
+  type inputElement = Element.input
   type input = array<Element.input>
   let showInput = (input: input) => {
     `[ ${input->Array.map(Element.showInput)->Array.joinWith(",\n")} ]`
@@ -96,7 +99,7 @@ module Make: Make = (I: IArray, F: Field.T) => {
   type inner = array<Element.t>
   type t = Store.t<inner, output, error>
 
-  let empty: context => inner = I.empty
+  let empty: context => inner = (context) => context->I.empty->Array.map(F.set)
   let init: context => t = context => context->empty->Store.init
 
   let set = (input: input): t => input->Array.map(F.set)->Dirty
@@ -148,51 +151,29 @@ module Make: Make = (I: IArray, F: Field.T) => {
   }
 
   // Just like FieldProduct makeStore, but for an array of same elements
-  let makeStore = (~context: context, ~force=false, inner: inner): Dynamic.t<t> => {
+  let makeStore = (~validate, inner: inner): Rxjs.t<Rxjs.foreign, Rxjs.void,t> => {
     [
       prefer(#Busy, Store.busy, inner),
       preferFiltered(#Invalid, Store.invalid(_, #Part), inner, inner->I.filter),
       preferFiltered(#Dirty, Store.dirty, inner, inner->I.filter),
-      validateImpl(context, force, inner),
+      validate(inner),
     ]
     ->Array.reduce(Result.first, Error(#Invalid))
     ->Result.resolve(~ok=x => x, ~err=FieldVector.resolveErr(inner))
   }
 
-  let validate = (force, context: context, store: t): Dynamic.t<t> => {
+  let validate = (force, context: context, store: t): Rxjs.t<Rxjs.foreign, Rxjs.void,t> => {
     // Using combineLatest to get the status of all children
     // requires there be children. so add shortcut for empty array
+    let validate = validateImpl(context, force)
     let inner = store->Store.inner
     if inner == [] {
-      makeStore(~context, ~force, inner)
+      makeStore(~validate, inner)
     } else {
       inner
       ->Array.map(Element.validate(force, context.element))
       ->Dynamic.combineLatest
-      ->Dynamic.bind(makeStore(~context, ~force))
-    }
-  }
-
-  type change = [
-    | #Set(input)
-    | #Index(int, F.change)
-    | #Add([#Some(F.input) | #Empty])
-    | #Remove(int)
-    | #Clear
-    | #Reset
-  ]
-
-  let makeSet = input => #Set(input)
-
-  let showChange = (change: change) => {
-    switch change {
-    | #Set(input) => `Set(${showInput(input)})`
-    | #Index(i, change) => `Index(${i->Int.toString}, ${Element.showChange(change)})`
-    | #Add(#Empty) => `Add(#Empty)`
-    | #Add(#Some(input)) => `Add(Some(${input->F.showInput}))`
-    | #Remove(i) => `Remove(${i->Int.toString})`
-    | #Reset => "Reset"
-    | #Clear => `Clear`
+      ->Dynamic.bind(makeStore(~validate))
     }
   }
 
@@ -201,143 +182,41 @@ module Make: Make = (I: IArray, F: Field.T) => {
     set: input => input->actions.set->fn,
     clear: () => actions.clear()->fn,
     opt: input => input->actions.opt->fn,
-    index: (i) => actions.index(i)->F.mapActions(fn),
+    index: (i) => actions.index(i)->Option.map(F.mapActions(_, fn)),
     add: input => input->actions.add->fn,
     remove: i => i->actions.remove->fn,
     reset: () => actions.reset()->fn
   }
 
-  let actions: actions<change> = {
-    set: (i) => #Set(i),
-    clear: () => #Clear,
-    opt: (i) => i->Option.map(makeSet)->Option.or(#Clear),
-    index: (i) => F.actions->F.mapActions(x => #Index(i, x)),
-    add: input => #Add(input),
-    remove: i => #Remove(i),
-    reset: () => #Reset,
-  }
-  
-  type pack = Pack.t<t, change, actions<Promise.t<()>>, actions<()>>
-  type parted = array<Pack.t<F.t, F.change, F.actions<Promise.t<()>>, F.actions<()>>>
-  let split = (pack: pack): parted => {
+  type parted = array<Form.t<F.t, F.actions<()>>>
+  let split = (pack: Form.t<t, actions<()>>): parted => {
     pack.field
     ->Store.inner
-    ->Array.mapi( (field, i): Pack.t<F.t, F.change, F.actions<Promise.t<()>>, F.actions<()>> => {
+    ->Array.mapi( (field, i): Form.t<F.t, F.actions<()>> => {
       field,
-      onChange: x => #Index(i, x)->pack.onChange,
-      actions: pack.actions.index(i), 
-      actions_: pack.actions_.index(i)
+      actions: pack.actions.index(i)->Option.getExn(~desc="fieldArray split"), 
     })
   }
 
   let enum = Store.toEnum
-  let show = (store: t) => {
-    `FieldArray{
-      state: ${store->enum->Store.enumToPretty},
-      children: [
-        ${store->Store.inner->Array.map(Element.show)->Array.joinWith(",\n")}
-      ]
-    }`
-  }
-    
-  let reduce = (~context: context, store: Rxjs.t<'c, 's, t>, change: Indexed.t<change>): Rxjs.t<'c, 's, t> => {
-    switch change.value {
-    | #Set(input) =>
-       // When an array field is set, we don't know if the length
-      // matches the previous length, or what relationship the elements
-      // have to the previous, so drop everything, make a store, and validate
-      // TODO: // F.set should honor validateImmediate flags
-      // TODO: needs to go after last store.
-      if input->Array.length > 0 {
-        input
-        ->Array.map(ch => (F.init(context.element)->Dynamic.return, ch->F.makeSet))
-        ->Array.map( ((store, ch)) => F.reduce(~context=context.element, store, change->Indexed.map(_ => ch)))
-        ->Dynamic.combineLatest
-        ->Dynamic.bind(makeStore(~context))
-      } else {
-        []->makeStore(~context)
-      }
-    | #Index(index, ch) =>
-      store
-      ->Dynamic.map(Store.inner)
-      ->Dynamic.map(Array.getUnsafe(_, index))
-      ->F.reduce(~context=context.element, _, change->Indexed.map(_ => ch))
-      ->Dynamic.withLatestFrom(store)
-      ->Dynamic.bind(((x, store)) =>
-        store->Store.inner->Array.replace(x, index)->makeStore(~context)
-      )
-    | #Add(#Some(value)) => {
-      // StoreInner stays dynamic so we can pass later values to child to be applied to in their own makeStore
-      let storeInner =
-        store
-        ->Dynamic.map(x => x->Store.inner)
-        // ->Dynamic.log("storeInner")
 
-      // We are taking the index once at the beginning so we do not drift off as the first update from the child will cause the length to grow
-      storeInner
-      ->Dynamic.map(Array.length)
-      ->Dynamic.take(1)
-      ->Dynamic.bind( index => {
-        // get the store for the element, defaulting to F.init w context
-        // Will not be set at first but will
-        let storeElement =
-          storeInner
-          ->Dynamic.map( (arr) => arr->Array.get(index)->Option.or(F.init(context.element)))
-          // ->Dynamic.log("storeElement")
-
-        F.makeSet(value)
-        ->Indexed.const(change, _)
-        ->F.reduce(~context=context.element, storeElement, _)
-        ->Dynamic.withLatestFrom(storeInner)
-        ->Dynamic.bind(((x, storeInner)) =>
-          storeInner
-          ->Array.setUnsafe(index, x)
-          ->makeStore(~context)
-        )
+  // We are generally using 
+  let makeDynInit = (context: context, set: Rxjs.Observable.t<input>)
+    :(
+      Array.t<Close.t<Form.t<F.t, F.actions<unit>>>>,
+      Array.t<Dyn.dyn<Close.t<Form.t<F.t, F.actions<()>>>>>,
+    ) 
+   => {
+      context
+      ->I.empty
+      ->Array.mapi( (input, index) => {
+        let setElement = set->Dynamic.keepMap(Array.get(_, index))->Dynamic.startWith(input)
+        let d = F.makeDyn(context.element, setElement, None)
+        (d.first, d.dyn)
       })
-    }
-    | #Add(#Empty) => {
-      // StoreInner stays dynamic so we can pass later values to child to be applied to in their own makeStore
-      let storeInner =
-        store
-        ->Dynamic.map(x => x->Store.inner)
-        // ->Dynamic.log("storeInner")
-
-      // We are taking the index once at the beginning so we do not drift off as the first update from the child will cause the length to grow
-      storeInner
-      ->Dynamic.map(Array.length)
-      ->Dynamic.take(1)
-      ->Dynamic.bind( index => {
-        // get the store for the element, defaulting to F.init w context
-        // Will not be set at first but will
-        let storeElement =
-          storeInner
-          ->Dynamic.map( (arr) => arr->Array.get(index)->Option.or(F.init(context.element)))
-          // ->Dynamic.log("storeElement")
-
-        context.element
-        ->F.init
-        ->F.input
-        ->F.makeSet
-        ->Indexed.const(change, _)
-        ->F.reduce(~context=context.element, storeElement, _)
-        ->Dynamic.withLatestFrom(storeInner)
-        ->Dynamic.bind(((x, storeInner)) =>
-          storeInner
-          ->Array.setUnsafe(index, x)
-          ->makeStore(~context)
-        )
-      })
-    }
-    | #Remove(i) =>
-      store
-      ->Dynamic.take(1)
-      ->Dynamic.bind((store: t) => store->Store.inner->Array.remove(i)->makeStore(~context))
-    | #Clear => []->makeStore(~context)
-    | #Reset => I.empty(context)->makeStore(~context)
-    }
+      ->Array.sequenceTuple
   }
-
+ 
   let inner = Store.inner
 
   let input = (store: t) => {
@@ -366,4 +245,197 @@ module Make: Make = (I: IArray, F: Field.T) => {
       }
     })
   }
+
+ 
+  external outputToString: output => string = "%identity"
+  let show = (store: t) => {
+    `FieldArray{
+      state: ${store->enum->Store.enumToPretty},
+      input: ${store->input->showInput},
+      output: ${store->Store.output->Option.map(outputToString)->Option.or("None")},
+      children: [
+        ${store->Store.inner->Array.map(Element.show)->Array.joinWith(",\n")}
+      ]
+    }`
+  }
+
+
+  let makeDyn = (context: context, set: Rxjs.Observable.t<input>, _validate: option<Rxjs.Observable.t<()>>)
+    : Dyn.t<Close.t<Form.t<t, actions<()>>>>
+  => {
+    let (firstInner, dynInner) = makeDynInit(context, set)
+    let packsInner = firstInner->Array.map(Close.pack)
+    let actionsInner = packsInner->Array.map(Form.actions)
+    let fieldsInner = packsInner->Array.map(Form.field) 
+
+    let opt: Rxjs.t<'c, Rxjs.source<option<input>>, option<input>> = Rxjs.Subject.makeEmpty()
+    let setInner: Rxjs.t<'c, Rxjs.source<input>, input> = Rxjs.Subject.makeEmpty()
+    let clearInner = Rxjs.Subject.makeEmpty()
+    let reset = Rxjs.Subject.makeEmpty()
+    let add: Rxjs.t<'ca, Rxjs.source<option<F.input>>, option<F.input>> = Rxjs.Subject.makeEmpty()
+    let remove: Rxjs.t<'cr, Rxjs.source<int>, int> = Rxjs.Subject.makeEmpty()
+    let complete = Rxjs.Subject.makeEmpty()
+
+    let setOpt = opt->Rxjs.pipe(Rxjs.keepMap(x => x))
+    let clearOpt = opt->Rxjs.pipe(Rxjs.keepMap(Option.invert(_, ())))
+    
+    let clear = Rxjs.merge2(clearInner, clearOpt)
+
+    let field = fieldsInner->Store.init
+    let actions: actions<()> = {
+      set: Rxjs.next(setInner),
+      clear: Rxjs.next(clearInner),
+      opt: Rxjs.next(opt),
+      index: Array.get(actionsInner), 
+      add: Rxjs.next(add),
+      remove: Rxjs.next(remove),
+      reset: Rxjs.next(reset),
+    }
+
+    let closeArray = () => { 
+      clearInner->Rxjs.complete
+      reset->Rxjs.complete
+      add->Rxjs.complete
+      remove->Rxjs.complete
+      opt->Rxjs.complete
+      setInner->Rxjs.complete
+      complete->Rxjs.next()
+    }
+
+    let close = () => {
+      firstInner->Array.forEach( c => c.close())
+      closeArray()
+    }
+
+    let first: Close.t<Form.t<'f, 'a>> = {pack: {field, actions}, close}
+
+    let set = Rxjs.merge3(set, setInner, setOpt)
+      ->Rxjs.pipe(Rxjs.shareReplay(1))
+
+    // multiplex all the various Array level change signals
+    // So we can scan on them, producing new arrays of F.t dyns.  
+    let changes = Rxjs.merge5(
+      add->Dynamic.map(x => #Add(x)),
+      remove->Dynamic.map(i => #Remove(i)),
+      set->Dynamic.map(x => #Set(x)),
+      clear->Dynamic.map(_ => #Clear),
+      reset->Dynamic.map(_ => #Reset),
+    )
+
+    let elements = 
+      changes
+      // scan accumulates state, but only so it can be passed to the combineLatestArray step
+      ->Rxjs.pipe(Rxjs.scan( ((firsts: Array.t<Close.t<Form.t<F.t, F.actions<unit>>>>, dyns), change: 'change, index)
+      : (
+          Array.t<Close.t<Form.t<F.t, F.actions<unit>>>>,
+          Array.t<Dyn.dyn<Close.t<Form.t<F.t, F.actions<()>>>>>,
+        ) 
+     => {
+      switch change {
+      | #Clear => {
+        firsts->Array.forEach(c => c.close())
+        ( [], [] )
+      }
+      | #Reset => {
+        firsts->Array.forEach(c => c.close())
+        makeDynInit(context, set)
+      }
+      | #Add(None) =>  {
+        let setElement = set->Dynamic.keepMap(Array.get(_, index))//->Dynamic.startWith(value)->Rxjs.toObservable
+        let {first, dyn} = F.makeDyn(context.element, setElement, None)
+
+        (
+          firsts->Array.append(first),
+          dyns->Array.append(dyn)
+        )
+      }
+      | #Add(Some(value)) =>  {
+        let setElement = set->Dynamic.keepMap(Array.get(_, index))->Dynamic.startWith(value) //->Rxjs.toObservable
+        let {first, dyn} = F.makeDyn(context.element, setElement, None)
+
+        (
+          firsts->Array.append(first),
+          dyns->Array.append(dyn)
+        )
+      }
+      | #Remove(index) => {
+        firsts->Array.get(index)->Option.forEach(c => c.close())
+        (
+          firsts->Array.remove(index),
+          dyns->Array.remove(index)
+        )
+      }
+      | #Set(input) => {
+        let (firsts, dyns) = 
+          input 
+          ->Array.mapi( (value, index) => {
+            let setElement = set->Dynamic.keepMap(Array.get(_, index))->Dynamic.startWith(value) //->Rxjs.toObservable
+            let x = F.makeDyn(context.element, setElement, None)
+            (x.first, x.dyn)
+          })
+          ->Array.sequenceTuple
+        ( firsts, 
+          dyns,
+        )
+      }
+      }
+    }, (firstInner, dynInner)))
+    // Take the latest array of inner dyns, 
+    ->Dynamic.switchMap( ((firsts, dyns): (
+        Array.t<Close.t<Form.t<F.t, F.actions<unit>>>>,
+        Array.t<Dyn.dyn<Close.t<Form.t<F.t, F.actions<()>>>>>
+      )): Dyn.dyn<Array.t<Close.t<Form.t<F.t, F.actions<()>>>>> => {
+
+      // When the array is empty, there are no events to animate combineLatestArray
+      // So a default for []
+      switch dyns {
+      | [] => Dynamic.return(Dynamic.return([]))
+      | dyns => {
+        // Console.log2("dyns", dyns->Array.length)
+        dyns
+        ->Rxjs.combineLatestArray
+        ->Dynamic.map(Rxjs.combineLatestArray)
+        // ->Dynamic.map(Dynamic.tap(_, x => {
+        //   Console.log2("dyn", x->Array.map(x => x.pack.field->F.show))
+        // }))
+        // Needs to tickle the combine latest with an initial value so that removing an index will emit new values 
+        ->Dynamic.map(Dynamic.startWith(_, firsts))
+        // ->Dynamic.log("dynf")
+      }
+      }
+    })
+
+
+    let validate = validateImpl(context, false)
+
+    // Combine the
+    let dyn = 
+      elements
+      ->Dynamic.switchMap(elements => { 
+          elements
+          ->Dynamic.map( elements => {
+            elements
+            ->Array.map(e => e->Close.pack->Form.field)
+            ->makeStore(~validate)
+            ->Dynamic.map((field): Close.t<Form.t<'f, 'a>> => {
+              let actions: actions<unit> = {
+                ...actions,
+                index: index => Array.get(elements, index)->Option.map(e => e->Close.pack->Form.actions),
+              }
+
+              let close = () => {
+                elements->Array.forEach(c => c.close())
+                closeArray()
+              }
+
+              {pack: {field, actions}, close}
+            })
+          })
+        })
+      ->Rxjs.pipe(Rxjs.takeUntil(complete))
+
+    {first, dyn}
+  }
+ 
+
 }

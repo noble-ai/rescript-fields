@@ -16,37 +16,44 @@ module Sum1 = {
   }
 
   module Context = FieldEither.Context
-  
+
   module type T = {
     include Field.T
     type parted
+    type pack
     let split: pack => parted
   }
 
   // giving the Make functor this
-  module type Make = (S: Interface, P: Product1.Generic, A: Field.T)
-   => T
-    with type input = S.t<A.input>
-    and type inner = S.t<A.t>
-    and type output = S.t<A.output>
-    and type error = error
-    and type t = Store.t<S.t<A.t>, S.t<A.output>, error>
-    and type context = Context.t<S.t<A.input>, FieldVector.validateOut<S.t<A.output>>, P.structure<A.context>>
-    and type change = FieldVector.Change.t<S.t<A.input>, S.t<A.change>>
-    and type actions<'change> = FieldVector.Actions.t<S.t<A.input>, 'change, P.structure<A.actions<'change>>>
-    and type pack = Pack.t<
-      Store.t<S.t<A.t>, S.t<A.output>, error>,
-      FieldVector.Change.t<S.t<A.input>, S.t<A.change>>,
-      FieldVector.Actions.t<S.t<A.input>, Promise.t<()>, P.structure<A.actions<Promise.t<()>>>>,
-      FieldVector.Actions.t<S.t<A.input>, (), P.structure<A.actions<()>>>,
-    >
-    and type parted = S.t<Pack.t<A.t, A.change, A.actions<Promise.t<()>>, A.actions<()>>>
+  module type Make = (S: Interface, P: Product1.Generic, A: Field.T) =>
+  (
+    T
+      with type input = S.t<A.input>
+      and type inner = S.t<A.t>
+      and type output = S.t<A.output>
+      and type error = error
+      and type t = Store.t<S.t<A.t>, S.t<A.output>, error>
+      and type context = Context.t<
+        S.t<A.input>,
+        FieldVector.validateOut<S.t<A.output>>,
+        P.structure<A.context>,
+      >
+      // and type change = FieldVector.Change.t<S.t<A.input>, S.t<A.change>>
+      and type actions<'change> = FieldVector.Actions.t<
+        S.t<A.input>,
+        'change,
+        P.structure<A.actions<'change>>,
+      >
+      and type pack = Form.t<
+        Store.t<S.t<A.t>, S.t<A.output>, error>,
+        FieldVector.Actions.t<S.t<A.input>, unit, P.structure<A.actions<unit>>>,
+      >
+      and type parted = S.t<Form.t<A.t, A.actions<unit>>>
+  )
 
   //Sum needs Product for maintaining context
   module Make: Make = (S: Interface, P: Product1.Generic, A: Field.T) => {
     module T = Product1.T
-    module Product = Product1.Make(S, P, A)
-    module Vector = FieldVector.Vector1.Make(S, A)
     module Inner = FieldEither.Either1.Make(S, A)
     type either<'a> = Either.Nested.t1<'a>
 
@@ -54,7 +61,7 @@ module Sum1 = {
     type inner = S.t<A.t>
     type output = S.t<A.output>
     type error = [#Whole(string) | #Part]
-    
+
     type t = Store.t<inner, output, error>
 
     type validate = FieldVector.validateOut<output>
@@ -65,13 +72,13 @@ module Sum1 = {
     let toTuple: P.structure<'a> => T.t<'a> = x => P.order->T.encode->T.napply(T.return(x))
     let fromTuple: T.t<'a> => P.structure<'a> = x => x->T.decode->P.fromTuple
 
-    let toEither: S.t<'a> => either<'a> = (s) => s->S.toSum->Product1.PolyVariant.toEither
+    let toEither: S.t<'a> => either<'a> = s => s->S.toSum->Product1.PolyVariant.toEither
     let fromEither: either<'a> => S.t<'a> = x => x->Product1.PolyVariant.fromEither->S.fromSum
 
     let storeToSum: Inner.t => t = Store.bimap(_, fromEither, fromEither)
     let storeToEither: t => Inner.t = Store.bimap(_, toEither, toEither)
 
-    let validateToEither = Option.map(_, v => out => out->fromEither->v)
+    let validateToEither = Option.map(_, (v, out) => out->fromEither->v)
     let contextToTuple = (context: context): Inner.context => {
       let inner = context.inner->toTuple
       let empty: option<Inner.input> = context.empty->Option.map(toEither)
@@ -79,53 +86,42 @@ module Sum1 = {
       {?empty, ?validate, inner}
     }
 
-    let showInput: input => string = (x) => x->toEither->Inner.showInput
+    let showInput: input => string = x => x->toEither->Inner.showInput
 
     // prefer a context given empty value over const A
-    let empty: context => inner = (context) => context->contextToTuple->Inner.empty->fromEither
+    let empty: context => inner = context => context->contextToTuple->Inner.empty->fromEither
     let init = context => context->empty->Store.init
-    let set: input => t = (x) => x->toEither->Inner.set->storeToSum
-    let show: t => string = (store) => store->storeToEither->Inner.show
+    let set: input => t = x => x->toEither->Inner.set->storeToSum
+    let show: t => string = store => store->storeToEither->Inner.show
 
-    let validate = (force, context: context, store: t): Dynamic.t<t> => {
-      Inner.validate(force, context->contextToTuple, store->storeToEither)
-      ->Dynamic.map(storeToSum)
+    let validate = (force, context: context, store: t): Rxjs.t<Rxjs.foreign, Rxjs.void,t> => {
+      Inner.validate(force, context->contextToTuple, store->storeToEither)->Dynamic.map(storeToSum)
     }
-
-    type changeInner = S.t<A.change>
-    type change = FieldVector.Change.t<input, changeInner>
-    let makeSet = (input: input): change => #Set(input)
-    let changeToEither: change => Inner.change = FieldVector.Change.bimap(toEither, toEither)
-    let changeFromEither: Inner.change => change = FieldVector.Change.bimap(fromEither, fromEither)
-    let showChange = (c: change): string => c->changeToEither->Inner.showChange
 
     type actionsInner<'out> = P.structure<A.actions<'out>>
-    let actionsInner: actionsInner<changeInner> = Inner.actionsInner->Inner.mapActionsInner(fromEither)->fromTuple
-    let mapActionsInner: (actionsInner<'ch>, 'ch => 'b) => actionsInner<'b> = (ac, fn) => ac->toTuple->Inner.mapActionsInner(fn)->fromTuple
+    let mapActionsInner: (actionsInner<'ch>, 'ch => 'b) => actionsInner<'b> = (ac, fn) =>
+      ac->toTuple->Inner.mapActionsInner(fn)->fromTuple
 
     type actions<'change> = FieldVector.Actions.t<input, 'change, actionsInner<'change>>
-    let actions: actions<change> = FieldVector.Actions.make(actionsInner->mapActionsInner(x => #Inner(x)))
-    let mapActions: (actions<'change>, 'change => 'b) => actions<'b> = (actions, fn) => actions->FieldVector.Actions.trimap(x=>x, fn, mapActionsInner(_, fn))
+    let mapActions: (actions<'change>, 'change => 'b) => actions<'b> = (actions, fn) =>
+      actions->FieldVector.Actions.trimap(x => x, fn, mapActionsInner(_, fn))
 
-    type pack = Pack.t<t, change, actions<Promise.t<()>>, actions<()>>
-    type parted = S.t<Pack.t<A.t, A.change, A.actions<Promise.t<()>>, A.actions<()>>>
+    type pack = Form.t<t, actions<unit>>
+    type parted = S.t<Form.t<A.t, A.actions<unit>>>
 
-    let split: (Pack.t<t, change, actions<Promise.t<()>>, actions<()>>) => parted  = (part) => {
-      let onChange = x => x->fromEither->#Inner->part.onChange
-      Inner.splitInner(
-        part.field->Store.inner->toEither,
-        onChange,
-        part.actions.inner->toTuple,
-        part.actions_.inner->toTuple
-      )
-      ->fromEither
+    let split: Form.t<t, actions<unit>> => parted = part => {
+      Inner.splitInner(part.field->Store.inner->toEither, part.actions.inner->toTuple)->fromEither
+    }
+    
+    let actionsFromVector: Inner.actions<()> => actions<()> = FieldVector.Actions.trimap(_, toEither, x=>x, fromTuple)
+    let packFromEither = Form.bimap(_, storeToSum, actionsFromVector)
+    let makeDyn = (context: context, set: Rxjs.Observable.t<input>, val: option<Rxjs.Observable.t<()>>)
+      : Dyn.t<Close.t<Form.t<t, actions<()>>>>
+      => {
+      Inner.makeDyn(context->contextToTuple, set->Dynamic.map(toEither), val)
+      ->Dyn.map(Close.map(_, packFromEither))
     }
   
-    let reduce = (~context: context, store: Dynamic.t<t>, change: Indexed.t<change>): Dynamic.t<t> => {
-      Inner.reduce(~context=context->contextToTuple, store->Dynamic.map(storeToEither), change->Indexed.map(changeToEither))
-      ->Dynamic.map(storeToSum)
-    }
-
     let input = (store: t): input => store->storeToEither->Inner.input->fromEither
     let inner = Store.inner
     let output = Store.output
@@ -146,8 +142,6 @@ module Sum2 = {
     type t<'a, 'b>
     let toSum: t<'a, 'b> => sum<'a, 'b>
     let fromSum: sum<'a, 'b> => t<'a, 'b>
-    // let toSum: t<'a, 'b> => sum<'a, 'b>
-    // let fromSum: sum<'a, 'b> => t<'a, 'b>
     let validateImmediate: bool
   }
 
@@ -156,62 +150,40 @@ module Sum2 = {
   module type T = {
     include Field.T
     type parted
+    type pack
     let split: pack => parted
   }
 
   // giving the Make functor this
-  module type Make = (S: Interface, P: Product2.Generic, A: Field.T, B: Field.T)
-   => T
-    with type input = S.t<A.input, B.input>
-    and type inner = S.t<A.t, B.t> 
-    and type output = S.t<A.output, B.output>
-    and type error = error
-    and type t = Store.t<
-      S.t<A.t, B.t>,
-      S.t<A.output, B.output>,
-      error
-    >
-    and type context = Context.t<
-      S.t<A.input, B.input>,
-      FieldVector.validateOut<S.t<A.output, B.output>>,
-      P.structure<A.context, B.context>
-    >
-    and type change = FieldVector.Change.t<
-      S.t<A.input, B.input>,
-      S.t<A.change, B.change>
-    >
-    and type actions<'change> = FieldVector.Actions.t<
-      S.t<A.input, B.input>,
-      'change,
-      P.structure<
-        A.actions<'change>,
-        B.actions<'change>,
-      >
-    >
-    and type pack = Pack.t<
-      Store.t< S.t<A.t, B.t>, S.t<A.output, B.output>, error >,
-      FieldVector.Change.t< S.t<A.input, B.input>, S.t<A.change, B.change> >,
-      FieldVector.Actions.t<
+  module type Make = (S: Interface, P: Product2.Generic, A: Field.T, B: Field.T) =>
+  (
+    T
+      with type input = S.t<A.input, B.input>
+      and type inner = S.t<A.t, B.t>
+      and type output = S.t<A.output, B.output>
+      and type error = error
+      and type t = Store.t<S.t<A.t, B.t>, S.t<A.output, B.output>, error>
+      and type context = Context.t<
         S.t<A.input, B.input>,
-        Promise.t<()>,
-        P.structure<
-          A.actions<Promise.t<()>>,
-          B.actions<Promise.t<()>>,
-        >
-      >,
-      FieldVector.Actions.t<
-        S.t<A.input, B.input>,
-        (),
-        P.structure<
-          A.actions<()>,
-          B.actions<()>,
-        >
+        FieldVector.validateOut<S.t<A.output, B.output>>,
+        P.structure<A.context, B.context>,
       >
-    >
-    and type parted = S.t<
-      Pack.t<A.t, A.change, A.actions<Promise.t<()>>, A.actions<()>>,
-      Pack.t<B.t, B.change, B.actions<Promise.t<()>>, B.actions<()>>,
-    >
+      // and type change = FieldVector.Change.t<S.t<A.input, B.input>, S.t<A.change, B.change>>
+      and type actions<'change> = FieldVector.Actions.t<
+        S.t<A.input, B.input>,
+        'change,
+        P.structure<A.actions<'change>, B.actions<'change>>,
+      >
+      and type pack = Form.t<
+        Store.t<S.t<A.t, B.t>, S.t<A.output, B.output>, error>,
+        FieldVector.Actions.t<
+          S.t<A.input, B.input>,
+          unit,
+          P.structure<A.actions<unit>, B.actions<unit>>,
+        >,
+      >
+      and type parted = S.t<Form.t<A.t, A.actions<unit>>, Form.t<B.t, B.actions<unit>>>
+  )
 
   //Sum needs Product for maintaining context
   module Make: Make = (S: Interface, P: Product2.Generic, A: Field.T, B: Field.T) => {
@@ -223,7 +195,7 @@ module Sum2 = {
     type inner = S.t<A.t, B.t>
     type output = S.t<A.output, B.output>
     type error = [#Whole(string) | #Part]
-    
+
     type t = Store.t<inner, output, error>
 
     type validate = FieldVector.validateOut<output>
@@ -235,12 +207,13 @@ module Sum2 = {
     let fromTuple: T.t<'a, 'b> => P.structure<'a, 'b> = x => x->T.decode->P.fromTuple
 
     let toEither = (s: S.t<'a, 'b>): either<'a, 'b> => s->S.toSum->Product2.PolyVariant.toEither
-    let fromEither: either<'a, 'b> => S.t<'a, 'b> = x => x->Product2.PolyVariant.fromEither->S.fromSum
+    let fromEither: either<'a, 'b> => S.t<'a, 'b> = x =>
+      x->Product2.PolyVariant.fromEither->S.fromSum
 
     let storeToSum = Store.bimap(_, fromEither, fromEither)
-    let storeToEither= Store.bimap(_, toEither, toEither)
+    let storeToEither = Store.bimap(_, toEither, toEither)
 
-    let validateToEither = Option.map(_, v => out => out->fromEither->v)
+    let validateToEither = Option.map(_, (v, out) => out->fromEither->v)
     let contextToTuple = (context: context): Inner.context => {
       let inner = context.inner->toTuple
       let empty: option<Inner.input> = context.empty->Option.map(toEither)
@@ -256,46 +229,33 @@ module Sum2 = {
     let set = (x: input): t => x->toEither->Inner.set->storeToSum
     let show = (store: t) => store->storeToEither->Inner.show
 
-    let validate = (force, context: context, store: t): Dynamic.t<t> => {
-      Inner.validate(force, context->contextToTuple, store->storeToEither)
-      ->Dynamic.map(storeToSum)
+    let validate = (force, context: context, store: t): Rxjs.t<Rxjs.foreign, Rxjs.void,t> => {
+      Inner.validate(force, context->contextToTuple, store->storeToEither)->Dynamic.map(storeToSum)
     }
-
-    type changeInner = S.t<A.change, B.change>
-    type change = FieldVector.Change.t<input, changeInner>
-    let makeSet = (input: input): change => #Set(input)
-    let changeToEither: change => Inner.change = FieldVector.Change.bimap(toEither, toEither)
-    let showChange = (c: change): string => c->changeToEither->Inner.showChange
 
     type actionsInner<'out> = P.structure<A.actions<'out>, B.actions<'out>>
-    let actionsInner: actionsInner<change> = Inner.actionsInner->Inner.mapActionsInner(x => #Inner(fromEither(x)))->fromTuple
-    let mapActionsInner: (actionsInner<'ch>, 'ch => 'b) => actionsInner<'b> = (ac, fn) => ac->toTuple->Inner.mapActionsInner(fn)->fromTuple
+    let mapActionsInner: (actionsInner<'ch>, 'ch => 'b) => actionsInner<'b> = (ac, fn) =>
+      ac->toTuple->Inner.mapActionsInner(fn)->fromTuple
 
-		type actions<'change> = FieldVector.Actions.t<input, 'change, actionsInner<'change>>	
-		let actions: actions<change> = FieldVector.Actions.make(actionsInner)
-    let mapActions: (actions<'change>, 'change => 'b) => actions<'b> = (actions, fn) => actions->FieldVector.Actions.trimap(x=>x, fn, mapActionsInner(_, fn))
+    type actions<'change> = FieldVector.Actions.t<input, 'change, actionsInner<'change>>
+    let mapActions: (actions<'change>, 'change => 'b) => actions<'b> = (actions, fn) =>
+      actions->FieldVector.Actions.trimap(x => x, fn, mapActionsInner(_, fn))
 
-    type pack = Pack.t<t, change, actions<Promise.t<()>>, actions<()>>
-    type parted = S.t<
-      Pack.t<A.t, A.change, A.actions<Promise.t<()>>, A.actions<()>>,
-      Pack.t<B.t, B.change, B.actions<Promise.t<()>>, B.actions<()>>
-    >
-    let split: (Pack.t<t, change, actions<Promise.t<()>>, actions<()>>) => parted  = (part) => {
-      let onChange = x => x->fromEither->#Inner->part.onChange
-      Inner.splitInner(
-        part.field->Store.inner->toEither,
-        onChange,
-        part.actions.inner->toTuple,
-        part.actions_.inner->toTuple
-      )
-      ->fromEither
+    type pack = Form.t<t, actions<unit>>
+    type parted = S.t<Form.t<A.t, A.actions<unit>>, Form.t<B.t, B.actions<unit>>>
+    let split: Form.t<t, actions<unit>> => parted = part => {
+      Inner.splitInner(part.field->Store.inner->toEither, part.actions.inner->toTuple)->fromEither
+    }
+    
+    let actionsFromVector: Inner.actions<()> => actions<()> = FieldVector.Actions.trimap(_, toEither, x=>x, fromTuple)
+    let packFromEither = Form.bimap(_, storeToSum, actionsFromVector)
+    let makeDyn = (context: context, set: Rxjs.Observable.t<input>, val: option<Rxjs.Observable.t<()>>)
+      : Dyn.t<Close.t<Form.t<t, actions<()>>>>
+      => {
+      Inner.makeDyn(context->contextToTuple, set->Dynamic.map(toEither), val)
+      ->Dyn.map(Close.map(_, packFromEither))
     }
  
-    let reduce = (~context: context, store: Dynamic.t<t>, change: Indexed.t<change>): Dynamic.t<t> => {
-      Inner.reduce(~context=context->contextToTuple, store->Dynamic.map(storeToEither), change->Indexed.map(changeToEither))
-      ->Dynamic.map(storeToSum)
-    }
-
     let input = (store: t): input => store->storeToEither->Inner.input->fromEither
     let inner = Store.inner
     let output = Store.output
@@ -324,67 +284,47 @@ module Sum3 = {
   module type T = {
     include Field.T
     type parted
+    type pack
     let split: pack => parted
   }
 
   // giving the Make functor this
-  module type Make = (S: Interface, P: Product3.Generic, A: Field.T, B: Field.T, C: Field.T)
-   => T
-    with type input = S.t<A.input, B.input, C.input>
-    and type inner = S.t<A.t, B.t, C.t> 
-    and type output = S.t<A.output, B.output, C.output>
-    and type error = error
-    and type t = Store.t<
-      S.t<A.t, B.t, C.t>,
-      S.t<A.output, B.output, C.output>,
-      error
-    >
-    and type context = Context.t<
-      S.t<A.input, B.input, C.input>,
-      FieldVector.validateOut<S.t<A.output, B.output, C.output>>,
-      P.structure<A.context, B.context, C.context>
-    >
-    and type change = FieldVector.Change.t<
-      S.t<A.input, B.input, C.input>,
-      S.t<A.change, B.change, C.change>
-    >
-    and type actions<'change> = FieldVector.Actions.t<
-      S.t<A.input, B.input, C.input>,
-      'change,
-      P.structure<
-        A.actions<'change>,
-        B.actions<'change>,
-        C.actions<'change>,
-      >
-    >
-    and type pack = Pack.t<
-      Store.t< S.t<A.t, B.t, C.t>, S.t<A.output, B.output, C.output>, error >,
-      FieldVector.Change.t< S.t<A.input, B.input, C.input>, S.t<A.change, B.change, C.change> >,
-      FieldVector.Actions.t<
+  module type Make = (S: Interface, P: Product3.Generic, A: Field.T, B: Field.T, C: Field.T) =>
+  (
+    T
+      with type input = S.t<A.input, B.input, C.input>
+      and type inner = S.t<A.t, B.t, C.t>
+      and type output = S.t<A.output, B.output, C.output>
+      and type error = error
+      and type t = Store.t<S.t<A.t, B.t, C.t>, S.t<A.output, B.output, C.output>, error>
+      and type context = Context.t<
         S.t<A.input, B.input, C.input>,
-        Promise.t<()>,
-        P.structure<
-          A.actions<Promise.t<()>>,
-          B.actions<Promise.t<()>>,
-          C.actions<Promise.t<()>>,
-        >
-      >,
-      FieldVector.Actions.t<
-        S.t<A.input, B.input, C.input>,
-        (),
-        P.structure<
-          A.actions<()>,
-          B.actions<()>,
-          C.actions<()>,
-        >
+        FieldVector.validateOut<S.t<A.output, B.output, C.output>>,
+        P.structure<A.context, B.context, C.context>,
       >
-    >
-    and type parted = S.t<
-      Pack.t<A.t, A.change, A.actions<Promise.t<()>>, A.actions<()>>,
-      Pack.t<B.t, B.change, B.actions<Promise.t<()>>, B.actions<()>>,
-      Pack.t<C.t, C.change, C.actions<Promise.t<()>>, C.actions<()>>,
-    >
-
+      // and type change = FieldVector.Change.t<
+      //   S.t<A.input, B.input, C.input>,
+      //   S.t<A.change, B.change, C.change>,
+      // >
+      and type actions<'change> = FieldVector.Actions.t<
+        S.t<A.input, B.input, C.input>,
+        'change,
+        P.structure<A.actions<'change>, B.actions<'change>, C.actions<'change>>,
+      >
+      and type pack = Form.t<
+        Store.t<S.t<A.t, B.t, C.t>, S.t<A.output, B.output, C.output>, error>,
+        FieldVector.Actions.t<
+          S.t<A.input, B.input, C.input>,
+          unit,
+          P.structure<A.actions<unit>, B.actions<unit>, C.actions<unit>>,
+        >,
+      >
+      and type parted = S.t<
+        Form.t<A.t, A.actions<unit>>,
+        Form.t<B.t, B.actions<unit>>,
+        Form.t<C.t, C.actions<unit>>,
+      >
+  )
 
   //Sum needs Product for maintaining context
   module Make: Make = (S: Interface, P: Product3.Generic, A: Field.T, B: Field.T, C: Field.T) => {
@@ -396,7 +336,7 @@ module Sum3 = {
     type inner = S.t<A.t, B.t, C.t>
     type output = S.t<A.output, B.output, C.output>
     type error = [#Whole(string) | #Part]
-    
+
     type t = Store.t<inner, output, error>
 
     type validate = FieldVector.validateOut<output>
@@ -404,16 +344,19 @@ module Sum3 = {
     type context = Context.t<input, validate, contextInner>
 
     // Context is the product equivalent of this sum, so we need toTuple in x->S.toSum->FieldProduct.Product1.PolyVariant.toEither
-    let toTuple: P.structure<'a, 'b, 'c> => T.t<'a, 'b, 'c> = x => P.order->T.encode->T.napply(T.return(x))
+    let toTuple: P.structure<'a, 'b, 'c> => T.t<'a, 'b, 'c> = x =>
+      P.order->T.encode->T.napply(T.return(x))
     let fromTuple: T.t<'a, 'b, 'c> => P.structure<'a, 'b, 'c> = x => x->T.decode->P.fromTuple
 
-    let toEither = (s: S.t<'a, 'b, 'c>): either<'a, 'b, 'c> => s->S.toSum->Product3.PolyVariant.toEither
-    let fromEither: either<'a, 'b, 'c> => S.t<'a, 'b, 'c> = x => x->Product3.PolyVariant.fromEither->S.fromSum
+    let toEither = (s: S.t<'a, 'b, 'c>): either<'a, 'b, 'c> =>
+      s->S.toSum->Product3.PolyVariant.toEither
+    let fromEither: either<'a, 'b, 'c> => S.t<'a, 'b, 'c> = x =>
+      x->Product3.PolyVariant.fromEither->S.fromSum
 
     let storeToSum = Store.bimap(_, fromEither, fromEither)
-    let storeToEither= Store.bimap(_, toEither, toEither)
+    let storeToEither = Store.bimap(_, toEither, toEither)
 
-    let validateToEither = Option.map(_, v => out => out->fromEither->v)
+    let validateToEither = Option.map(_, (v, out) => out->fromEither->v)
     let contextToTuple = (context: context): Inner.context => {
       let inner = context.inner->toTuple
       let empty: option<Inner.input> = context.empty->Option.map(toEither)
@@ -429,48 +372,37 @@ module Sum3 = {
     let set = (x: input): t => x->toEither->Inner.set->storeToSum
     let show = (store: t) => store->storeToEither->Inner.show
 
-    let validate = (force, context: context, store: t): Dynamic.t<t> => {
-      Inner.validate(force, context->contextToTuple, store->storeToEither)
-      ->Dynamic.map(storeToSum)
+    let validate = (force, context: context, store: t): Rxjs.t<Rxjs.foreign, Rxjs.void,t> => {
+      Inner.validate(force, context->contextToTuple, store->storeToEither)->Dynamic.map(storeToSum)
     }
-
-    type changeInner = S.t<A.change, B.change, C.change>
-    type change = FieldVector.Change.t<input, changeInner>
-    let makeSet = (input: input): change => #Set(input)
-    let changeToEither: change => Inner.change = FieldVector.Change.bimap(toEither, toEither)
-    let showChange = (c: change): string => c->changeToEither->Inner.showChange
 
     type actionsInner<'out> = P.structure<A.actions<'out>, B.actions<'out>, C.actions<'out>>
-    let mapActionsInner: (actionsInner<'ch>, 'ch => 'b) => actionsInner<'b> = (ac, fn) => ac->toTuple->Inner.mapActionsInner(fn)->fromTuple
+    let mapActionsInner: (actionsInner<'ch>, 'ch => 'b) => actionsInner<'b> = (ac, fn) =>
+      ac->toTuple->Inner.mapActionsInner(fn)->fromTuple
 
-		type actions<'change> = FieldVector.Actions.t<input, 'change, actionsInner<'change>>	
-		let actions: actions<change> = FieldVector.Actions.make(
-			Inner.actionsInner->Inner.mapActionsInner(x => #Inner(fromEither(x)))->fromTuple,
-		)
-    let mapActions: (actions<'change>, 'change => 'b) => actions<'b> = (actions, fn) => actions->FieldVector.Actions.trimap(x=>x, fn, mapActionsInner(_, fn))
-    
-    type pack = Pack.t<t, change, actions<Promise.t<()>>, actions<()>>
+    type actions<'change> = FieldVector.Actions.t<input, 'change, actionsInner<'change>>
+    let mapActions: (actions<'change>, 'change => 'b) => actions<'b> = (actions, fn) =>
+      actions->FieldVector.Actions.trimap(x => x, fn, mapActionsInner(_, fn))
+
+    type pack = Form.t<t, actions<unit>>
     type parted = S.t<
-      Pack.t<A.t, A.change, A.actions<Promise.t<()>>, A.actions<()>>,
-      Pack.t<B.t, B.change, B.actions<Promise.t<()>>, B.actions<()>>,
-      Pack.t<C.t, C.change, C.actions<Promise.t<()>>, C.actions<()>>
+      Form.t<A.t, A.actions<unit>>,
+      Form.t<B.t, B.actions<unit>>,
+      Form.t<C.t, C.actions<unit>>,
     >
-    let split: (Pack.t<t, change, actions<Promise.t<()>>, actions<()>>) => parted  = (part) => {
-      let onChange = x => x->fromEither->#Inner->part.onChange
-      Inner.splitInner(
-        part.field->Store.inner->toEither,
-        onChange,
-        part.actions.inner->toTuple,
-        part.actions_.inner->toTuple
-      )
-      ->fromEither
+    let split: Form.t<t, actions<unit>> => parted = part => {
+      Inner.splitInner(part.field->Store.inner->toEither, part.actions.inner->toTuple)->fromEither
+    }
+    
+    let actionsFromVector: Inner.actions<()> => actions<()> = FieldVector.Actions.trimap(_, toEither, x=>x, fromTuple)
+    let packFromEither = Form.bimap(_, storeToSum, actionsFromVector)
+    let makeDyn = (context: context, set: Rxjs.Observable.t<input>, val: option<Rxjs.Observable.t<()>>)
+      : Dyn.t<Close.t<Form.t<t, actions<()>>>>
+      => {
+      Inner.makeDyn(context->contextToTuple, set->Dynamic.map(toEither), val)
+      ->Dyn.map(Close.map(_, packFromEither))
     }
  
-    let reduce = (~context: context, store: Dynamic.t<t>, change: Indexed.t<change>): Dynamic.t<t> => {
-      Inner.reduce(~context=context->contextToTuple, store->Dynamic.map(storeToEither), change->Indexed.map(changeToEither))
-      ->Dynamic.map(storeToSum)
-    }
-
     let input = (store: t): input => store->storeToEither->Inner.input->fromEither
     let inner = Store.inner
     let output = Store.output
@@ -499,74 +431,69 @@ module Sum4 = {
   module type T = {
     include Field.T
     type parted
+    type pack
     let split: pack => parted
   }
 
   // giving the Make functor this
-  module type Make = (S: Interface, P: Product4.Generic, A: Field.T, B: Field.T, C: Field.T, D: Field.T)
-   => T
-    with type input = S.t<A.input, B.input, C.input, D.input>
-    and type inner = S.t<A.t, B.t, C.t, D.t> 
-    and type output = S.t<A.output, B.output, C.output, D.output>
-    and type error = error
-    and type t = Store.t<
-      S.t<A.t, B.t, C.t, D.t>,
-      S.t<A.output, B.output, C.output, D.output>,
-      error
-    >
-    and type context = Context.t<
-      S.t<A.input, B.input, C.input, D.input>,
-      FieldVector.validateOut<S.t<A.output, B.output, C.output, D.output>>,
-      P.structure<A.context, B.context, C.context, D.context>
-    >
-    and type change = FieldVector.Change.t<
-      S.t<A.input, B.input, C.input, D.input>,
-      S.t<A.change, B.change, C.change, D.change>
-    >
-    and type actions<'change> = FieldVector.Actions.t<
-      S.t<A.input, B.input, C.input, D.input>,
-      'change,
-      P.structure<
-        A.actions<'change>,
-        B.actions<'change>,
-        C.actions<'change>,
-        D.actions<'change>,
+  module type Make = (
+    S: Interface,
+    P: Product4.Generic,
+    A: Field.T,
+    B: Field.T,
+    C: Field.T,
+    D: Field.T,
+  ) =>
+  (
+    T
+      with type input = S.t<A.input, B.input, C.input, D.input>
+      and type inner = S.t<A.t, B.t, C.t, D.t>
+      and type output = S.t<A.output, B.output, C.output, D.output>
+      and type error = error
+      and type t = Store.t<
+        S.t<A.t, B.t, C.t, D.t>,
+        S.t<A.output, B.output, C.output, D.output>,
+        error,
       >
-    >
-    and type pack = Pack.t<
-      Store.t< S.t<A.t, B.t, C.t, D.t>, S.t<A.output, B.output, C.output, D.output>, error >,
-      FieldVector.Change.t< S.t<A.input, B.input, C.input, D.input>, S.t<A.change, B.change, C.change, D.change> >,
-      FieldVector.Actions.t<
+      and type context = Context.t<
         S.t<A.input, B.input, C.input, D.input>,
-        Promise.t<()>,
-        P.structure<
-          A.actions<Promise.t<()>>,
-          B.actions<Promise.t<()>>,
-          C.actions<Promise.t<()>>,
-          D.actions<Promise.t<()>>,
-        >
-      >,
-      FieldVector.Actions.t<
-        S.t<A.input, B.input, C.input, D.input>,
-        (),
-        P.structure<
-          A.actions<()>,
-          B.actions<()>,
-          C.actions<()>,
-          D.actions<()>,
-        >
+        FieldVector.validateOut<S.t<A.output, B.output, C.output, D.output>>,
+        P.structure<A.context, B.context, C.context, D.context>,
       >
-    >
-    and type parted = S.t<
-      Pack.t<A.t, A.change, A.actions<Promise.t<()>>, A.actions<()>>,
-      Pack.t<B.t, B.change, B.actions<Promise.t<()>>, B.actions<()>>,
-      Pack.t<C.t, C.change, C.actions<Promise.t<()>>, C.actions<()>>,
-      Pack.t<D.t, D.change, D.actions<Promise.t<()>>, D.actions<()>>,
-    >
-
+      // and type change = FieldVector.Change.t<
+      //   S.t<A.input, B.input, C.input, D.input>,
+      //   S.t<A.change, B.change, C.change, D.change>,
+      // >
+      and type actions<'change> = FieldVector.Actions.t<
+        S.t<A.input, B.input, C.input, D.input>,
+        'change,
+        P.structure<A.actions<'change>, B.actions<'change>, C.actions<'change>, D.actions<'change>>,
+      >
+      and type pack = Form.t<
+        Store.t<S.t<A.t, B.t, C.t, D.t>, S.t<A.output, B.output, C.output, D.output>, error>,
+        FieldVector.Actions.t<
+          S.t<A.input, B.input, C.input, D.input>,
+          unit,
+          P.structure<A.actions<unit>, B.actions<unit>, C.actions<unit>, D.actions<unit>>,
+        >,
+      >
+      and type parted = S.t<
+        Form.t<A.t, A.actions<unit>>,
+        Form.t<B.t, B.actions<unit>>,
+        Form.t<C.t, C.actions<unit>>,
+        Form.t<D.t, D.actions<unit>>,
+      >
+  )
 
   //Sum needs Product for maintaining context
-  module Make: Make = (S: Interface, P: Product4.Generic, A: Field.T, B: Field.T, C: Field.T, D: Field.T) => {
+  module Make: Make = (
+    S: Interface,
+    P: Product4.Generic,
+    A: Field.T,
+    B: Field.T,
+    C: Field.T,
+    D: Field.T,
+  ) => {
     module T = Product4.T
     module Inner = FieldEither.Either4.Make(S, A, B, C, D)
     type either<'a, 'b, 'c, 'd> = Either.Nested.t4<'a, 'b, 'c, 'd>
@@ -575,7 +502,7 @@ module Sum4 = {
     type inner = S.t<A.t, B.t, C.t, D.t>
     type output = S.t<A.output, B.output, C.output, D.output>
     type error = [#Whole(string) | #Part]
-    
+
     type t = Store.t<inner, output, error>
 
     type validate = FieldVector.validateOut<output>
@@ -583,16 +510,20 @@ module Sum4 = {
     type context = Context.t<input, validate, contextInner>
 
     // Context is the product equivalent of this sum, so we need toTuple in x->S.toSum->FieldProduct.Product1.PolyVariant.toEither
-    let toTuple: P.structure<'a, 'b, 'c, 'd> => T.t<'a, 'b, 'c, 'd> = x => P.order->T.encode->T.napply(T.return(x))
-    let fromTuple: T.t<'a, 'b, 'c, 'd> => P.structure<'a, 'b, 'c, 'd> = x => x->T.decode->P.fromTuple
+    let toTuple: P.structure<'a, 'b, 'c, 'd> => T.t<'a, 'b, 'c, 'd> = x =>
+      P.order->T.encode->T.napply(T.return(x))
+    let fromTuple: T.t<'a, 'b, 'c, 'd> => P.structure<'a, 'b, 'c, 'd> = x =>
+      x->T.decode->P.fromTuple
 
-    let toEither = (s: S.t<'a, 'b, 'c, 'd>): either<'a, 'b, 'c, 'd> => s->S.toSum->Product4.PolyVariant.toEither
-    let fromEither: either<'a, 'b, 'c, 'd> => S.t<'a, 'b, 'c, 'd> = x => x->Product4.PolyVariant.fromEither->S.fromSum
+    let toEither = (s: S.t<'a, 'b, 'c, 'd>): either<'a, 'b, 'c, 'd> =>
+      s->S.toSum->Product4.PolyVariant.toEither
+    let fromEither: either<'a, 'b, 'c, 'd> => S.t<'a, 'b, 'c, 'd> = x =>
+      x->Product4.PolyVariant.fromEither->S.fromSum
 
     let storeToSum = Store.bimap(_, fromEither, fromEither)
-    let storeToEither= Store.bimap(_, toEither, toEither)
+    let storeToEither = Store.bimap(_, toEither, toEither)
 
-    let validateToEither = Option.map(_, v => out => out->fromEither->v)
+    let validateToEither = Option.map(_, (v, out) => out->fromEither->v)
     let contextToTuple = (context: context): Inner.context => {
       let inner = context.inner->toTuple
       let empty: option<Inner.input> = context.empty->Option.map(toEither)
@@ -608,50 +539,44 @@ module Sum4 = {
     let set = (x: input): t => x->toEither->Inner.set->storeToSum
     let show = (store: t) => store->storeToEither->Inner.show
 
-    let validate = (force, context: context, store: t): Dynamic.t<t> => {
-      Inner.validate(force, context->contextToTuple, store->storeToEither)
-      ->Dynamic.map(storeToSum)
+    let validate = (force, context: context, store: t): Rxjs.t<Rxjs.foreign, Rxjs.void,t> => {
+      Inner.validate(force, context->contextToTuple, store->storeToEither)->Dynamic.map(storeToSum)
     }
 
-    type changeInner = S.t<A.change, B.change, C.change, D.change>
-    type change = FieldVector.Change.t<input, changeInner>
-    let makeSet = (input: input): change => #Set(input)
-    let changeToEither: change => Inner.change = FieldVector.Change.bimap(toEither, toEither)
-    let showChange = (c: change): string => c->changeToEither->Inner.showChange
+    type actionsInner<'out> = P.structure<
+      A.actions<'out>,
+      B.actions<'out>,
+      C.actions<'out>,
+      D.actions<'out>,
+    >
+    let mapActionsInner: (actionsInner<'ch>, 'ch => 'b) => actionsInner<'b> = (ac, fn) =>
+      ac->toTuple->Inner.mapActionsInner(fn)->fromTuple
 
-    type actionsInner<'out> = P.structure<A.actions<'out>, B.actions<'out>, C.actions<'out>, D.actions<'out>>
-    let mapActionsInner: (actionsInner<'ch>, 'ch => 'b) => actionsInner<'b> = (ac, fn) => ac->toTuple->Inner.mapActionsInner(fn)->fromTuple
+    type actions<'change> = FieldVector.Actions.t<input, 'change, actionsInner<'change>>
+    let mapActions: (actions<'change>, 'change => 'b) => actions<'b> = (actions, fn) =>
+      actions->FieldVector.Actions.trimap(x => x, fn, mapActionsInner(_, fn))
 
-		type actions<'change> = FieldVector.Actions.t<input, 'change, actionsInner<'change>>	
-		let actions: actions<change> = FieldVector.Actions.make(
-			Inner.actionsInner->Inner.mapActionsInner(x => #Inner(fromEither(x)))->fromTuple,
-		)
-    let mapActions: (actions<'change>, 'change => 'b) => actions<'b> = (actions, fn) => actions->FieldVector.Actions.trimap(x=>x, fn, mapActionsInner(_, fn))
-  
-    type pack = Pack.t<t, change, actions<Promise.t<()>>, actions<()>>
+    type pack = Form.t<t, actions<unit>>
 
     type parted = S.t<
-      Pack.t<A.t, A.change, A.actions<Promise.t<()>>, A.actions<()>>,
-      Pack.t<B.t, B.change, B.actions<Promise.t<()>>, B.actions<()>>,
-      Pack.t<C.t, C.change, C.actions<Promise.t<()>>, C.actions<()>>,
-      Pack.t<D.t, D.change, D.actions<Promise.t<()>>, D.actions<()>>
+      Form.t<A.t, A.actions<unit>>,
+      Form.t<B.t, B.actions<unit>>,
+      Form.t<C.t, C.actions<unit>>,
+      Form.t<D.t, D.actions<unit>>,
     >
-    let split: (Pack.t<t, change, actions<Promise.t<()>>, actions<()>>) => parted  = (part) => {
-      let onChange = x => x->fromEither->#Inner->part.onChange
-      Inner.splitInner(
-        part.field->Store.inner->toEither,
-        onChange,
-        part.actions.inner->toTuple,
-        part.actions_.inner->toTuple
-      )
-      ->fromEither
+    let split: Form.t<t, actions<unit>> => parted = part => {
+      Inner.splitInner(part.field->Store.inner->toEither, part.actions.inner->toTuple)->fromEither
     }
-  
+
+    let actionsFromVector: Inner.actions<()> => actions<()> = FieldVector.Actions.trimap(_, toEither, x=>x, fromTuple)
+    let packFromEither = Form.bimap(_, storeToSum, actionsFromVector)
+    let makeDyn = (context: context, set: Rxjs.Observable.t<input>, val: option<Rxjs.Observable.t<()>>)
+      : Dyn.t<Close.t<Form.t<t, actions<()>>>>
+      => {
+      Inner.makeDyn(context->contextToTuple, set->Dynamic.map(toEither), val)
+      ->Dyn.map(Close.map(_, packFromEither))
+    }
  
-    let reduce = (~context: context, store: Dynamic.t<t>, change: Indexed.t<change>): Dynamic.t<t> => {
-      Inner.reduce(~context=context->contextToTuple, store->Dynamic.map(storeToEither), change->Indexed.map(changeToEither))
-      ->Dynamic.map(storeToSum)
-    }
 
     let input = (store: t): input => store->storeToEither->Inner.input->fromEither
     let inner = Store.inner
@@ -681,77 +606,88 @@ module Sum5 = {
   module type T = {
     include Field.T
     type parted
+    type pack
     let split: pack => parted
   }
 
   // giving the Make functor this
-  module type Make = (S: Interface, P: Product5.Generic, A: Field.T, B: Field.T, C: Field.T, D: Field.T, E: Field.T)
-   => T
-    with type input = S.t<A.input, B.input, C.input, D.input, E.input>
-    and type inner = S.t<A.t, B.t, C.t, D.t, E.t> 
-    and type output = S.t<A.output, B.output, C.output, D.output, E.output>
-    and type error = error
-    and type t = Store.t<
-      S.t<A.t, B.t, C.t, D.t, E.t>,
-      S.t<A.output, B.output, C.output, D.output, E.output>,
-      error
-    >
-    and type context = Context.t<
-      S.t<A.input, B.input, C.input, D.input, E.input>,
-      FieldVector.validateOut<S.t<A.output, B.output, C.output, D.output, E.output>>,
-      P.structure<A.context, B.context, C.context, D.context, E.context>
-    >
-    and type change = FieldVector.Change.t<
-      S.t<A.input, B.input, C.input, D.input, E.input>,
-      S.t<A.change, B.change, C.change, D.change, E.change>
-    >
-    and type actions<'change> = FieldVector.Actions.t<
-      S.t<A.input, B.input, C.input, D.input, E.input>,
-      'change,
-      P.structure<
-        A.actions<'change>,
-        B.actions<'change>,
-        C.actions<'change>,
-        D.actions<'change>,
-        E.actions<'change>,
+  module type Make = (
+    S: Interface,
+    P: Product5.Generic,
+    A: Field.T,
+    B: Field.T,
+    C: Field.T,
+    D: Field.T,
+    E: Field.T,
+  ) =>
+  (
+    T
+      with type input = S.t<A.input, B.input, C.input, D.input, E.input>
+      and type inner = S.t<A.t, B.t, C.t, D.t, E.t>
+      and type output = S.t<A.output, B.output, C.output, D.output, E.output>
+      and type error = error
+      and type t = Store.t<
+        S.t<A.t, B.t, C.t, D.t, E.t>,
+        S.t<A.output, B.output, C.output, D.output, E.output>,
+        error,
       >
-    >
-    and type pack = Pack.t<
-      Store.t< S.t<A.t, B.t, C.t, D.t, E.t>, S.t<A.output, B.output, C.output, D.output, E.output>, error >,
-      FieldVector.Change.t< S.t<A.input, B.input, C.input, D.input, E.input>, S.t<A.change, B.change, C.change, D.change, E.change> >,
-      FieldVector.Actions.t<
+      and type context = Context.t<
         S.t<A.input, B.input, C.input, D.input, E.input>,
-        Promise.t<()>,
-        P.structure<
-          A.actions<Promise.t<()>>,
-          B.actions<Promise.t<()>>,
-          C.actions<Promise.t<()>>,
-          D.actions<Promise.t<()>>,
-          E.actions<Promise.t<()>>,
-        >
-      >,
-      FieldVector.Actions.t<
-        S.t<A.input, B.input, C.input, D.input, E.input>,
-        (),
-        P.structure<
-          A.actions<()>,
-          B.actions<()>,
-          C.actions<()>,
-          D.actions<()>,
-          E.actions<()>,
-        >
+        FieldVector.validateOut<S.t<A.output, B.output, C.output, D.output, E.output>>,
+        P.structure<A.context, B.context, C.context, D.context, E.context>,
       >
-    >
-    and type parted = S.t<
-      Pack.t<A.t, A.change, A.actions<Promise.t<()>>, A.actions<()>>,
-      Pack.t<B.t, B.change, B.actions<Promise.t<()>>, B.actions<()>>,
-      Pack.t<C.t, C.change, C.actions<Promise.t<()>>, C.actions<()>>,
-      Pack.t<D.t, D.change, D.actions<Promise.t<()>>, D.actions<()>>,
-      Pack.t<E.t, E.change, E.actions<Promise.t<()>>, E.actions<()>>,
-    >
+      // and type change = FieldVector.Change.t<
+      //   S.t<A.input, B.input, C.input, D.input, E.input>,
+      //   S.t<A.change, B.change, C.change, D.change, E.change>,
+      // >
+      and type actions<'change> = FieldVector.Actions.t<
+        S.t<A.input, B.input, C.input, D.input, E.input>,
+        'change,
+        P.structure<
+          A.actions<'change>,
+          B.actions<'change>,
+          C.actions<'change>,
+          D.actions<'change>,
+          E.actions<'change>,
+        >,
+      >
+      and type pack = Form.t<
+        Store.t<
+          S.t<A.t, B.t, C.t, D.t, E.t>,
+          S.t<A.output, B.output, C.output, D.output, E.output>,
+          error,
+        >,
+        FieldVector.Actions.t<
+          S.t<A.input, B.input, C.input, D.input, E.input>,
+          unit,
+          P.structure<
+            A.actions<unit>,
+            B.actions<unit>,
+            C.actions<unit>,
+            D.actions<unit>,
+            E.actions<unit>,
+          >,
+        >,
+      >
+      and type parted = S.t<
+        Form.t<A.t, A.actions<unit>>,
+        Form.t<B.t, B.actions<unit>>,
+        Form.t<C.t, C.actions<unit>>,
+        Form.t<D.t, D.actions<unit>>,
+        Form.t<E.t, E.actions<unit>>,
+      >
+  )
 
   //Sum needs Product for maintaining context
-  module Make: Make = (S: Interface, P: Product5.Generic, A: Field.T, B: Field.T, C: Field.T, D: Field.T, E: Field.T) => {
+  module Make: Make = (
+    S: Interface,
+    P: Product5.Generic,
+    A: Field.T,
+    B: Field.T,
+    C: Field.T,
+    D: Field.T,
+    E: Field.T,
+  ) => {
     module T = Product5.T
     module Inner = FieldEither.Either5.Make(S, A, B, C, D, E)
     type either<'a, 'b, 'c, 'd, 'e> = Either.Nested.t5<'a, 'b, 'c, 'd, 'e>
@@ -760,7 +696,7 @@ module Sum5 = {
     type inner = S.t<A.t, B.t, C.t, D.t, E.t>
     type output = S.t<A.output, B.output, C.output, D.output, E.output>
     type error = [#Whole(string) | #Part]
-    
+
     type t = Store.t<inner, output, error>
 
     type validate = FieldVector.validateOut<output>
@@ -768,16 +704,20 @@ module Sum5 = {
     type context = Context.t<input, validate, contextInner>
 
     // Context is the product equivalent of this sum, so we need toTuple in x->S.toSum->FieldProduct.Product1.PolyVariant.toEither
-    let toTuple: P.structure<'a, 'b, 'c, 'd, 'e> => T.t<'a, 'b, 'c, 'd, 'e> = x => P.order->T.encode->T.napply(T.return(x))
-    let fromTuple: T.t<'a, 'b, 'c, 'd, 'e> => P.structure<'a, 'b, 'c, 'd, 'e> = x => x->T.decode->P.fromTuple
+    let toTuple: P.structure<'a, 'b, 'c, 'd, 'e> => T.t<'a, 'b, 'c, 'd, 'e> = x =>
+      P.order->T.encode->T.napply(T.return(x))
+    let fromTuple: T.t<'a, 'b, 'c, 'd, 'e> => P.structure<'a, 'b, 'c, 'd, 'e> = x =>
+      x->T.decode->P.fromTuple
 
-    let toEither = (s: S.t<'a, 'b, 'c, 'd, 'e>): either<'a, 'b, 'c, 'd, 'e> => s->S.toSum->Product5.PolyVariant.toEither
-    let fromEither: either<'a, 'b, 'c, 'd, 'e> => S.t<'a, 'b, 'c, 'd, 'e> = x => x->Product5.PolyVariant.fromEither->S.fromSum
+    let toEither = (s: S.t<'a, 'b, 'c, 'd, 'e>): either<'a, 'b, 'c, 'd, 'e> =>
+      s->S.toSum->Product5.PolyVariant.toEither
+    let fromEither: either<'a, 'b, 'c, 'd, 'e> => S.t<'a, 'b, 'c, 'd, 'e> = x =>
+      x->Product5.PolyVariant.fromEither->S.fromSum
 
     let storeToSum = Store.bimap(_, fromEither, fromEither)
-    let storeToEither= Store.bimap(_, toEither, toEither)
+    let storeToEither = Store.bimap(_, toEither, toEither)
 
-    let validateToEither = Option.map(_, v => out => out->fromEither->v)
+    let validateToEither = Option.map(_, (v, out) => out->fromEither->v)
     let contextToTuple = (context: context): Inner.context => {
       let inner = context.inner->toTuple
       let empty: option<Inner.input> = context.empty->Option.map(toEither)
@@ -793,51 +733,47 @@ module Sum5 = {
     let set = (x: input): t => x->toEither->Inner.set->storeToSum
     let show = (store: t) => store->storeToEither->Inner.show
 
-    let validate = (force, context: context, store: t): Dynamic.t<t> => {
-      Inner.validate(force, context->contextToTuple, store->storeToEither)
-      ->Dynamic.map(storeToSum)
+    let validate = (force, context: context, store: t): Rxjs.t<Rxjs.foreign, Rxjs.void,t> => {
+      Inner.validate(force, context->contextToTuple, store->storeToEither)->Dynamic.map(storeToSum)
     }
 
-    type changeInner = S.t<A.change, B.change, C.change, D.change, E.change>
-    type change = FieldVector.Change.t<input, changeInner>
-    let makeSet = (input: input): change => #Set(input)
-    let changeToEither: change => Inner.change = FieldVector.Change.bimap(toEither, toEither)
-    let showChange = (c: change): string => c->changeToEither->Inner.showChange
+    type actionsInner<'out> = P.structure<
+      A.actions<'out>,
+      B.actions<'out>,
+      C.actions<'out>,
+      D.actions<'out>,
+      E.actions<'out>,
+    >
+    let mapActionsInner: (actionsInner<'ch>, 'ch => 'b) => actionsInner<'b> = (ac, fn) =>
+      ac->toTuple->Inner.mapActionsInner(fn)->fromTuple
 
-    type actionsInner<'out> = P.structure<A.actions<'out>, B.actions<'out>, C.actions<'out>, D.actions<'out>, E.actions<'out>>
-    let mapActionsInner: (actionsInner<'ch>, 'ch => 'b) => actionsInner<'b> = (ac, fn) => ac->toTuple->Inner.mapActionsInner(fn)->fromTuple
+    type actions<'change> = FieldVector.Actions.t<input, 'change, actionsInner<'change>>
+    let mapActions: (actions<'change>, 'change => 'b) => actions<'b> = (actions, fn) =>
+      actions->FieldVector.Actions.trimap(x => x, fn, mapActionsInner(_, fn))
 
-		type actions<'change> = FieldVector.Actions.t<input, 'change, actionsInner<'change>>	
-		let actions: actions<change> = FieldVector.Actions.make(
-			Inner.actionsInner->Inner.mapActionsInner(x => #Inner(fromEither(x)))->fromTuple,
-		)
-    let mapActions: (actions<'change>, 'change => 'b) => actions<'b> = (actions, fn) => actions->FieldVector.Actions.trimap(x=>x, fn, mapActionsInner(_, fn))
-    
-    type pack = Pack.t<t, change, actions<Promise.t<()>>, actions<()>>
+    type pack = Form.t<t, actions<unit>>
 
     type parted = S.t<
-      Pack.t<A.t, A.change, A.actions<Promise.t<()>>, A.actions<()>>,
-      Pack.t<B.t, B.change, B.actions<Promise.t<()>>, B.actions<()>>,
-      Pack.t<C.t, C.change, C.actions<Promise.t<()>>, C.actions<()>>,
-      Pack.t<D.t, D.change, D.actions<Promise.t<()>>, D.actions<()>>,
-      Pack.t<E.t, E.change, E.actions<Promise.t<()>>, E.actions<()>>
+      Form.t<A.t, A.actions<unit>>,
+      Form.t<B.t, B.actions<unit>>,
+      Form.t<C.t, C.actions<unit>>,
+      Form.t<D.t, D.actions<unit>>,
+      Form.t<E.t, E.actions<unit>>,
     >
 
-    let split: (Pack.t<t, change, actions<Promise.t<()>>, actions<()>>) => parted  = (part) => {
-      let onChange = x => x->fromEither->#Inner->part.onChange
-      Inner.splitInner(
-        part.field->Store.inner->toEither,
-        onChange,
-        part.actions.inner->toTuple,
-        part.actions_.inner->toTuple
-      )
-      ->fromEither
+    let split: Form.t<t, actions<unit>> => parted = part => {
+      Inner.splitInner(part.field->Store.inner->toEither, part.actions.inner->toTuple)->fromEither
+    }
+
+    let actionsFromVector: Inner.actions<()> => actions<()> = FieldVector.Actions.trimap(_, toEither, x=>x, fromTuple)
+    let packFromEither = Form.bimap(_, storeToSum, actionsFromVector)
+    let makeDyn = (context: context, set: Rxjs.Observable.t<input>, val: option<Rxjs.Observable.t<()>>)
+      : Dyn.t<Close.t<Form.t<t, actions<()>>>>
+      => {
+      Inner.makeDyn(context->contextToTuple, set->Dynamic.map(toEither), val)
+      ->Dyn.map(Close.map(_, packFromEither))
     }
  
-    let reduce = (~context: context, store: Dynamic.t<t>, change: Indexed.t<change>): Dynamic.t<t> => {
-      Inner.reduce(~context=context->contextToTuple, store->Dynamic.map(storeToEither), change->Indexed.map(changeToEither))
-      ->Dynamic.map(storeToSum)
-    }
 
     let input = (store: t): input => store->storeToEither->Inner.input->fromEither
     let inner = Store.inner
@@ -867,82 +803,93 @@ module Sum6 = {
   module type T = {
     include Field.T
     type parted
+    type pack
     let split: pack => parted
   }
 
   // giving the Make functor this
-  module type Make = (S: Interface, P: Product6.Generic, A: Field.T, B: Field.T, C: Field.T, D: Field.T, E: Field.T, F: Field.T)
-   => T
-    with type input = S.t<A.input, B.input, C.input, D.input, E.input, F.input>
-    and type inner = S.t<A.t, B.t, C.t, D.t, E.t, F.t> 
-    and type output = S.t<A.output, B.output, C.output, D.output, E.output, F.output>
-    and type error = error
-    and type t = Store.t<
-      S.t<A.t, B.t, C.t, D.t, E.t, F.t>,
-      S.t<A.output, B.output, C.output, D.output, E.output, F.output>,
-      error
-    >
-    and type context = Context.t<
-      S.t<A.input, B.input, C.input, D.input, E.input, F.input>,
-      FieldVector.validateOut<S.t<A.output, B.output, C.output, D.output, E.output, F.output>>,
-      P.structure<A.context, B.context, C.context, D.context, E.context, F.context>
-    >
-    and type change = FieldVector.Change.t<
-      S.t<A.input, B.input, C.input, D.input, E.input, F.input>,
-      S.t<A.change, B.change, C.change, D.change, E.change, F.change>
-    >
-    and type actions<'change> = FieldVector.Actions.t<
-      S.t<A.input, B.input, C.input, D.input, E.input, F.input>,
-      'change,
-      P.structure<
-        A.actions<'change>,
-        B.actions<'change>,
-        C.actions<'change>,
-        D.actions<'change>,
-        E.actions<'change>,
-        F.actions<'change>
+  module type Make = (
+    S: Interface,
+    P: Product6.Generic,
+    A: Field.T,
+    B: Field.T,
+    C: Field.T,
+    D: Field.T,
+    E: Field.T,
+    F: Field.T,
+  ) =>
+  (
+    T
+      with type input = S.t<A.input, B.input, C.input, D.input, E.input, F.input>
+      and type inner = S.t<A.t, B.t, C.t, D.t, E.t, F.t>
+      and type output = S.t<A.output, B.output, C.output, D.output, E.output, F.output>
+      and type error = error
+      and type t = Store.t<
+        S.t<A.t, B.t, C.t, D.t, E.t, F.t>,
+        S.t<A.output, B.output, C.output, D.output, E.output, F.output>,
+        error,
       >
-    >
-    and type pack = Pack.t<
-      Store.t< S.t<A.t, B.t, C.t, D.t, E.t, F.t>, S.t<A.output, B.output, C.output, D.output, E.output, F.output>, error >,
-      FieldVector.Change.t< S.t<A.input, B.input, C.input, D.input, E.input, F.input>, S.t<A.change, B.change, C.change, D.change, E.change, F.change> >,
-      FieldVector.Actions.t<
+      and type context = Context.t<
         S.t<A.input, B.input, C.input, D.input, E.input, F.input>,
-        Promise.t<()>,
-        P.structure<
-          A.actions<Promise.t<()>>,
-          B.actions<Promise.t<()>>,
-          C.actions<Promise.t<()>>,
-          D.actions<Promise.t<()>>,
-          E.actions<Promise.t<()>>,
-          F.actions<Promise.t<()>>,
-        >
-      >,
-      FieldVector.Actions.t<
-        S.t<A.input, B.input, C.input, D.input, E.input, F.input>,
-        (),
-        P.structure<
-          A.actions<()>,
-          B.actions<()>,
-          C.actions<()>,
-          D.actions<()>,
-          E.actions<()>,
-          F.actions<()>,
-        >
+        FieldVector.validateOut<S.t<A.output, B.output, C.output, D.output, E.output, F.output>>,
+        P.structure<A.context, B.context, C.context, D.context, E.context, F.context>,
       >
-    >
-    and type parted = S.t<
-      Pack.t<A.t, A.change, A.actions<Promise.t<()>>, A.actions<()>>,
-      Pack.t<B.t, B.change, B.actions<Promise.t<()>>, B.actions<()>>,
-      Pack.t<C.t, C.change, C.actions<Promise.t<()>>, C.actions<()>>,
-      Pack.t<D.t, D.change, D.actions<Promise.t<()>>, D.actions<()>>,
-      Pack.t<E.t, E.change, E.actions<Promise.t<()>>, E.actions<()>>,
-      Pack.t<F.t, F.change, F.actions<Promise.t<()>>, F.actions<()>>
-    >
-
+      // and type change = FieldVector.Change.t<
+      //   S.t<A.input, B.input, C.input, D.input, E.input, F.input>,
+      //   S.t<A.change, B.change, C.change, D.change, E.change, F.change>,
+      // >
+      and type actions<'change> = FieldVector.Actions.t<
+        S.t<A.input, B.input, C.input, D.input, E.input, F.input>,
+        'change,
+        P.structure<
+          A.actions<'change>,
+          B.actions<'change>,
+          C.actions<'change>,
+          D.actions<'change>,
+          E.actions<'change>,
+          F.actions<'change>,
+        >,
+      >
+      and type pack = Form.t<
+        Store.t<
+          S.t<A.t, B.t, C.t, D.t, E.t, F.t>,
+          S.t<A.output, B.output, C.output, D.output, E.output, F.output>,
+          error,
+        >,
+        FieldVector.Actions.t<
+          S.t<A.input, B.input, C.input, D.input, E.input, F.input>,
+          unit,
+          P.structure<
+            A.actions<unit>,
+            B.actions<unit>,
+            C.actions<unit>,
+            D.actions<unit>,
+            E.actions<unit>,
+            F.actions<unit>,
+          >,
+        >,
+      >
+      and type parted = S.t<
+        Form.t<A.t, A.actions<unit>>,
+        Form.t<B.t, B.actions<unit>>,
+        Form.t<C.t, C.actions<unit>>,
+        Form.t<D.t, D.actions<unit>>,
+        Form.t<E.t, E.actions<unit>>,
+        Form.t<F.t, F.actions<unit>>,
+      >
+  )
 
   //Sum needs Product for maintaining context
-  module Make: Make = (S: Interface, P: Product6.Generic, A: Field.T, B: Field.T, C: Field.T, D: Field.T, E: Field.T, F: Field.T) => {
+  module Make: Make = (
+    S: Interface,
+    P: Product6.Generic,
+    A: Field.T,
+    B: Field.T,
+    C: Field.T,
+    D: Field.T,
+    E: Field.T,
+    F: Field.T,
+  ) => {
     module T = Product6.T
     module Inner = FieldEither.Either6.Make(S, A, B, C, D, E, F)
     type either<'a, 'b, 'c, 'd, 'e, 'f> = Either.Nested.t6<'a, 'b, 'c, 'd, 'e, 'f>
@@ -951,24 +898,35 @@ module Sum6 = {
     type inner = S.t<A.t, B.t, C.t, D.t, E.t, F.t>
     type output = S.t<A.output, B.output, C.output, D.output, E.output, F.output>
     type error = [#Whole(string) | #Part]
-    
+
     type t = Store.t<inner, output, error>
 
     type validate = FieldVector.validateOut<output>
-    type contextInner = P.structure<A.context, B.context, C.context, D.context, E.context, F.context>
+    type contextInner = P.structure<
+      A.context,
+      B.context,
+      C.context,
+      D.context,
+      E.context,
+      F.context,
+    >
     type context = Context.t<input, validate, contextInner>
 
     // Context is the product equivalent of this sum, so we need toTuple in x->S.toSum->FieldProduct.Product1.PolyVariant.toEither
-    let toTuple: P.structure<'a, 'b, 'c, 'd, 'e, 'f> => T.t<'a, 'b, 'c, 'd, 'e, 'f> = x => P.order->T.encode->T.napply(T.return(x))
-    let fromTuple: T.t<'a, 'b, 'c, 'd, 'e, 'f> => P.structure<'a, 'b, 'c, 'd, 'e, 'f> = x => x->T.decode->P.fromTuple
+    let toTuple: P.structure<'a, 'b, 'c, 'd, 'e, 'f> => T.t<'a, 'b, 'c, 'd, 'e, 'f> = x =>
+      P.order->T.encode->T.napply(T.return(x))
+    let fromTuple: T.t<'a, 'b, 'c, 'd, 'e, 'f> => P.structure<'a, 'b, 'c, 'd, 'e, 'f> = x =>
+      x->T.decode->P.fromTuple
 
-    let toEither = (s: S.t<'a, 'b, 'c, 'd, 'e, 'f>): either<'a, 'b, 'c, 'd, 'e, 'f> => s->S.toSum->Product6.PolyVariant.toEither
-    let fromEither: either<'a, 'b, 'c, 'd, 'e, 'f> => S.t<'a, 'b, 'c, 'd, 'e, 'f> = x => x->Product6.PolyVariant.fromEither->S.fromSum
+    let toEither = (s: S.t<'a, 'b, 'c, 'd, 'e, 'f>): either<'a, 'b, 'c, 'd, 'e, 'f> =>
+      s->S.toSum->Product6.PolyVariant.toEither
+    let fromEither: either<'a, 'b, 'c, 'd, 'e, 'f> => S.t<'a, 'b, 'c, 'd, 'e, 'f> = x =>
+      x->Product6.PolyVariant.fromEither->S.fromSum
 
     let storeToSum = Store.bimap(_, fromEither, fromEither)
-    let storeToEither= Store.bimap(_, toEither, toEither)
+    let storeToEither = Store.bimap(_, toEither, toEither)
 
-    let validateToEither = Option.map(_, v => out => out->fromEither->v)
+    let validateToEither = Option.map(_, (v, out) => out->fromEither->v)
     let contextToTuple = (context: context): Inner.context => {
       let inner = context.inner->toTuple
       let empty: option<Inner.input> = context.empty->Option.map(toEither)
@@ -984,53 +942,49 @@ module Sum6 = {
     let set = (x: input): t => x->toEither->Inner.set->storeToSum
     let show = (store: t) => store->storeToEither->Inner.show
 
-    let validate = (force, context: context, store: t): Dynamic.t<t> => {
-      Inner.validate(force, context->contextToTuple, store->storeToEither)
-      ->Dynamic.map(storeToSum)
+    let validate = (force, context: context, store: t): Rxjs.t<Rxjs.foreign, Rxjs.void,t> => {
+      Inner.validate(force, context->contextToTuple, store->storeToEither)->Dynamic.map(storeToSum)
     }
 
-    type changeInner = S.t<A.change, B.change, C.change, D.change, E.change, F.change>
-    type change = FieldVector.Change.t<input, changeInner>
-    let makeSet = (input: input): change => #Set(input)
-    let changeToEither: change => Inner.change = FieldVector.Change.bimap(toEither, toEither)
-    let showChange = (c: change): string => c->changeToEither->Inner.showChange
+    type actionsInner<'out> = P.structure<
+      A.actions<'out>,
+      B.actions<'out>,
+      C.actions<'out>,
+      D.actions<'out>,
+      E.actions<'out>,
+      F.actions<'out>,
+    >
+    let mapActionsInner: (actionsInner<'ch>, 'ch => 'b) => actionsInner<'b> = (ac, fn) =>
+      ac->toTuple->Inner.mapActionsInner(fn)->fromTuple
 
-    type actionsInner<'out> = P.structure<A.actions<'out>, B.actions<'out>, C.actions<'out>, D.actions<'out>, E.actions<'out>, F.actions<'out>>
-    let mapActionsInner: (actionsInner<'ch>, 'ch => 'b) => actionsInner<'b> = (ac, fn) => ac->toTuple->Inner.mapActionsInner(fn)->fromTuple
+    type actions<'change> = FieldVector.Actions.t<input, 'change, actionsInner<'change>>
+    let mapActions: (actions<'change>, 'change => 'b) => actions<'b> = (actions, fn) =>
+      actions->FieldVector.Actions.trimap(x => x, fn, mapActionsInner(_, fn))
 
-		type actions<'change> = FieldVector.Actions.t<input, 'change, actionsInner<'change>>	
-		let actions: actions<change> = FieldVector.Actions.make(
-			Inner.actionsInner->Inner.mapActionsInner(x => #Inner(fromEither(x)))->fromTuple,
-		)
-    let mapActions: (actions<'change>, 'change => 'b) => actions<'b> = (actions, fn) => actions->FieldVector.Actions.trimap(x=>x, fn, mapActionsInner(_, fn))
-    
-    type pack = Pack.t<t, change, actions<Promise.t<()>>, actions<()>>
+    type pack = Form.t<t, actions<unit>>
 
     type parted = S.t<
-      Pack.t<A.t, A.change, A.actions<Promise.t<()>>, A.actions<()>>,
-      Pack.t<B.t, B.change, B.actions<Promise.t<()>>, B.actions<()>>,
-      Pack.t<C.t, C.change, C.actions<Promise.t<()>>, C.actions<()>>,
-      Pack.t<D.t, D.change, D.actions<Promise.t<()>>, D.actions<()>>,
-      Pack.t<E.t, E.change, E.actions<Promise.t<()>>, E.actions<()>>,
-      Pack.t<F.t, F.change, F.actions<Promise.t<()>>, F.actions<()>>
+      Form.t<A.t, A.actions<unit>>,
+      Form.t<B.t, B.actions<unit>>,
+      Form.t<C.t, C.actions<unit>>,
+      Form.t<D.t, D.actions<unit>>,
+      Form.t<E.t, E.actions<unit>>,
+      Form.t<F.t, F.actions<unit>>,
     >
 
-    let split: (Pack.t<t, change, actions<Promise.t<()>>, actions<()>>) => parted  = (part) => {
-      let onChange = x => x->fromEither->#Inner->part.onChange
-      Inner.splitInner(
-        part.field->Store.inner->toEither,
-        onChange,
-        part.actions.inner->toTuple,
-        part.actions_.inner->toTuple
-      )
-      ->fromEither
-    }
- 
-    let reduce = (~context: context, store: Dynamic.t<t>, change: Indexed.t<change>): Dynamic.t<t> => {
-      Inner.reduce(~context=context->contextToTuple, store->Dynamic.map(storeToEither), change->Indexed.map(changeToEither))
-      ->Dynamic.map(storeToSum)
+    let split: Form.t<t, actions<unit>> => parted = part => {
+      Inner.splitInner(part.field->Store.inner->toEither, part.actions.inner->toTuple)->fromEither
     }
 
+    let actionsFromVector: Inner.actions<()> => actions<()> = FieldVector.Actions.trimap(_, toEither, x=>x, fromTuple)
+    let packFromEither = Form.bimap(_, storeToSum, actionsFromVector)
+    let makeDyn = (context: context, set: Rxjs.Observable.t<input>, val: option<Rxjs.Observable.t<()>>)
+      : Dyn.t<Close.t<Form.t<t, actions<()>>>>
+      => {
+      Inner.makeDyn(context->contextToTuple, set->Dynamic.map(toEither), val)
+      ->Dyn.map(Close.map(_, packFromEither))
+    }
+ 
     let input = (store: t): input => store->storeToEither->Inner.input->fromEither
     let inner = Store.inner
     let output = Store.output

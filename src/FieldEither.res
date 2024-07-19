@@ -31,31 +31,33 @@ module type Tail = {
   let setInner: input => inner
 
   let outputInner: inner => option<output>
-  let validateInner: (bool, contextInner, inner) => Dynamic.t<inner>
+  let validateInner: (bool, contextInner, inner) => Rxjs.t<Rxjs.foreign, Rxjs.void,inner>
 
-  type changeInner
-  let showChangeInner: changeInner => string
+  // type changeInner
+  // let showChangeInner: changeInner => string
 
   // actionsInner is a collection of functions from the specific changes
   // to a particular output value.  This is a functor with mapActionsInner
   // which allows the actions to be lifted into their parents actions
   // when needed
   type actionsInner<'a>
-  let actionsInner: actionsInner<changeInner>
+  // let actionsInner: actionsInner<changeInner>
   let mapActionsInner: (actionsInner<'a>, 'a => 'b) => actionsInner<'b>
   
   type partition
   @ocaml.doc("Takes the fields of a part instead of a part since we are having to deconstruct in the outer `split` to prepare inner values so why reconstruct")
-  let splitInner: (inner, changeInner => (), actionsInner<Promise.t<()>>, actionsInner<()>) => partition
+  let splitInner: (inner, actionsInner<()>) => partition
+  
+  let makeDynInner: (contextInner, Rxjs.Observable.t<input>) => Dyn.t<Close.t<Form.t<inner, actionsInner<()>>>>
 
   let toEnumInner: inner => Store.enum
-  let reduceSet: (contextInner, Dynamic.t<inner>, Indexed.t<unit>, input) => Dynamic.t<inner>
-  let reduceInner: (
-    contextInner,
-    Dynamic.t<inner>,
-    Indexed.t<unit>,
-    changeInner,
-  ) => Dynamic.t<inner>
+  // let reduceSet: (contextInner, Rxjs.t<Rxjs.foreign, Rxjs.void,inner>, Indexed.t<unit>, input) => Rxjs.t<Rxjs.foreign, Rxjs.void,inner>
+//   let reduceInner: (
+//     contextInner,
+//     Rxjs.t<Rxjs.foreign, Rxjs.void,inner>,
+//     Indexed.t<unit>,
+//     changeInner,
+//   ) => Rxjs.t<Rxjs.foreign, Rxjs.void,inner>
   let inputInner: inner => input
   let showInner: inner => string
   let printErrorInner: inner => option<string>
@@ -64,6 +66,11 @@ module type Tail = {
 module Context = FieldVector.Context
 
 module Either0 = {
+  // Either0 is the terminal case of recursion in FieldEither.
+  // Its degenerate, holds only unit value, and occupies the final Right value in the
+  // Nested Eithers for state etc.
+  // All real values are Left, nested into Rights to place them in context.
+
   // TODO: Could be reduced to not use Either at all? - AxM
   type input = () 
   type inner = () 
@@ -91,8 +98,8 @@ module Either0 = {
   
   let hasEnum = (_x, e) => e == #Valid
 
-  let validateInner = (_force, _context: contextInner, inner: inner) => { empty()->Dynamic.return }
-  let validate = (_force, _context: context, store: t) => init()->Dynamic.return
+  let validateInner = (_force, _context: contextInner, _inner: inner) => { empty()->Dynamic.return }
+  let validate = (_force, _context: context, _store: t) => init()->Dynamic.return
 
   let inner = _ => ()
   
@@ -113,28 +120,64 @@ module Either0 = {
   let toEnumInner = (_t: inner) => #Valid
 
   type actionsInner<'a> = unit
-  let actionsInner: actionsInner<changeInner> = ()
+  // let actionsInner: actionsInner<changeInner> = ()
   let mapActionsInner = (_actions: actionsInner<'a>, _fn): actionsInner<'b> => ()
 
   type actions<'change> = unit
   let mapActions = (_actions, _fn) => ()
-  let actions: actions<change> = ()
+  // let actions: actions<change> = ()
   
-  type pack = Pack.t<t, change, actions<Promise.t<()>>, actions<()>>
+  type pack = Form.t<t, actions<()>>
 
   type partition = ()
-  let splitInner = (_, _, _, _) => {
+  let splitInner = (_, _) => {
     ()
   }
  
-  let showInner = (_inner: inner): string => ""
+  let showInner = (_inner: inner): string => "(either0 inner)"
 
   let show = (_store: t): string => "Either0"
 
+  type observables = 
+    Rxjs.t<Rxjs.foreign, Rxjs.void, Form.t<t, actions<()>>>
+  
+  let makeDynInner =  (_context: contextInner, set: Rxjs.Observable.t<input>)
+    : Dyn.t<Close.t<Form.t<inner, actionsInner<()>>>>
+    => {
+      // Since either0 is degenerate, it will never be meanigfully set
+      // and it should never emit values on validation.
+
+      let first: Close.t<Form.t<'f, 'a>> = {pack: {field: (), actions: ()}, close: () => ()}
+
+      let dyn = set 
+        // ->Dynamic.log("Either0 set")
+        ->Dynamic.map(_ => Dynamic.return(first))
+
+      {first, dyn}
+    }
+
+  let makeDyn = (_context: context, setOuter: Rxjs.Observable.t<input>, valOuter: option<Rxjs.Observable.t<()>> )
+    : Dyn.t<Close.t<Form.t<t, actions<()>>>>
+    => {
+    let field = init()
+    let actions: actions<()> = () 
+    let first: Close.t<Form.t<'f, 'a>> = {pack: { field, actions }, close: () => ()}
+
+    let dyn = 
+      valOuter
+      ->Option.map(Rxjs.merge2(setOuter, _))
+      ->Option.or(setOuter)
+      ->Dynamic.map(_ => Dynamic.return(first))
+      ->Rxjs.toObservable
+
+    {first, dyn}
+  }
+
+
   // We're counting on these streams producing values, so we cant just return the existing inner/store Dynamics - AxM
-  let reduceSet = ( _context: contextInner, inner: Dynamic.t<inner>, _change: Indexed.t<unit>, _input: input) => ()->Dynamic.return
-  let reduceInner = ( _context: contextInner, _inner: Dynamic.t<inner>, _change: Indexed.t<unit>, _ch: changeInner) => ()->Dynamic.return
-  let reduce = (~context: context, store: Dynamic.t<t>, _change: Indexed.t<change>) => init()->Dynamic.return
+  // let reduceSet = ( _context: contextInner, inner: Rxjs.t<Rxjs.foreign, Rxjs.void,inner>, _change: Indexed.t<unit>, _input: input) => ()->Dynamic.return
+  // let reduceInner = ( _context: contextInner, _inner: Rxjs.t<Rxjs.foreign, Rxjs.void,inner>, _change: Indexed.t<unit>, _ch: changeInner) => ()->Dynamic.return
+  // let reduce = (~context: context, store: Rxjs.t<Rxjs.foreign, Rxjs.void,t>, _change: Indexed.t<change>) => init()->Dynamic.return
 
 }
 
@@ -175,19 +218,19 @@ module Rec = {
 
     let set = (x: input): t => x->setInner->Store.dirty
 
-    let makeStore = (inner: inner): Dynamic.t<t> => {
+    let makeStore = (inner: inner): t => {
       let output = inner->Either.bimap(Head.output, Tail.outputInner, _)->Either.sequence
       let enum = inner->Either.either(Head.enum, Tail.toEnumInner, _)
       [
-        output->Option.map(output => Store.valid(inner, output)->Dynamic.return),
-        enum == #Init ? Store.init(inner)->Dynamic.return->Some : None,
-        enum == #Invalid ? Store.invalid(inner, #Part)->Dynamic.return->Some : None,
+        output->Option.map(output => Store.valid(inner, output)),
+        enum == #Init ? Store.init(inner)->Some : None,
+        enum == #Invalid ? Store.invalid(inner, #Part)->Some : None,
       ]
       ->Array.reduce(Option.first, None)
-      ->Option.or(Store.dirty(inner)->Dynamic.return)
+      ->Option.or(Store.dirty(inner))
     }
 
-    let validateInner = (force, context: contextInner, inner: inner): Dynamic.t<inner> => {
+    let validateInner = (force, context: contextInner, inner: inner): Rxjs.t<Rxjs.foreign, Rxjs.void,inner> => {
       let (contextHead, contextTail) = context
       switch inner {
       | Left(a) => a->Head.validate(force, contextHead, _)->Dynamic.map(Either.left)
@@ -195,29 +238,12 @@ module Rec = {
       }
     }
 
-    let validate = (force, context: context, store: t): Dynamic.t<t> => {
-      validateInner(force, context.inner, store->Store.inner)->Dynamic.bind(makeStore)
+    let validate = (force, context: context, store: t): Rxjs.t<Rxjs.foreign, Rxjs.void,t> => {
+      validateInner(force, context.inner, store->Store.inner)->Dynamic.map(makeStore)
     }
-
-    type changeInner = Either.t<Head.change, Tail.changeInner>
-    let showChangeInner = (change: changeInner): string => {
-      switch change {
-      | Left(a) => `Left(${Head.showChange(a)})`
-      | Right(b) => `Right(${Tail.showChangeInner(b)})`
-      }
-    }
-
-    type change = FieldVector.Change.t<input, changeInner>
-    let showChange = (change: change): string =>
-      change->FieldVector.Change.bimap(showInput, showChangeInner, _)->FieldVector.Change.show
-    let makeSet = input => #Set(input)
 
     // A Nested tupe managing the "Inner" actions alone, for this head and tail
     type actionsInner<'change> = (Head.actions<'change>, Tail.actionsInner<'change>)
-    let actionsInner: actionsInner<changeInner> = (
-      Head.actions->Head.mapActions(Either.left),
-      Tail.actionsInner->Tail.mapActionsInner(Either.right)
-    )
 
     let mapActionsInner = (actions: actionsInner<'a>, fn): actionsInner<'b> => {
       let (head, tail) = actions
@@ -227,127 +253,22 @@ module Rec = {
     // Application of actionsInner into our own local Actions, for direct clients of FieldEither.
     type actions<'change> = Actions.t<input, 'change, actionsInner<'change>>
     let mapActions = (actions, fn) => Actions.trimap(actions, x => x, fn, mapActionsInner(_, fn))
-    let actions: actions<change> = Actions.make(
-      actionsInner->mapActionsInner(x => #Inner(x))
-    )
   
-    type pack = Pack.t<t, change, actions<Promise.t<()>>, actions<()>>
+    type pack = Form.t<t, actions<()>>
 
-    type partition = Either.t<Pack.t<Head.t, Head.change, Head.actions<Promise.t<()>>, Head.actions<()>>, Tail.partition>
-    let splitInner = (inner: inner, onChange: changeInner => (), actions: actionsInner<'a>, actions_: actionsInner<'a_>): partition => {
+    type partition = Either.t<Form.t<Head.t, Head.actions<()>>, Tail.partition>
+    let splitInner = (inner: inner, actions: actionsInner<'a>): partition => {
       let (ah, at) = actions
-      let (ah_, at_) = actions_
-      let onChangeHead = x => x->Left->onChange
-      let onChangeTail = x => x->Right->onChange
       inner->Either.bimap(
-        (field) => ({field, onChange: onChangeHead, actions: ah, actions_: ah_}: Pack.t<Head.t, Head.change, Head.actions<Promise.t<()>>, Head.actions<()>>),
-        (tail) => Tail.splitInner(tail, onChangeTail, at, at_),
+        (field) => ({field, actions: ah}: Form.t<Head.t, Head.actions<()>>),
+        (tail) => Tail.splitInner(tail, at),
         _
       )
     }
 
-    let split = (part: Pack.t<t, change, actions<Promise.t<()>>, actions<()>>): partition => {
-      let onChange = x => x->#Inner->part.onChange
-      splitInner( part.field->Store.inner, onChange, part.actions.inner, part.actions_.inner)
+    let split = (part: Form.t<t, actions<()>>): partition => {
+      splitInner( part.field->Store.inner, part.actions.inner)
     }
-
-
-    let reduceSet = (
-      context: contextInner,
-      inner: Dynamic.t<inner>,
-      change: Indexed.t<unit>,
-      input: input,
-    ): Dynamic.t<inner> => {
-      let (contextHead, contextTail) = context
-      switch input {
-      | Left(a) => {
-          let innerHead = inner->Dynamic.map(i =>
-            switch i {
-            | Left(a) => a
-            | _ => Head.init(contextHead)
-            }
-          )
-          change
-          ->Indexed.const(a->Head.makeSet)
-          ->Head.reduce(~context=contextHead, innerHead, _)
-          ->Dynamic.map(Either.left)
-        }
-      | Right(inputTail) => {
-          let innerTail = inner->Dynamic.map(x =>
-            switch x {
-            | Right(b) => b
-            | _ => Tail.initInner(contextTail)
-            }
-          )
-          Tail.reduceSet(contextTail, innerTail, change, inputTail)->Dynamic.map(Either.right)
-        }
-      }
-    }
-
-    let reduceInnerHead = (
-      context: contextInner,
-      inner: Dynamic.t<inner>,
-      change: Indexed.t<unit>,
-      ch: Head.change,
-    ) => {
-      let (contextHead, _) = context
-      let innerHead = inner->Dynamic.map(i => {
-        switch i {
-        | Left(a) => a
-        | _ => Head.init(contextHead)
-        }
-      })
-      change
-      ->Indexed.const(ch)
-      ->Head.reduce(~context=contextHead, innerHead, _)
-      ->Dynamic.map(Either.left)
-    }
-
-    let reduceInnerTail = (
-      context: contextInner,
-      inner: Dynamic.t<inner>,
-      change: Indexed.t<unit>,
-      ch: Tail.changeInner,
-    ) => {
-      let (_, contextTail) = context
-      let innerTail = inner->Dynamic.map(i =>
-        switch i {
-        | Right(a) => a
-        | _ => Tail.initInner(contextTail)
-        }
-      )
-      Tail.reduceInner(contextTail, innerTail, change, ch)->Dynamic.map(Either.right)
-    }
-
-    let reduceInner = (
-      context: contextInner,
-      inner: Dynamic.t<inner>,
-      change: Indexed.t<unit>,
-      changeInner: changeInner,
-    ) => {
-      switch changeInner {
-      | Left(ch) => reduceInnerHead(context, inner, change, ch)
-      | Right(ch) => reduceInnerTail(context, inner, change, ch)
-      }
-    }
-
-    let reduce = (~context: context, store: Dynamic.t<t>, change: Indexed.t<change>): Dynamic.t<
-      t,
-    > => {
-      let inner = store->Dynamic.map(Store.inner)
-      switch change.value {
-      | #Clear => context->init->Dynamic.return
-      | #Set(input) =>
-        reduceSet(context.inner, inner, change->Indexed.const(), input)->Dynamic.bind(makeStore)
-      | #Inner(changeInner) =>
-        reduceInner(context.inner, inner, change->Indexed.const(), changeInner)->Dynamic.bind(
-          makeStore,
-        )
-      | #Validate => store->Dynamic.take(1)->Dynamic.bind(store => validate(true, context, store))
-      }
-    }
-
-    let makeSet = input => #Set(input)
 
     let inner = Store.inner
 
@@ -374,6 +295,177 @@ module Rec = {
       }`
     }
 
+
+    // Recursive elements of makeObservable
+    let makeDynInner = (context: contextInner, set: Rxjs.Observable.t<input>)
+      : Dyn.t<Close.t<Form.t<inner, actionsInner<()>>>>
+      => {
+      let (contextHead, contextTail) = context
+      let setHead = set->Dynamic.keepMap(Either.toLeft)//->Dynamic.log("setHead")
+      let setTail  = set->Dynamic.keepMap(Either.toRight)//->Dynamic.log("setTail")
+
+      let {first: firstHead, dyn: dynHead } = Head.makeDyn(contextHead, setHead->Rxjs.toObservable, None)
+      let dynHead = dynHead
+        ->Dynamic.startWith(Dynamic.return(firstHead))
+        // ->Rxjs.pipe(Rxjs.share())
+        // ->Dynamic.tap(Dynamic.log_(_, "head"))
+
+      // FIXME: Sould all dyns be required to emit a first observable as well as include a first value?
+      let {first: firstTail, dyn: dynTail } = Tail.makeDynInner(contextTail, setTail)
+      // let dynTail = dynTail->Dynamic.startWith(Dynamic.return(firstTail))
+
+      // FIXME: take correct value for initial field?
+      let field: inner = Left(firstHead.pack->Form.field) //, packTail->Form.field)
+      let actions: actionsInner<()> = (firstHead.pack->Form.actions, firstTail.pack->Form.actions)
+      let close = () => {
+        firstTail.close()
+        firstHead.close()
+      }
+
+      let packFirst: Form.t<'f, 'a> = { field, actions }
+      let first: Close.t<Form.t<'f, 'a>> = { pack: packFirst, close }
+
+      let dynActionsHead = 
+        dynHead
+        ->Dynamic.switchMap(Dynamic.map(_,  head => head.pack.actions))
+        ->Dynamic.startWith(firstHead.pack.actions)
+        // ->Dynamic.log("dynActionsHead")
+
+      let dynActionsTail = 
+        dynTail
+        ->Dynamic.switchMap(Dynamic.map(_, tail => tail.pack.actions))
+        ->Dynamic.startWith(firstTail.pack.actions)
+        // ->Dynamic.log("dynActionsTail")
+
+      let dynActions = 
+            Rxjs.combineLatest2(dynActionsHead, dynActionsTail)
+            ->Dynamic.startWith(actions)
+            // ->Rxjs.pipe(Rxjs.shareReplay(1))
+            // ->Dynamic.log("dynActions")
+
+      let dynCloseHead = 
+        dynHead
+        ->Dynamic.switchMap( Dynamic.map(_, Close.close))
+      //   ->Dynamic.startWith(firstHead.close)
+      //   ->Rxjs.pipe(Rxjs.shareReplay(1))
+        // ->Dynamic.log("dynCloseHead")
+
+      let dynCloseTail = 
+        dynTail
+        ->Dynamic.switchMap(Dynamic.map(_, Close.close))
+      //   ->Dynamic.startWith(firstTail.close)
+      //   ->Rxjs.pipe(Rxjs.shareReplay(1))
+        // ->Dynamic.log("dynCloseTail")
+
+      let dynClose: Rxjs.t<Rxjs.foreign, Rxjs.void,() => ()> = 
+        Rxjs.combineLatest2(dynCloseHead, dynCloseTail)
+        ->Dynamic.map( ((closeHead, closeTail)) => {
+          () => {
+            closeHead()
+            closeTail()
+          }
+        })
+        ->Dynamic.startWith(close)
+
+      // Head and Tail both produce their own dyns
+      // As an Sum type, we are trying to produce only one or the other value at any moment
+      // But we still want to produce actions and close for both.
+
+      let dynFieldHead = 
+        dynHead
+        ->Dynamic.map(Dynamic.map(_, head => head.pack.field->Either.left))
+
+      let dynFieldTail = 
+        dynTail
+        ->Dynamic.map(Dynamic.map(_, tail => tail.pack.field->Either.right))
+
+      let dyn = Rxjs.merge2( dynFieldHead, dynFieldTail)
+        ->Dynamic.map( field => {
+          field 
+          ->Dynamic.withLatestFrom2(dynActions, dynClose)
+          ->Dynamic.map( ((field, actions, close)): Close.t<Form.t<'f, 'a>> => {pack: {field, actions}, close })
+          // FIXME: should start with latest left pack?
+        })
+        ->Dynamic.startWith(Dynamic.return(first))
+
+      {first, dyn}
+    }
+
+    let applyInner = (inner: Rxjs.Observable.t<Close.t<Form.t<inner, actionsInner<()>>>>, actions, closeOpt) => {
+      inner
+      ->Dynamic.map(({pack}): Close.t<Form.t<t, actions<()>>> => {
+        let field = pack.field->makeStore
+        let actions: actions<()> = {
+          ...actions,
+          inner: pack.actions
+        }
+
+        let close = closeOpt
+        // () => {
+        //   closeInner()
+        //   closeOpt()
+        // }
+        {pack: { field, actions }, close}
+      })
+    }
+
+
+    // Non-Recursive makeObservable
+    let makeDyn = (context: context, setOuter: Rxjs.Observable.t<input>, valOuter: option<Rxjs.Observable.t<()>> )
+      : Dyn.t<Close.t<Form.t<t, actions<()>>>>
+      => {
+      let setInner = Rxjs.Subject.makeEmpty()
+      let clearInner = Rxjs.Subject.makeEmpty()
+      let opt = Rxjs.Subject.makeEmpty()
+      let valInner = Rxjs.Subject.makeEmpty() 
+      let complete = Rxjs.Subject.makeEmpty()
+
+      let setOpt = opt->Rxjs.pipe(Rxjs.keepMap(x => x))//->Dynamic.log("setOpt")
+      let clearOpt = opt->Rxjs.pipe(Rxjs.keepMap(Option.invert(_, ())))
+
+      let val = valOuter->Option.map(Rxjs.merge2(_, valInner))->Option.or(valInner->Rxjs.toObservable)
+      let set = Rxjs.merge3(setOuter, setInner, setOpt)//->Dynamic.log("set")
+      let clear = Rxjs.merge2(clearInner, clearOpt)
+
+      let {first: firstInner, dyn: dynInner} = makeDynInner(context.inner, set)
+      let field = firstInner.pack->Form.field->Store.init //->makeStore
+    
+      let state = Rxjs.Subject.makeBehavior(field)
+
+      let actions: actions<()> = {
+        clear: Rxjs.next(clearInner), 
+        set: Rxjs.next(setInner),
+        opt: Rxjs.next(opt),
+        inner: firstInner.pack->Form.actions,
+        validate: Rxjs.next(valInner),
+      }
+
+      let close = Rxjs.next(complete)
+    
+      let first: Close.t<Form.t<t, 'a>> = {pack: { field, actions }, close}
+
+      let memoState = Dynamic.map(_, Dynamic.tap(_, (x: Close.t<Form.t<t, 'a>>) => Rxjs.next(state, x.pack.field)))
+
+      let changes = Rxjs.merge2(
+        clear->Dynamic.map(_ => Dynamic.return(first))->memoState,
+        dynInner->Dynamic.map(applyInner(_, actions, close))->memoState
+      )
+
+      let validated = val 
+        ->Dynamic.withLatestFrom(state)
+        ->Dynamic.map( ((_validation, field)) => {
+          validate(false, context, field)
+          ->Dynamic.map((field): Close.t<Form.t<'f, 'a>> => {pack: {field, actions}, close})
+        })
+
+      // Any single value from changes interrupts a validation sequence  
+      let dyn = 
+        Rxjs.merge2(changes, validated)
+        ->Rxjs.pipe(Rxjs.takeUntil(complete))
+
+      {first, dyn}
+    }
+
     let printErrorInner = (inner: inner): option<string> =>
       inner->Either.either(Head.printError, Tail.printErrorInner, _)
 
@@ -398,11 +490,11 @@ module Either1 = {
         tuple<A.context>,
       >
       and type t = Store.t<either<A.t>, either<A.output>, error>
-      and type changeInner = either<A.change>
-      and type change = FieldVector.Change.t<either<A.input>, either<A.change>>
+      // and type changeInner = either<A.change>
+      // and type change = FieldVector.Change.t<either<A.input>, either<A.change>>
       and type actionsInner<'a> = tuple<A.actions<'a>>
       and type actions<'change> = Actions.t<either<A.input>, 'change, tuple<A.actions<'change>>>
-      and type partition = either<Pack.t<A.t, A.change, A.actions<Promise.t<()>>, A.actions<()>>>
+      and type partition = either<Form.t<A.t, A.actions<()>>>
   ) => Rec.Make(I, A, Either0)
 }
 
@@ -421,13 +513,13 @@ module Either2 = {
         tuple<A.context, B.context>,
       >
       and type t = Store.t<either<A.t, B.t>, either<A.output, B.output>, error>
-      and type changeInner = either<A.change, B.change>
-      and type change = FieldVector.Change.t<either<A.input, B.input>, either<A.change, B.change>>
+      // and type changeInner = either<A.change, B.change>
+      // and type change = FieldVector.Change.t<either<A.input, B.input>, either<A.change, B.change>>
       and type actionsInner<'a> = tuple<A.actions<'a>, B.actions<'a>>
       and type actions<'change> = Actions.t<either<A.input, B.input>, 'change, tuple<A.actions<'change>, B.actions<'change>>>
       and type partition = either<
-        Pack.t<A.t, A.change, A.actions<Promise.t<()>>, A.actions<()>>,
-        Pack.t<B.t, B.change, B.actions<Promise.t<()>>, B.actions<()>>
+        Form.t<A.t, A.actions<()>>,
+        Form.t<B.t, B.actions<()>>
         >
   ) => Rec.Make(I, A, Either1.Make(I, B))
 }
@@ -447,11 +539,11 @@ module Either3 = {
         tuple<A.context, B.context, C.context>,
       >
       and type t = Store.t<either<A.t, B.t, C.t>, either<A.output, B.output, C.output>, error>
-      and type changeInner = Either.t<A.change, Either.t<B.change, Either.t<C.change, unit>>>
-      and type change = FieldVector.Change.t<
-        either<A.input, B.input, C.input>,
-        either<A.change, B.change, C.change>,
-      >
+      // and type changeInner = Either.t<A.change, Either.t<B.change, Either.t<C.change, unit>>>
+      // and type change = FieldVector.Change.t<
+      //   either<A.input, B.input, C.input>,
+      //   either<A.change, B.change, C.change>,
+      // >
       and type actionsInner<'a> = tuple<
         A.actions<'a>,
         B.actions<'a>,
@@ -459,9 +551,9 @@ module Either3 = {
       >
       and type actions<'change> = Actions.t<either<A.input, B.input, C.input>, 'change, tuple<A.actions<'change>, B.actions<'change>, C.actions<'change>>>
       and type partition = either<
-        Pack.t<A.t, A.change, A.actions<Promise.t<()>>, A.actions<()>>,
-        Pack.t<B.t, B.change, B.actions<Promise.t<()>>, B.actions<()>>,
-        Pack.t<C.t, C.change, C.actions<Promise.t<()>>, C.actions<()>>
+        Form.t<A.t, A.actions<()>>,
+        Form.t<B.t, B.actions<()>>,
+        Form.t<C.t, C.actions<()>>
       >
   ) => Rec.Make(I, A, Either2.Make(I, B, C))
 }
@@ -485,11 +577,11 @@ module Either4 = {
         either<A.output, B.output, C.output, D.output>,
         error,
       >
-      and type changeInner = either<A.change, B.change, C.change, D.change>
-      and type change = FieldVector.Change.t<
-        either<A.input, B.input, C.input, D.input>,
-        either<A.change, B.change, C.change, D.change>,
-      >
+      // and type changeInner = either<A.change, B.change, C.change, D.change>
+      // and type change = FieldVector.Change.t<
+      //   either<A.input, B.input, C.input, D.input>,
+      //   either<A.change, B.change, C.change, D.change>,
+      // >
       and type actionsInner<'a> = Tuple.Nested.Tuple4.t<
         A.actions<'a>,
         B.actions<'a>,
@@ -501,10 +593,10 @@ module Either4 = {
         'change,
          tuple<A.actions<'change>, B.actions<'change>, C.actions<'change>, D.actions<'change>>>
       and type partition = either<
-        Pack.t<A.t, A.change, A.actions<Promise.t<()>>, A.actions<()>>,
-        Pack.t<B.t, B.change, B.actions<Promise.t<()>>, B.actions<()>>,
-        Pack.t<C.t, C.change, C.actions<Promise.t<()>>, C.actions<()>>,
-        Pack.t<D.t, D.change, D.actions<Promise.t<()>>, D.actions<()>>
+        Form.t<A.t, A.actions<()>>,
+        Form.t<B.t, B.actions<()>>,
+        Form.t<C.t, C.actions<()>>,
+        Form.t<D.t, D.actions<()>>
       >
   ) => Rec.Make(I, A, Either3.Make(I, B, C, D))
 }
@@ -530,11 +622,11 @@ module Either5 = {
         either<A.output, B.output, C.output, D.output, E.output>,
         error,
       >
-      and type changeInner = either<A.change, B.change, C.change, D.change, E.change>
-      and type change = FieldVector.Change.t<
-        either<A.input, B.input, C.input, D.input, E.input>,
-        either<A.change, B.change, C.change, D.change, E.change>,
-      >
+      // and type changeInner = either<A.change, B.change, C.change, D.change, E.change>
+      // and type change = FieldVector.Change.t<
+      //   either<A.input, B.input, C.input, D.input, E.input>,
+      //   either<A.change, B.change, C.change, D.change, E.change>,
+      // >
       and type actionsInner<'a> = tuple< 
         A.actions<'a>,
         B.actions<'a>,
@@ -542,12 +634,16 @@ module Either5 = {
         D.actions<'a>,
         E.actions<'a>
       >
+      and type actions<'change> = Actions.t<
+        either<A.input, B.input, C.input, D.input, E.input>,
+        'change,
+         tuple<A.actions<'change>, B.actions<'change>, C.actions<'change>, D.actions<'change>, E.actions<'change>>>
       and type partition = either<
-        Pack.t<A.t, A.change, A.actions<Promise.t<()>>, A.actions<()>>,
-        Pack.t<B.t, B.change, B.actions<Promise.t<()>>, B.actions<()>>,
-        Pack.t<C.t, C.change, C.actions<Promise.t<()>>, C.actions<()>>,
-        Pack.t<D.t, D.change, D.actions<Promise.t<()>>, D.actions<()>>,
-        Pack.t<E.t, E.change, E.actions<Promise.t<()>>, E.actions<()>>
+        Form.t<A.t, A.actions<()>>,
+        Form.t<B.t, B.actions<()>>,
+        Form.t<C.t, C.actions<()>>,
+        Form.t<D.t, D.actions<()>>,
+        Form.t<E.t, E.actions<()>>
       >
   ) => Rec.Make(I, A, Either4.Make(I, B, C, D, E))
 }
@@ -573,11 +669,11 @@ module Either6 = {
         either<A.output, B.output, C.output, D.output, E.output, F.output>,
         error,
       >
-      and type changeInner = either<A.change, B.change, C.change, D.change, E.change, F.change>
-      and type change = FieldVector.Change.t<
-        either<A.input, B.input, C.input, D.input, E.input, F.input>,
-        either<A.change, B.change, C.change, D.change, E.change, F.change>,
-      >
+      // and type changeInner = either<A.change, B.change, C.change, D.change, E.change, F.change>
+      // and type change = FieldVector.Change.t<
+      //   either<A.input, B.input, C.input, D.input, E.input, F.input>,
+      //   either<A.change, B.change, C.change, D.change, E.change, F.change>,
+      // >
       and type actionsInner<'a> = tuple<
           A.actions<'a>,
           B.actions<'a>,
@@ -586,13 +682,17 @@ module Either6 = {
           E.actions<'a>,
           F.actions<'a>
         >
+      and type actions<'change> = Actions.t<
+        either<A.input, B.input, C.input, D.input, E.input, F.input>,
+        'change,
+         tuple<A.actions<'change>, B.actions<'change>, C.actions<'change>, D.actions<'change>, E.actions<'change>, F.actions<'change>>>
       and type partition = either<
-        Pack.t<A.t, A.change, A.actions<Promise.t<()>>, A.actions<()>>,
-        Pack.t<B.t, B.change, B.actions<Promise.t<()>>, B.actions<()>>,
-        Pack.t<C.t, C.change, C.actions<Promise.t<()>>, C.actions<()>>,
-        Pack.t<D.t, D.change, D.actions<Promise.t<()>>, D.actions<()>>,
-        Pack.t<E.t, E.change, E.actions<Promise.t<()>>, E.actions<()>>,
-        Pack.t<F.t, F.change, F.actions<Promise.t<()>>, F.actions<()>>
+        Form.t<A.t, A.actions<()>>,
+        Form.t<B.t, B.actions<()>>,
+        Form.t<C.t, C.actions<()>>,
+        Form.t<D.t, D.actions<()>>,
+        Form.t<E.t, E.actions<()>>,
+        Form.t<F.t, F.actions<()>>
       >
   ) => Rec.Make(I, A, Either5.Make(I, B, C, D, E, F))
 }
