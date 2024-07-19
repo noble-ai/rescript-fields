@@ -17,7 +17,7 @@ let validate = (
   force,
   context: context,
   store: t,
-): Dynamic.t<t> => {
+): Rxjs.t<Rxjs.foreign, Rxjs.void,t> => {
   ignore(context)
   ignore(force)
   let inner = store->Store.inner
@@ -25,37 +25,42 @@ let validate = (
   ->Dynamic.return
 }
 
-type change = [#Set(input)]
-let makeSet = input => #Set(input)
-let showChange = (change: change) => {
-  switch change {
-  | #Set(input) => `Set(${input->string_of_bool})`
-  }
-}
-
 type actions<'change> = { set: input => 'change }
 let mapActions: (actions<'a>, 'a => 'b) => actions<'b> = (actions, fn) => {
   set: input => input->actions.set->fn
 }
-let actions: actions<change> = { 
-  set: input => #Set(input)
+
+let makeDyn = (context: context, initial: option<input>, setOuter: Rxjs.Observable.t<input>, _validate: option<Rxjs.Observable.t<()>> )
+    : Dyn.t<Close.t<Form.t<t, actions<()>>>>
+  => {
+  let field = 
+    Option.map(initial, set)
+    ->Option.or(init(context))
+
+  let complete = Rxjs.Subject.makeEmpty()
+  let setInner = Rxjs.Subject.makeEmpty()
+
+  let actions: actions<unit> = {
+    set: Rxjs.next(setInner),
+  }
+
+  let close = Rxjs.next(complete)
+
+  let first: Close.t<Form.t<'f, 'a>> = {pack: {field, actions}, close}
+
+  let field = Rxjs.merge2(setOuter, setInner)
+        ->Dynamic.map(set)
+
+  let dyn =  
+    field 
+    ->Dynamic.map((field): Close.t<Form.t<'f, 'a>> => {pack: {field, actions}, close})
+    ->Dynamic.map(Dynamic.return)
+    ->Rxjs.pipe(Rxjs.shareReplay(1))
+    ->Rxjs.pipe(Rxjs.takeUntil(complete))
+
+  { first, dyn }
 }
   
-type pack = Pack.t<t, change, actions<Promise.t<()>>, actions<()>>
-
-let reduce = (
-  ~context: context,
-  store: Dynamic.t<t>,
-  change: Indexed.t<change>,
-): Dynamic.t<t> => {
-  ignore(context)
-  ignore(store)
-  switch change.value {
-  | #Set(val) => Store.valid(val, val)->Dynamic.return
-  }
-}
-
-
 let inner = Store.inner
 let input = Store.inner
 let output = Store.output

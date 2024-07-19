@@ -4,7 +4,6 @@ You'll see this Field.T in the Module Functions which asserts
 that a module passed to the function has each of these types and values.
 ")
 
-
 module type T = {
   // A field is passed a context to its validate and reduce methods
   // and it can be any shape of your choosing.
@@ -44,42 +43,46 @@ module type T = {
   // Async added here as we do some network requests for password validations etc.
   // This force is to override the P.validateImmediate in Product2 etc, but might want a more narrow name
   // since we prob dont want to apply ALL async validations when this is true - AxM
-  let validate: (bool, context, t ) => Dynamic.t<t>
+  let validate: (bool, context, t ) => Rxjs.t<Rxjs.foreign, Rxjs.void, t>
 
   // Provide a type that specifies the changes you can make on this field.
   // So far this is a poly variant where some values may hold change types for children
-  type change
   // Every field has a record of functions producing changes at this level.
   // This type is opaque here so its a big of a hazard
   type actions<'change>
   let mapActions: (actions<'change>, 'change => 'b) => actions<'b>
 
-  // Without any conctext, we have actions producing our own changes
-  let actions: actions<change>
+  // Each field wants to do its own validation when its set
+  // So we want to take any set signal from a parent and pass down to children
+  // So take in the set signal in makeDyn.
 
-  @ocaml.doc("All fields have a pack so that the Pack decompsition system can go all the way to leaves, instead of running out just above in the last product/sum.")
-  type pack = Pack.t<t, change, actions<Promise.t<()>>, actions<()>>
+  // Returns an initial pack to expose actions to the parent
+  // and allow the parent to prime observables with beginsWith etc.
 
-  // When a composite field is given a set change, we want to allow our children
-  // to validate, but we do not have access [yet/ever] to their change action type
-  // to send to their reduce function.  So instead, provide an explicit setValidate
-  // that gives them context, and returns dynamic, like reduce would given a #Set - AxM
-  // Not using named arguments so this is easier to use with napply patterns in Product2 etc
-  let makeSet: input => change
+  // Though most observables are static in as far as they know, Arrays do
+  // create and destroy observables on the fly. When Array drops a channel
+  // A new array is created and that last one is dropped by a switchMap
+  // but in testing it seems that the observable never completes so we cant do testing
+  // So provide a completion function along with each pack so we can close at any point.
 
-  let showChange: change => string
-  // Reduce takes definite store instead of optional, unlike Redux, to match React.useReducer
-  // Reduce is async as a reduce may invoke a validation which is asychronous
-  // TODO: Maybe better to have reduce produce more actions?
-  let reduce: (
-    ~context: context,
-    Dynamic.t<t>,
-    Indexed.t<change>,
-  ) => Dynamic.t<t>
+  // NOTE: Chasing down closure of observable inputs is a paint, so implementations should use Rxjs.takeUntil 
+  // to cut themselves off on a close event
+  
+  // takes an optional validation observable to enable decoration fields liek FieldOpt.
+  // The system doesnt yet handle validation across all nodes of a field tree in the dyn situation.
+
+  // takes an optional input to initialize the state of the field.
+  // This is should be passed to any children but only reflected in the first value.
+  // Either/Sum use the emission from Dyn as a signal that the sum state has changed
+  // So were all inits to emit to dyn, the Sums will be confused.
+  // There may be cases where you _DO_ want to emit to dyn, like adding an element to FieldArray, but
+  // needs to be handled in Array - AxM
+  let makeDyn: (context, option<input>, Rxjs.Observable.t<input>, option<Rxjs.Observable.t<()>>) => 
+      Dyn.t<Close.t<Form.t<t, actions<()>>>>
 
   // Accessors for input, output, etc via the Field
 
-  // just return our children for splitging
+  // just return our children for splitting
   let inner: t => inner
 
   // in leaf fields this is usually just return inner
@@ -101,6 +104,3 @@ module type T = {
 let printErrorArray = errors => {
   errors->Array.catOptions->Array.joinWith(", ")->Some
 }
-
-// TODO: Needs consolidation with changes - AxM
-let setOrClear = v => v->Option.map(v => #Set(v))->Option.or(#Clear)

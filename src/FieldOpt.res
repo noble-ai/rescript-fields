@@ -1,10 +1,37 @@
-// shadow global Dynamic with the impl chosen by FT
+@deriving(accessors)
+type actions<'clear, 'opt, 'inner, 'validate> = {
+  clear: 'clear,
+  opt: 'opt,
+  inner: 'inner,
+  validate: 'validate,
+}
+
+module type T = {
+  include Field.T
+  type parted
+  let split: (Form.t<t, actions<()>>) => parted 
+}
+
+module type Make = (F: Field.T) => T
+  with type t = Store.t<option<F.t>, F.output, [#Whole(string) | #Part]>
+  and type context = F.context
+  and type input = option<F.input>
+  and type inner = option<F.t>
+  and type output = F.output
+  and type error = [#Whole(string) | #Part]
+  and type actions<'change> = actions<
+    () => 'change,
+    option<F.input> => 'change,
+    F.actions<'change>,
+    () => 'change,
+  >
+  and type parted = option<Form.t<F.t, F.actions<()>>>
 
 // Allow a field to have Empty input
 // But Require the value be set and valid for this to be valid
 // So this output type is our the inner output type.
-module Make = (F: Field.T) => {
-  module Inner = F
+module Make: Make = (F: Field.T) => {
+  // module Inner = F
   type context = F.context
 
   type input = option<F.input>
@@ -32,6 +59,9 @@ module Make = (F: Field.T) => {
   let makeStorePred = (inner, enum, ctor) =>
     inner->F.enum == enum ? ctor(Some(inner))->Some : None
 
+  // FieldOpt makeStore doesnt take validate like others
+  // because the only goal of FieldOpt is to allow optional input values
+  // notice that our context is the F.context so we have no specific validation behavior 
   let makeStore = (inner: F.t): t => {
     [
       inner->F.output->Option.map(output => Store.valid(Some(inner), output)),
@@ -44,33 +74,21 @@ module Make = (F: Field.T) => {
     ->Option.getExn(~desc="makeStore")
   }
 
-  let validate = (force, context: context, store: t): Dynamic.t<t> => {
+  let validate = (force, context: context, store: t): Rxjs.t<Rxjs.foreign, Rxjs.void,t> => {
     ignore(force)
-    let input = store->Store.inner
-    switch input {
+    let inner = store->Store.inner
+    switch inner {
     | None => Store.invalid(None, #Whole("Required"))->Dynamic.return
-    | Some(val) => F.validate(false, context, val)->Dynamic.map(makeStore)
+    | Some(val) => F.validate(force, context, val)->Dynamic.map(makeStore)
     }
   }
 
-  type change = [#None | #Opt(option<F.change>) | #Some(F.change) | #Validate]
-  let makeSet = (inner: input): change  => inner->Option.map(F.makeSet)->#Opt
-
-  let showChange = (change: change): string =>
-    switch change {
-    | #None => "None"
-    | #Opt(None) => "Opt(None)"
-    | #Opt(Some(x)) => `Opt(Some(${F.showChange(x)}))`
-    | #Some(x) => `Some(${F.showChange(x)})`
-    | #Validate => "Validate"
-    }
-
-  type actions<'change> = {
-    clear: () => 'change,
-    opt: option<F.input> => 'change,
-    inner: F.actions<'change>,
-    validate: () => 'change,
-  }
+  type actions<'change> = actions<
+    () => 'change,
+    option<F.input> => 'change,
+    F.actions<'change>,
+    () => 'change,
+  >
 
   let mapActions = ({clear, opt, inner, validate}, fn) => {
     clear: () => clear()->fn,
@@ -79,49 +97,107 @@ module Make = (F: Field.T) => {
     validate: () => validate()->fn,
   }
 
-  let actions: actions<change> = {
-    clear: () => #None,
-    opt: x => x->Option.map(F.makeSet)->#Opt,
-    inner: F.actions->F.mapActions(x => #Some(x)),
-    validate: () => #Validate,
+  let applyClear = (clear, actions, close) => {
+      clear
+      ->Rxjs.pipe(Rxjs.map((_, _i) => Store.init(None)))
+      ->Rxjs.pipe(Rxjs.map( (field, _): Close.t<Form.t<t, actions<()>>> => {pack:{ field, actions }, close}))
+  }
+
+  let applyInner = (inner: Rxjs.Observable.t<Close.t<Form.t<F.t, F.actions<()>>>>, actions, close) => {
+      inner
+      ->Dynamic.map(({pack}): Close.t<Form.t<t, actions<()>>> => {
+        let field = pack.field->makeStore
+        let actions = {
+          ...actions,
+          inner: pack.actions
+        }
+        {pack: { field, actions }, close}
+      })
   }
   
-  type pack = Pack.t<t, change, actions<Promise.t<()>>, actions<()>>
-  type parted = option<
-    Pack.t<F.t, F.change, F.actions<Promise.t<()>>, F.actions<()>>,
-  >
-
-  let split = (pack: pack): parted => {
+  type parted = option<Form.t<F.t, F.actions<()>>>
+  let split = (pack: Form.t<t, actions<()>>): option<Form.t<F.t, F.actions<()>>> => {
     pack.field
     ->Store.inner
-    ->Option.map( (field): Pack.t<F.t, F.change, F.actions<Promise.t<()>>, F.actions<()>> => {
+    ->Option.map( (field): Form.t<F.t, F.actions<()>> => {
       field,
-      onChange: x => x->#Some->pack.onChange,
       actions: pack.actions.inner, 
-      actions_: pack.actions_.inner
     })
   }
 
-  let reduce = (~context: context, store: Dynamic.t<t>, change: Indexed.t<change>): Dynamic.t<t> => {
-    switch change.value {
-    | #Opt(None)
-    | #None =>
-      Store.dirty(None)->Dynamic.return
-    | #Opt(Some(x))
-    | #Some(x) => {
-        let input =
-          store->Dynamic.map(store => store->Store.inner->Option.or(F.init(context)))
-        F.reduce(~context, input, change->Indexed.map( _ => x))->Dynamic.map(makeStore)
-      }
-    // Todo check if child validated and submit valid - AxM
-    | #Validate => store
-      ->Dynamic.take(1)
-      // We are already taking only one store, so we can use an concatenative bind here
-      ->Dynamic.bind(store => validate(false, context, store))
+  let makeDyn = (context: context, initial: option<input>, setOuter: Rxjs.Observable.t<input>, valOuter: option<Rxjs.Observable.t<()>> )
+      : Dyn.t<Close.t<Form.t<t, actions<()>>>>
+    => {
+    let field = init(context) 
+
+    let complete = Rxjs.Subject.makeEmpty()
+
+    let clearInner: Rxjs.t<'c, Rxjs.source<()>, ()> = 
+        Rxjs.Subject.makeEmpty()
+
+    let valInner = Rxjs.Subject.makeEmpty()
+    let val = valOuter
+      ->Option.map(Rxjs.merge2(_, valInner))
+      ->Option.or(valInner->Rxjs.toObservable)
+
+    let opt: Rxjs.t<'co, 'so, input> = Rxjs.Subject.makeEmpty()
+    let setOpt = opt->Dynamic.keepMap(x => x)
+    let clearOpt = opt->Dynamic.keepMap(Option.invert(_, ()))
+
+    let (setOuter, clearOuter) = 
+      setOuter
+      ->Dynamic.partition2((x=>x, Option.invert(_, ())))
+
+    let clear = Rxjs.merge3(clearOuter, clearOpt, clearInner)
+
+    let set = Rxjs.merge2(setOuter, setOpt)
+    
+    let initialInner = initial->Option.join
+    let {first: firstInner, dyn: dynInner} = F.makeDyn(context, initialInner, set, Some(val))
+
+    let close = Rxjs.next(complete)
+
+    let actions: actions<()> = {
+      clear: Rxjs.next(clearInner),
+      opt: Rxjs.next(opt),
+      inner: firstInner.pack->Form.actions,
+      validate: Rxjs.next(valInner),
     }
+
+    let first: Close.t<Form.t<t, actions<()>>> = {pack: {field, actions}, close}
+
+    let clear = 
+      clear
+      ->applyClear(actions, close)
+      ->Dynamic.map(Dynamic.return)
+
+    let inner = dynInner->Dynamic.map(applyInner(_, actions, close))
+    let changes = Rxjs.merge2( clear, inner )
+
+    // Explicit validations need to take latest state, but we want the validation
+    // async process to be interrupted by new state.
+    // so maintain changes Observable-of-observable, and also
+    // collapse changes to change here to use in validation 
+    let change = changes//->Dynamic.map(Dynamic.return)
+      ->Dynamic.switchSequence
+
+    // FIXME: needs a startsWith for withLatestFrom in case validate comes before change
+    let validated = val 
+      ->Dynamic.withLatestFrom(change)
+      ->Rxjs.toObservable
+      ->Dynamic.map( ((_, {pack: {field, actions}, close})) =>
+        validate(false, context, field)
+        ->Dynamic.map((field): Close.t<Form.t<'f, 'a>> => {pack: {field, actions}, close})
+      )
+
+    let dyn = 
+      Rxjs.merge2(changes, validated)
+      ->Rxjs.pipe(Rxjs.shareReplay(1))
+      ->Rxjs.pipe(Rxjs.takeUntil(complete))
+
+    {first, dyn}
   }
-
-
+ 
   let enum = Store.toEnum
   let inner = Store.inner
   let error = Store.error
@@ -147,6 +223,7 @@ module Make = (F: Field.T) => {
       inner: ${store->inner->Option.map(F.show)->Option.or("None")},
     }`
   }
+
   let printError = (s: t) => {
     let inner = s->Store.inner
     s->Store.error->Option.bind(printError(inner, _))

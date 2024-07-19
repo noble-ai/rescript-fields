@@ -3,3 +3,4 @@ lib
 yarn-error.log
 **/*.bs.js
 .sl
+.anima
