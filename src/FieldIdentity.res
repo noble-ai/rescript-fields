@@ -16,7 +16,7 @@ module type T = {
 }
 
 // Bring record types out of fields so they are not hidden in functors, module type applications
-type contextEmpty<'a> = {empty?: 'a}
+type context<'a> = {empty?: 'a, debug? : bool}
 type setClear<'a> = [#Clear | #Set('a)]
 
 type actions<'input, 'change> = {
@@ -35,19 +35,12 @@ module type FieldIdentity = (T: T) =>
     and type output = T.t
     and type inner = T.t
     and type t = Store.t<T.t, T.t, unit>
-    and type change = setClear<T.t>
-    and type context = contextEmpty<T.t>
+    and type context = context<T.t>
     and type actions<'change> = actions<T.t, 'change>
-    and type pack = Pack.t<
-      Store.t<T.t, T.t, unit>,
-      setClear<T.t>,
-      actions<T.t, Promise.t<()>>,
-      actions<T.t, ()>
-    >
 
 module Make: FieldIdentity = (T: T) => {
   module T = T
-  type context = contextEmpty<T.t>
+  type context = context<T.t>
   type input = T.t
   let showInput = T.show
   type inner = T.t
@@ -61,25 +54,11 @@ module Make: FieldIdentity = (T: T) => {
 
   let set = input => Store.Valid(input, input)
 
-  let validate = (
-    force,
-    context: context,
-    store: t,
-  ): Dynamic.t<t> => {
+  let validate = ( force, context: context, store: t): Rxjs.t<Rxjs.foreign, Rxjs.void,t> => {
     ignore(context)
     ignore(force)
     let input = store->Store.inner
     Store.Valid(input, input)->Dynamic.return
-  }
-
-  type change = setClear<T.t>
-  let makeSet = inner => #Set(inner)
-
-  let showChange = (change: change) => {
-    switch change {
-      | #Clear => "Clear"
-      | #Set(x) => "Set(" ++ x->T.show ++ ")"
-    }
   }
 
   type actions<'change> = actions<input, 'change>
@@ -89,27 +68,63 @@ module Make: FieldIdentity = (T: T) => {
     clear: () => actions.clear()->fn,
     opt: i => i->actions.opt->fn,
   }
+    
+  let logField = Dynamic.tap(_, (x: Close.t<Form.t<t, 'a>>) => {
+    Console.log2("FieldIdentity field", x.pack.field)
+  })
 
-  let actions: actions<change> = {
-    set: input => #Set(input),
-    clear: _ => #Clear,
-    opt: x => switch x {
-      | None => #Clear
-      | Some(x) => #Set(x)
+  let makeDyn = (context: context, initial: option<input>, setOuter: Rxjs.Observable.t<input>, val: option<Rxjs.Observable.t<()>> )
+      : Dyn.t<Close.t<Form.t<t, actions<()>>>>
+    => {
+    let debug = false 
+    let debug = context.debug->Option.or(false) || debug
+
+    if debug { Console.log("FieldIdentity makeDyn") }
+
+    let complete = Rxjs.Subject.makeEmpty()
+    let setInner = Rxjs.Subject.makeEmpty()
+
+    let clear = Rxjs.Subject.makeEmpty()
+    let opt = Rxjs.Subject.makeEmpty()
+    let actions: actions<unit> = {
+      set: Rxjs.next(setInner),
+      clear: Rxjs.next(clear),
+      opt: Rxjs.next(opt),
     }
-  }
-  
-  type pack = Pack.t<t, change, actions<Promise.t<()>>, actions<()>>
-  
-  let reduce = (
-    ~context: context,
-    _store: Dynamic.t<t>,
-    change: Indexed.t<change>,
-  ): Dynamic.t<t> => {
-    switch change.value {
-      | #Clear => context->init->Dynamic.return
-      | #Set(val) => Store.Valid(val, val)->Dynamic.return
-    }
+
+    let close = Rxjs.next(complete)
+
+    let field = initial->Option.map(set)->Option.or(init(context))
+    let first: Close.t<Form.t<'f, 'a>> = {pack: {field, actions}, close}
+    let state = Rxjs.Subject.make(first)
+    let memoState = Dynamic.tap(_, (x: Close.t<Form.t<t, 'a>>) => {
+      Rxjs.next(state, x)
+    })
+
+    let clear = Rxjs.merge2(clear, opt->Dynamic.keepMap(Option.invert(_, ())))
+          ->Dynamic.map(_ => init(context))
+          ->Dynamic._log(~enable=debug, "FieldIdentity clear")
+
+    let set = Rxjs.merge3(setOuter, setInner, opt->Dynamic.keepMap(x => x))
+          ->Dynamic.log(~enable=debug, "FieldIdentity set")
+          ->Dynamic.map(set)
+
+    let field = Rxjs.merge2(clear, set)
+
+    let validated = 
+      val
+      ->Option.or(Rxjs.Subject.makeEmpty()->Rxjs.toObservable)
+      ->Dynamic.withLatestFrom(field)
+      ->Dynamic.map(Tuple.snd2)
+
+    let dyn = 
+      Rxjs.merge2(field, validated)
+      ->Dynamic.map((field): Close.t<Form.t<'f, 'a>> => {pack: {field, actions}, close})
+      ->memoState
+      ->Dynamic.map(Dynamic.return)
+      ->Rxjs.pipe(Rxjs.takeUntil(complete))
+    
+    { first, dyn }
   }
 
   let enum = Store.toEnum

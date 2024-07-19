@@ -138,8 +138,3 @@ that a module passed to the function has each of these types and values.
   
 `let printErrorArray: Array.t<option<string>> => option<string>`  
 
-
-### Field.setOrClear
-  
-`let setOrClear: option<'a> => [> #Clear | #Set('a)]`  
-
