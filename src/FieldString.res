@@ -190,28 +190,28 @@ module Make = (I: IString) => {
     let set = set
       ->Dynamic.map(input => {
           if I.validateImmediate {
-            // Console.log2("FieldString set", input)
             Store.dirty(input)->validate(false, context, _)
           } else {
             Store.dirty(input)->Dynamic.return
           }
         })
+      
+    let memoState = Dynamic.map(_, Dynamic.tap(_, (x: Close.t<Form.t<t, 'a>>) => {
+      // Console.log2("FieldString memoState", x.pack.field)
+      Rxjs.next(state, x.pack.field)
+    }))
 
-    Rxjs.merge4( clear, reset, val, set)
-      ->Dynamic.switchSequence
-      ->Rxjs.subscribe_({
-        next: (. x) => Rxjs.next(state, x),
-        error: (. _err) => (),
-        complete: (. ) => ()
-      })
-
+    let logField = Dynamic.map(_, Dynamic.tap(_, (x: Close.t<Form.t<t, 'a>>) => {
+      Console.log2("FieldString field", x.pack.field)
+    }))
 
     let dyn = 
       Rxjs.merge4(clear, reset, val, set)
       ->Dynamic.map(Dynamic.map(_, (field): Close.t<Form.t<t, 'b>> => {pack: {field, actions}, close}))
       ->Dynamic.startWith(Dynamic.return(first))
+      ->memoState
       ->Rxjs.pipe(Rxjs.takeUntil(complete))
-      // ->Dynamic.mapLog("field string", x => x->Tuple.fst2->Form.field->show)
+      // ->logField
 
     {first, dyn}
   }

@@ -1,0 +1,22 @@
+<!-- // Boilerplate HTML to initialize react and render the Login component -->
+<!DOCTYPE html>
+
+<html lang="en">
+	<head>
+		<meta charset="UTF-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+		<title>Login</title>
+	</head>
+	<body>
+		<div id="root"></div>
+		<script type="module"> 
+		 	import * as ReactDOM from 'react-dom';
+			import React from 'react';
+			import { make as Login, Login1, Login1Vector } from './Login.bs';
+			// Initialize the React app
+			// ReactDOM.render(React.createElement(Login), document.getElementById('root'));
+			// Use React 18 pattern
+			ReactDOM.createRoot(document.getElementById('root')).render(React.createElement(Login));
+		</script>
+	</body>
+</html>

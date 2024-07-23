@@ -42,6 +42,27 @@ describe("FieldProduct", () => {
 
 				describe("#makeDyn", () => {
 					describe("setOuter", () => {
+						let test = () => {
+							let set = Rxjs.Subject.makeEmpty()
+							let val = Rxjs.Subject.makeEmpty()
+
+							let {first, dyn} = Subject.makeDyn(context, set->Rxjs.toObservable, val->Rxjs.toObservable->Some)
+							let current: ref<'a> = {contents: first}
+
+							let res = dyn->Dynamic.switchSequence->FieldArray_test.applyCurrent(current)->Dynamic.toPromise
+
+							set->Rxjs.next({left: "haha", right: "nono"})
+							current.contents.close()
+
+							res
+						}
+
+						itPromise("applies value", () => {
+							test()->Promise.tap(res => res->Close.pack->Form.field->Subject.input->expect->toEqual({left: "haha", right: "nono"}))
+						})
+					})
+				describe("setElement", () => {
+					let test = () => {
 						let set = Rxjs.Subject.makeEmpty()
 						let val = Rxjs.Subject.makeEmpty()
 
@@ -51,13 +72,25 @@ describe("FieldProduct", () => {
 						let res = dyn->Dynamic.switchSequence->FieldArray_test.applyCurrent(current)->Dynamic.toPromise
 
 						set->Rxjs.next({left: "haha", right: "nono"})
-						current.contents.close()
+						Promise.sleep(100)
+						->Promise.tap(_ => current.contents.pack.actions.inner.right.set("HEHE"))
+						->Promise.delay(~ms=100)
+						->Promise.tap(_ => current.contents.pack.actions.inner.left.set("NONO"))
+						->Promise.delay(~ms=100)
+						->Promise.tap(_ => current.contents.close())
+						->Promise.void
 
-						itPromise("applies value", () => {
-							res->Promise.tap(res => res->Close.pack->Form.field->Subject.input->expect->toEqual({left: "haha", right: "nono"}))
-						})
+						res
+					}
+
+					itPromise("Applies inner set left", () => {
+						test()->Promise.tap(res => res->Close.pack->Form.field->Subject.input->Gen2.left->expect->toEqual("NONO"))
+					})
+					itPromise("Applies inner set right", () => {
+						test()->Promise.tap(res => res->Close.pack->Form.field->Subject.input->Gen2.right->expect->toEqual("HEHE"))
 					})
 				})
+			})
 			})
 
 			describe("context validate", () => {
@@ -91,6 +124,35 @@ describe("FieldProduct", () => {
 
 						itPromise("applies last", () => {
 							res->Promise.tap(res => res->Close.pack->Form.field->Subject.input->expect->toEqual({left: "nono", right: "haha"}))
+						})
+					})
+					describe("setElement", () => {
+						let test = () => {
+							let set = Rxjs.Subject.makeEmpty()
+							let val = Rxjs.Subject.makeEmpty()
+
+							let {first, dyn} = Subject.makeDyn(context, set->Rxjs.toObservable, val->Rxjs.toObservable->Some)
+							let current: ref<'a> = {contents: first}
+
+							let res = dyn->Dynamic.switchSequence->FieldArray_test.applyCurrent(current)->Dynamic.toPromise
+
+							set->Rxjs.next({left: "haha", right: "nono"})
+							Promise.sleep(100)
+							->Promise.tap(_ => current.contents.pack.actions.inner.right.set("HEHE"))
+							->Promise.delay(~ms=100)
+							->Promise.tap(_ => current.contents.pack.actions.inner.left.set("NONO"))
+							->Promise.delay(~ms=100)
+							->Promise.tap(_ => current.contents.close())
+							->Promise.void
+
+							res
+						}
+
+						itPromise("Applies inner set left", () => {
+							test()->Promise.tap(res => res->Close.pack->Form.field->Subject.input->Gen2.left->expect->toEqual("NONO"))
+						})
+						itPromise("Applies inner set right", () => {
+							test()->Promise.tap(res => res->Close.pack->Form.field->Subject.input->Gen2.right->expect->toEqual("HEHE"))
 						})
 					})
 				})
@@ -151,9 +213,39 @@ describe("FieldProduct", () => {
 							field->Promise.tap(field => field->Subject.enum->expect->toEqual(#Valid))
 						})
 					})
-				})
+					describe("setElement", () => {
+						let test = () => {
+							let set = Rxjs.Subject.makeEmpty()
+							let val = Rxjs.Subject.makeEmpty()
+
+							let {first, dyn} = Subject.makeDyn(context, set->Rxjs.toObservable, val->Rxjs.toObservable->Some)
+							let current: ref<'a> = {contents: first}
+
+							let res = dyn->Dynamic.switchSequence->FieldArray_test.applyCurrent(current)->Dynamic.toPromise
+
+							set->Rxjs.next({left: "haha", right: "nono"})
+							Promise.sleep(100)
+							->Promise.tap(_ => current.contents.pack.actions.inner.right.set("HEHE"))
+							->Promise.delay(~ms=100)
+							->Promise.tap(_ => current.contents.pack.actions.inner.left.set("NONO"))
+							->Promise.delay(~ms=100)
+							->Promise.tap(_ => current.contents.close())
+							->Promise.void
+
+							res
+						}
+
+						itPromise("Applies inner set left", () => {
+							test()->Promise.tap(res => res->Close.pack->Form.field->Subject.input->Gen2.left->expect->toEqual("NONO"))
+						})
+						itPromise("Applies inner set right", () => {
+							test()->Promise.tap(res => res->Close.pack->Form.field->Subject.input->Gen2.right->expect->toEqual("HEHE"))
+						})
+					})
 			})
 		})
+		})
+
 		describe("validate deferred", () => {
 			module Subject = FieldProduct.Product2.Make({
 				let validateImmediate = false 
@@ -182,6 +274,35 @@ describe("FieldProduct", () => {
 
 						itPromise("applies value", () => {
 							res->Promise.tap(res => res->Close.pack->Form.field->Subject.input->expect->toEqual({left: "haha", right: "nono"}))
+						})
+					})
+					describe("setElement", () => {
+						let test = () => {
+							let set = Rxjs.Subject.makeEmpty()
+							let val = Rxjs.Subject.makeEmpty()
+
+							let {first, dyn} = Subject.makeDyn(context, set->Rxjs.toObservable, val->Rxjs.toObservable->Some)
+							let current: ref<'a> = {contents: first}
+
+							let res = dyn->Dynamic.switchSequence->FieldArray_test.applyCurrent(current)->Dynamic.toPromise
+
+							set->Rxjs.next({left: "haha", right: "nono"})
+							Promise.sleep(100)
+							->Promise.tap(_ => current.contents.pack.actions.inner.right.set("HEHE"))
+							->Promise.delay(~ms=100)
+							->Promise.tap(_ => current.contents.pack.actions.inner.left.set("NONO"))
+							->Promise.delay(~ms=100)
+							->Promise.tap(_ => current.contents.close())
+							->Promise.void
+
+							res
+						}
+
+						itPromise("Applies inner set left", () => {
+							test()->Promise.tap(res => res->Close.pack->Form.field->Subject.input->Gen2.left->expect->toEqual("NONO"))
+						})
+						itPromise("Applies inner set right", () => {
+							test()->Promise.tap(res => res->Close.pack->Form.field->Subject.input->Gen2.right->expect->toEqual("HEHE"))
 						})
 					})
 				})
@@ -218,6 +339,35 @@ describe("FieldProduct", () => {
 
 						itPromise("applies last", () => {
 							res->Promise.tap(res => res->Close.pack->Form.field->Subject.input->expect->toEqual({left: "nono", right: "haha"}))
+						})
+					})
+					describe("setElement", () => {
+						let test = () => {
+							let set = Rxjs.Subject.makeEmpty()
+							let val = Rxjs.Subject.makeEmpty()
+
+							let {first, dyn} = Subject.makeDyn(context, set->Rxjs.toObservable, val->Rxjs.toObservable->Some)
+							let current: ref<'a> = {contents: first}
+
+							let res = dyn->Dynamic.switchSequence->FieldArray_test.applyCurrent(current)->Dynamic.toPromise
+
+							set->Rxjs.next({left: "haha", right: "nono"})
+							Promise.sleep(100)
+							->Promise.tap(_ => current.contents.pack.actions.inner.right.set("HEHE"))
+							->Promise.delay(~ms=100)
+							->Promise.tap(_ => current.contents.pack.actions.inner.left.set("NONO"))
+							->Promise.delay(~ms=100)
+							->Promise.tap(_ => current.contents.close())
+							->Promise.void
+
+							res
+						}
+
+						itPromise("Applies inner set left", () => {
+							test()->Promise.tap(res => res->Close.pack->Form.field->Subject.input->Gen2.left->expect->toEqual("NONO"))
+						})
+						itPromise("Applies inner set right", () => {
+							test()->Promise.tap(res => res->Close.pack->Form.field->Subject.input->Gen2.right->expect->toEqual("HEHE"))
 						})
 					})
 				})
@@ -274,6 +424,35 @@ describe("FieldProduct", () => {
 							field->Promise.tap(field => field->Subject.enum->expect->toEqual(#Dirty))
 						})
 					})
+				describe("setElement", () => {
+					let test = () => {
+						let set = Rxjs.Subject.makeEmpty()
+						let val = Rxjs.Subject.makeEmpty()
+
+						let {first, dyn} = Subject.makeDyn(context, set->Rxjs.toObservable, val->Rxjs.toObservable->Some)
+						let current: ref<'a> = {contents: first}
+
+						let res = dyn->Dynamic.switchSequence->FieldArray_test.applyCurrent(current)->Dynamic.toPromise
+
+						set->Rxjs.next({left: "haha", right: "nono"})
+						Promise.sleep(100)
+						->Promise.tap(_ => current.contents.pack.actions.inner.right.set("HEHE"))
+						->Promise.delay(~ms=100)
+						->Promise.tap(_ => current.contents.pack.actions.inner.left.set("NONO"))
+						->Promise.delay(~ms=100)
+						->Promise.tap(_ => current.contents.close())
+						->Promise.void
+
+						res
+					}
+
+					itPromise("Applies inner set left", () => {
+						test()->Promise.tap(res => res->Close.pack->Form.field->Subject.input->Gen2.left->expect->toEqual("NONO"))
+					})
+					itPromise("Applies inner set right", () => {
+						test()->Promise.tap(res => res->Close.pack->Form.field->Subject.input->Gen2.right->expect->toEqual("HEHE"))
+					})
+				})
 				})
 			})
 		})

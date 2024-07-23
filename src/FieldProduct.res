@@ -28,11 +28,21 @@ module Context = {
   let inner = t => t.inner
 }
 
+module type T = {
+  include Field.T
+  type contextInner
+  type parted
+  type pack
+  let split: pack => parted
+}
+
+
 module Product1 = {
   module Tuple = Tuple
   open Tuple
   module T = Tuple1
 
+  // No such thing as a 1-tuple in rescript so slightly diffrent than the rest
   module type Generic = {
     type structure<'a>
 
@@ -58,13 +68,6 @@ module Product1 = {
     }
   }
 
-  module type T = {
-    include Field.T
-    type parted
-    type pack
-    let split: pack => parted
-  }
-
   // giving the Make functor this
   module type Make = (I: Interface, Gen: Generic, A: Field.T)
    => T
@@ -73,6 +76,7 @@ module Product1 = {
     and type output = Gen.structure<A.output>
     and type error = error
     and type t = Store.t<Gen.structure<A.t>, Gen.structure<A.output>, error>
+    and type contextInner = Gen.structure<A.context>
     and type context = Context.t<Gen.structure<A.input>, validateOut<Gen.structure<A.output>>, Gen.structure<A.context>>
     and type actions<'change> = FieldVector.Actions.t<Gen.structure<A.input>, 'change, Gen.structure<A.actions<'change>>>
     and type pack = Form.t<
@@ -118,7 +122,7 @@ module Product1 = {
     let showInput = (x: input) => x->toTuple->Vector.showInput
 
     let set = (x: input): t => x->toTuple->Vector.set->storeToStructure
-    let empty = (context): inner => context->contextToTuple->FieldVector.Context.inner->Vector.empty->fromTuple
+    let empty = (context): inner => context->contextToTuple->FieldVector.Context.inner->Vector.emptyInner->fromTuple
     let init = (context: context): t => context->empty->Store.init
 
     let inner = Store.inner
@@ -206,13 +210,6 @@ module Product2 = {
     }
   }
 
-  module type T = {
-    include Field.T
-    type parted
-    type pack
-    let split: pack => parted
-  }
-
   // giving the Make functor this
   module type Make = (I: Interface, Gen: Generic, A: Field.T, B: Field.T)
    => T
@@ -221,6 +218,7 @@ module Product2 = {
     and type output = Gen.structure<A.output, B.output>
     and type error = error
     and type t = Store.t<Gen.structure<A.t, B.t>, Gen.structure<A.output, B.output>, error>
+    and type contextInner = Gen.structure<A.context, B.context>
     and type context = Context.t<Gen.structure<A.input, B.input>, validateOut<Gen.structure<A.output, B.output>>, Gen.structure<A.context, B.context>>
     and type actions<'change> = FieldVector.Actions.t<Gen.structure<A.input, B.input>, 'change, Gen.structure<A.actions<'change>, B.actions<'change>>>
     and type pack = Form.t<
@@ -270,7 +268,7 @@ module Product2 = {
     let showInput = (x: input) => x->toTuple->Vector.showInput
 
     let set = (x: input): t => x->toTuple->Vector.set->storeToStructure
-    let empty = (context): inner => context->contextToTuple->FieldVector.Context.inner->Vector.empty->fromTuple
+    let empty = (context): inner => context->contextToTuple->FieldVector.Context.inner->Vector.emptyInner->fromTuple
     let init = (context: context): t => context->empty->Store.init
 
     let inner = Store.inner
@@ -363,14 +361,7 @@ module Product3 = {
     }
   }
 
-  module type T = {
-    include Field.T
-    type parted
-    type pack
-    let split: pack => parted
-  }
-
-  // giving the Make functor this
+ // giving the Make functor this
   module type Make = (I: Interface, Gen: Generic, A: Field.T, B: Field.T, C: Field.T)
    => T
     with type input = Gen.structure<A.input, B.input, C.input>
@@ -378,6 +369,7 @@ module Product3 = {
     and type output = Gen.structure<A.output, B.output, C.output>
     and type error = error
     and type t = Store.t<Gen.structure<A.t, B.t, C.t>, Gen.structure<A.output, B.output, C.output>, error>
+    and type contextInner = Gen.structure<A.context, B.context, C.context>
     and type context = Context.t<Gen.structure<A.input, B.input, C.input>, validateOut<Gen.structure<A.output, B.output, C.output>>, Gen.structure<A.context, B.context, C.context>>
     and type actions<'change> = FieldVector.Actions.t<Gen.structure<A.input, B.input, C.input>, 'change, Gen.structure<A.actions<'change>, B.actions<'change>, C.actions<'change>>>
     and type pack = Form.t<
@@ -423,7 +415,7 @@ module Product3 = {
     let showInput = (x: input) => x->toTuple->Vector.showInput
 
     let set = (x: input): t => x->toTuple->Vector.set->storeToStructure
-    let empty = (context): inner => context->contextToTuple->FieldVector.Context.inner->Vector.empty->fromTuple
+    let empty = (context): inner => context->contextToTuple->FieldVector.Context.inner->Vector.emptyInner->fromTuple
     let init = (context: context): t => context->empty->Store.init
 
     let validate = (force, context: context, store: t): Rxjs.t<Rxjs.foreign, Rxjs.void,t> => 
@@ -516,13 +508,6 @@ module Product4 = {
       }
     }
   }
-  module type T = {
-    include Field.T
-    type parted
-    type pack
-    let split: pack => parted
-  }
-
   module type Make = (I: Interface, Gen: Generic, A: Field.T, B: Field.T, C: Field.T, D: Field.T)
    => T
     with type input = Gen.structure<A.input, B.input, C.input, D.input>
@@ -534,6 +519,7 @@ module Product4 = {
       Gen.structure<A.output, B.output, C.output, D.output>,
       error
     >
+    and type contextInner = Gen.structure<A.context, B.context, C.context, D.context>
     and type context = Context.t<
       Gen.structure<A.input, B.input, C.input, D.input>,
       validateOut<Gen.structure<A.output, B.output, C.output, D.output>>,
@@ -603,7 +589,7 @@ module Product4 = {
     let showInput = (x: input) => x->toTuple->Vector.showInput
 
     let set = (x: input) => x->toTuple->Vector.set->storeToStructure
-    let empty = (context): inner => context->contextToTuple->FieldVector.Context.inner->Vector.empty->fromTuple
+    let empty = (context): inner => context->contextToTuple->FieldVector.Context.inner->Vector.emptyInner->fromTuple
     let init = (context: context): t => context->empty->Store.init
 
     let validate = (force, context: context, store: t): Rxjs.t<Rxjs.foreign, Rxjs.void,t> => 
@@ -700,13 +686,6 @@ module Product5 = {
     }
   }
 
-  module type T = {
-    include Field.T
-    type parted
-    type pack
-    let split: pack => parted
-  }
-
   module type Make = (I: Interface, Gen: Generic, A: Field.T, B: Field.T, C: Field.T, D: Field.T, E: Field.T)
    => T
     with type input = Gen.structure<A.input, B.input, C.input, D.input, E.input>
@@ -718,6 +697,7 @@ module Product5 = {
       Gen.structure<A.output, B.output, C.output, D.output, E.output>,
       error
     >
+    and type contextInner = Gen.structure<A.context, B.context, C.context, D.context, E.context>
     and type context = Context.t<
       Gen.structure<A.input, B.input, C.input, D.input, E.input>,
       validateOut<Gen.structure<A.output, B.output, C.output, D.output, E.output>>,
@@ -789,7 +769,7 @@ module Product5 = {
     let showInput = (x: input) => x->toTuple->Vector.showInput
     let set = (x: input): t => x->toTuple->Vector.set->storeToStructure
     
-    let empty = (context): inner => context->contextToTuple->FieldVector.Context.inner->Vector.empty->fromTuple
+    let empty = (context): inner => context->contextToTuple->FieldVector.Context.inner->Vector.emptyInner->fromTuple
     let init = (context: context): t => context->empty->Store.init
 
     let validate = (force, context: context, store: t): Rxjs.t<Rxjs.foreign, Rxjs.void,t> => 
@@ -889,13 +869,6 @@ module Product6 = {
     }
   }
 
-  module type T = {
-    include Field.T
-    type parted
-    type pack
-    let split: pack => parted
-  }
-
   module type Make = (I: Interface, Gen: Generic, A: Field.T, B: Field.T, C: Field.T, D: Field.T, E: Field.T, F: Field.T)
    => T
     with type input = Gen.structure<A.input, B.input, C.input, D.input, E.input, F.input>
@@ -907,6 +880,7 @@ module Product6 = {
       Gen.structure<A.output, B.output, C.output, D.output, E.output, F.output>,
       error
     >
+    and type contextInner = Gen.structure<A.context, B.context, C.context, D.context, E.context, F.context>
     and type context = Context.t<
       Gen.structure<A.input, B.input, C.input, D.input, E.input, F.input>,
       validateOut<Gen.structure<A.output, B.output, C.output, D.output, E.output, F.output>>,
@@ -979,7 +953,7 @@ module Product6 = {
       {?empty, ?validate, inner}
     }
 
-    let empty = (context): inner => context->contextToTuple->FieldVector.Context.inner->Vector.empty->fromTuple
+    let empty = (context): inner => context->contextToTuple->FieldVector.Context.inner->Vector.emptyInner->fromTuple
     let init = (context: context): t => context->empty->Store.init
 
     let set = (x: input): t => x->toTuple->Vector.set->storeToStructure
@@ -1091,13 +1065,6 @@ module Product7 = {
     }
   }
 
-  module type T = {
-    include Field.T
-    type parted
-    type pack
-    let split: pack => parted
-  }
-
   module type Make = (I: Interface, Gen: Generic, A: Field.T, B: Field.T, C: Field.T, D: Field.T, E: Field.T, F: Field.T, G: Field.T)
    => T
     with type input = Gen.structure<A.input, B.input, C.input, D.input, E.input, F.input, G.input>
@@ -1109,6 +1076,7 @@ module Product7 = {
       Gen.structure<A.output, B.output, C.output, D.output, E.output, F.output, G.output>,
       error
     >
+    and type contextInner = Gen.structure<A.context, B.context, C.context, D.context, E.context, F.context, G.context>
     and type context = Context.t<
       Gen.structure<A.input, B.input, C.input, D.input, E.input, F.input, G.input>,
       validateOut<Gen.structure<A.output, B.output, C.output, D.output, E.output, F.output, G.output>>,
@@ -1183,7 +1151,7 @@ module Product7 = {
       {?empty, ?validate, inner}
     }
 
-    let empty = (context): inner => context->contextToTuple->FieldVector.Context.inner->Vector.empty->fromTuple
+    let empty = (context): inner => context->contextToTuple->FieldVector.Context.inner->Vector.emptyInner->fromTuple
     let init = (context: context): t => context->empty->Store.init
 
     let set = (x: input): t => x->toTuple->Vector.set->storeToStructure

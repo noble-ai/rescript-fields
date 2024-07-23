@@ -8,11 +8,18 @@ module Make = (F: Field.T) => {
       let {first, dyn} = F.makeDyn(context, set->Rxjs.toObservable, validate->Rxjs.toObservable->Some)
       let dyn = dyn->Dynamic.switchSequence
 
+
       (first, dyn)
     })
 
     // FIXME: apply init value
     let (close, setclose) = React.useState((_): Close.t<Form.t<F.t, F.actions<()>>> => first)
+
+    // let _ = React.useMemo0( () => {
+    //   dyn->Dynamic.tap(x => setclose(_ => x))
+    //   ->Dynamic.toPromise
+    //   ->Promise.void
+    // })
 
     React.useEffect0(() => {
       let sub = Rxjs.subscribe(dyn, {

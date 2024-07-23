@@ -1,6 +1,6 @@
 {
   "name": "@nobleai/rescript-fields",
-  "version": "1.0.0-beta.1",
+  "version": "1.0.0-beta.2",
   "description": "Elaborate form validation system for Rescript",
   "files": [
     "README.md",
@@ -16,7 +16,8 @@
     "start": "rescript build -w",
     "clean": "rescript clean",
     "test": "yarn vitest",
-    "pub": "yarn publish --scope nobleai --access public"
+    "pub": "yarn publish --scope nobleai --access public",
+    "examples:login": "yarn vite dev --open examples/login/"
   },
   "keywords": [
     "rescript",
