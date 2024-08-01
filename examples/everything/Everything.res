@@ -52,26 +52,6 @@ module State = {
 		let empty = #Ohio
 		let show = show
 	})
-
-	module Input = {
-		@react.component
-		let make = (~form: Fields.Form.t<Field.t, Field.actions<()>>) => {
-			<div>
-				<select
-					value={form.field->Field.input->show}
-					onChange={e => {
-						let target = e->ReactEvent.Form.target
-						target["value"]->form.actions.set
-					}}
-				>
-					{all->Array.map(state => {
-						<option key={state->show} value={state->show}>{state->show->React.string}</option>
-					})->React.array}
-				</select>
-				<Status enum={form.field->Field.enum} error={form.field->Field.printError}/>
-			</div>
-		}
-	}
 }
 
 module String = {
