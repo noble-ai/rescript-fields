@@ -76,6 +76,6 @@ module Field = FieldProduct.Product2.Make(
 - debounced asyc validation  
 - graphql async validation based on hook provided function  
 - optimistic update chaging form twice?  
-- write tests for specific product fields. range etc.  
+- Realign Polyvariant #A, #B, etc with sum 'a, 'b etc.
 
 
