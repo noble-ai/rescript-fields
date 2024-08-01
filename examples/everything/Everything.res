@@ -169,10 +169,10 @@ module AddressStreet = {
 
 	let contextDefault: Field.context = {
 		inner: {
-			street: {},
-			city: {},
+			street: FieldParse.String.contextNonEmpty,
+			city: FieldParse.String.contextNonEmpty,
 			state: {},
-			zip: {}
+			zip: Zip.contextDefault 
 		}
 	}
 
@@ -358,7 +358,7 @@ module AddressMilitary = {
 			box: {},
 			branch: {},
 			theater: {},
-			zip: {}
+			zip: Zip.contextDefault 
 		}
 	}
 
