@@ -325,7 +325,6 @@ module AddressMilitary = {
 						<Status enum={form.field->Field.enum} error={form.field->Field.printError}/>
 					</div>
 				</>
-
 			}
 		}
 	}
@@ -484,21 +483,37 @@ module Addresses = {
 				e->ReactEvent.Mouse.stopPropagation
 				form.actions.remove(index)
 			}
+			let handleClear = (e) => {
+				e->ReactEvent.Mouse.preventDefault
+				e->ReactEvent.Mouse.stopPropagation
+				form.actions.clear()
+			}
+
+			let handleReset = e => {
+				e->ReactEvent.Mouse.preventDefault
+				e->ReactEvent.Mouse.stopPropagation
+				form.actions.reset()
+			}
+
 			<div>
-			{ forms->Array.mapi((f, i) => {
-				// let key: string = f.field->State.FieldOpt.input->Option.map(State.show)->Option.or("null")
-				// let key = `${i->Int.toString}`
-				<div className="row">
-					<div className="column">
-						<Address.Input form=f/>
+				{ forms->Array.mapi((f, i) => {
+					// let key: string = f.field->State.FieldOpt.input->Option.map(State.show)->Option.or("null")
+					// let key = `${i->Int.toString}`
+					<div className="row">
+						<div className="column">
+							<Address.Input form=f/>
+						</div>
+						<button className="button-clear" onClick={handleRemove(~index=i)}>{"✕"->React.string}</button>
 					</div>
-					<button className="button-clear" onClick={handleRemove(~index=i)}>{"✕"->React.string}</button>
+				})->React.array }
+				<div className="row">
+					<Status enum={form.field->Field.enum} error={form.field->Field.printError}/>
 				</div>
-			})->React.array }
-			<div className="row">
-				<Status enum={form.field->Field.enum} error={form.field->Field.printError}/>
-			</div>
-			<button  className="button-clear" onClick={handleAdd}>{"Add One"->React.string}</button>
+				<div className="row">
+					<button  className="button-clear column column-20" onClick={handleAdd}>{"Add One"->React.string}</button>
+					<button  className="button-clear float-left" onClick={handleReset}>{"Reset"->React.string}</button>
+					<button  className="button-clear float-left" onClick={handleClear}>{"Clear"->React.string}</button>
+				</div>
 			</div>
 		}
 	}
