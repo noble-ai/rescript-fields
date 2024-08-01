@@ -11,7 +11,6 @@ describe("FieldArray", () => {
       {
         type t = FieldElement.t
         let filter = FieldArray.filterIdentity
-        let empty = _ => []
       }
     )
 

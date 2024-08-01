@@ -29,7 +29,7 @@ module Field: Field.T = {
   type actions<'change> = { set: input => 'change }
   let mapActions = (actions, fn) => {set: x => x->actions.set->fn }
   
-  let makeDyn = (_context: context, initial: option<input>, setOuter: Rxjs.t<'cs, 'ss, input>, val: option<Rxjs.Observable.t<()>> )
+  let makeDyn = (_context: context, _initial: option<input>, setOuter: Rxjs.t<'cs, 'ss, input>, val: option<Rxjs.Observable.t<()>> )
       : Dyn.t<Close.t<Form.t<t, actions<()>>>>
     => {
     let setInner = Rxjs.Subject.makeEmpty()

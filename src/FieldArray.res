@@ -259,8 +259,6 @@ module Make: Make = (F: Field.T, I: IArray with type t = F.t) => {
     }`
   }
 
-  let showInputInnerClose = (elements: array<Close.t<Form.t<'t, 'a>>>) => elements->Array.map(e => e.pack.field->F.input)->showInput
-
   let makeDyn = (context: context, initial: option<input>, setOuter: Rxjs.Observable.t<input>, _validate: option<Rxjs.Observable.t<()>>)
     : Dyn.t<Close.t<Form.t<t, actions<()>>>>
   => {
@@ -332,7 +330,7 @@ module Make: Make = (F: Field.T, I: IArray with type t = F.t) => {
       ->Dynamic.withLatestFrom(stateElements->Dynamic.startWith(firstInner))
       // scan accumulates state, but only so it can be passed to the combineLatestArray step
       ->Rxjs.pipe(Rxjs.scan( 
-        ( (firsts: Array.t<Close.t<Form.t<F.t, F.actions<unit>>>>, dyns)
+        ( (_firsts: Array.t<Close.t<Form.t<F.t, F.actions<unit>>>>, dyns)
         , (change: 'change, stateElements: Array.t<Close.t<Form.t<F.t, F.actions<unit>>>>)
         , index)
       : ( Array.t<Close.t<Form.t<F.t, F.actions<unit>>>>

@@ -171,18 +171,6 @@ describe("Float", () => {
 })
 
 describe("FieldParse.String", () => {
-  let itHasLength = (res, len) => {
-    itPromise(`emits ${len->Int.toString} states`, () => {
-      res->Promise.tap( res => res->Array.length->expect->toEqual(len) )
-    })
-  }
-
-  let itHasLengthMin = (res, min) => {
-    itPromise(`emits at least ${min->Int.toString} state`, () => {
-          res->Promise.tap( res => res->Array.length->expect->toBeGreaterThanOrEqualInt(min) )
-    })
-  }
-
   module Field = FieldParse.String.Field
 	describe("context default", () => {
 		let context: Field.context = {}

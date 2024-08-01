@@ -69,9 +69,9 @@ module Make: FieldIdentity = (T: T) => {
     opt: i => i->actions.opt->fn,
   }
     
-  let logField = Dynamic.tap(_, (x: Close.t<Form.t<t, 'a>>) => {
-    Console.log2("FieldIdentity field", x.pack.field)
-  })
+  // let logField = Dynamic.tap(_, (x: Close.t<Form.t<t, 'a>>) => {
+  //   Console.log2("FieldIdentity field", x.pack.field)
+  // })
 
   let makeDyn = (context: context, initial: option<input>, setOuter: Rxjs.Observable.t<input>, val: option<Rxjs.Observable.t<()>> )
       : Dyn.t<Close.t<Form.t<t, actions<()>>>>
