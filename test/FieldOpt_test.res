@@ -79,7 +79,7 @@ describe("FieldOpt", () => {
     })
 
     describe("context valdiate", () => {
-      let context: Subject.context = { validate: (x) => Ok()->Promise.return->Promise.delay(~ms=100) } 
+      let context: Subject.context = { validate: (_x) => Ok()->Promise.return->Promise.delay(~ms=100) } 
       describe("Clear during validate", () => {
         let test = () => {
           let set = Rxjs.Subject.makeEmpty()

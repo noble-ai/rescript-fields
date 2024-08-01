@@ -98,7 +98,7 @@ describe("FieldEither", () => {
           //     delay.contents = delay.contents - 10
           //     Promise.sleep(d)->Promise.map(_ => Ok())
           //   }
-          let validateFloat = (x: FieldLeft.output) => {
+          let validateFloat = (_x: FieldLeft.output) => {
               let d = delay.contents
               delay.contents = delay.contents - 10
               Promise.sleep(d)->Promise.map(_ => Ok())

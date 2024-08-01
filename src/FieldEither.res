@@ -117,7 +117,7 @@ module Either0 = {
   type observables = 
     Rxjs.t<Rxjs.foreign, Rxjs.void, Form.t<t, actions<()>>>
   
-  let makeDynInner =  (_context: contextInner, initial: option<input>, set: Rxjs.Observable.t<input>)
+  let makeDynInner =  (_context: contextInner, _initial: option<input>, set: Rxjs.Observable.t<input>)
     : Dyn.t<Close.t<Form.t<inner, actionsInner<()>>>>
     => {
       // Since either0 is degenerate, it will never be meanigfully set

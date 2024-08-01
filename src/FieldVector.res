@@ -198,7 +198,7 @@ module Vector0 = {
 
   // We have no meaningful actions here, but you may get an external set event from a larger vector
   // So we want to produce a value for each set that comes in, at least
-  let makeDynInner = (_context: contextInner, initial: option<input>, set: Rxjs.Observable.t<input>)
+  let makeDynInner = (_context: contextInner, _initial: option<input>, set: Rxjs.Observable.t<input>)
     : Dyn.t<Close.t<Form.t<inner, actionsInner<()>>>>
   => {
     let pack: Form.t<'f, 'a> = { field: (), actions: () }
@@ -213,7 +213,7 @@ module Vector0 = {
   }
 
   // I dont think you're going to find much use in creating a Vector0 directly but I may be wrong. 
-  let makeDyn = (context: context, initial: option<input>, set: Rxjs.Observable.t<input>, val: option<Rxjs.Observable.t<()>>)
+  let makeDyn = (_context: context, _initial: option<input>, _set: Rxjs.Observable.t<input>, _val: option<Rxjs.Observable.t<()>>)
       : Dyn.t<Close.t<Form.t<t, actions<()>>>>
     => {
     let actions: actions<()> = {
