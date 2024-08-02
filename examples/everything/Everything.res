@@ -41,7 +41,7 @@ module State = {
 }
 
 module String = {
-	module Field = FieldParse.String.Field
+	module Field = FieldOpt.Make(FieldParse.String.Field)
 
 	module Input = {
 		@react.component
@@ -49,13 +49,7 @@ module String = {
 			<>
 				<div>
 					<label>{label->React.string}</label>
-					<input
-						value={form.field->Field.input}
-						onChange={e => {
-							let target = e->ReactEvent.Form.target
-							target["value"]->form.actions.set
-						}}
-					/>
+					<InputOptString value={form.field->Field.input} clear={form.actions.clear} set={form.actions.inner.set} />
 					<Status enum={form.field->Field.enum} error={form.field->Field.printError} />
 				</div>
 			</>
@@ -404,7 +398,7 @@ module Address = {
 			let setStreet = e => {
 				e->ReactEvent.Mouse.preventDefault
 				e->ReactEvent.Mouse.stopPropagation
-				form.actions.set(Street({street: "", city: "", state: None, zip: None}))
+				form.actions.set(Street({street: None, city: None, state: None, zip: None}))
 			}
 			let setMilitary = e => {
 				e->ReactEvent.Mouse.preventDefault
@@ -505,8 +499,8 @@ module Form = UseField.Make(Field)
 
 let init: Field.input = [
 	Street({
-		street: "123 Hhaa",
-		city: "Fort Collines",
+		street: Some("123 Hhaa"),
+		city: Some("Fort Collines"),
 		state: Some(#Alabama),
 		zip: Some("44400"),
 	}),
