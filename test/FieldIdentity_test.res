@@ -1,5 +1,4 @@
 open Vitest
-// shadow global Dynamic with the impl chosen by FT
 describe("FieldIdentity", () => {
   module Subject = FieldIdentity.Float
   let value = 3.0

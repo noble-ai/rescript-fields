@@ -1,3 +1,4 @@
+@@ocamldoc("A Functor for creating a React hook for executing a Field")
 module Make = (F: Field.T) => {
   type ret = Form.t<F.t, F.actions<()>>
   let use = (. ~context: F.context, ~init: option<F.input>, ~validateInit): ret => {

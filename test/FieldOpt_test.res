@@ -20,7 +20,6 @@ module Behaviors = (F: Field.T) => {
 }
 
 
-// shadow global Dynamic with the impl chosen by FT
 describe("FieldOpt", () => {
   module Subject = FieldOpt.Int
   module Behaviors = Behaviors(Subject) 

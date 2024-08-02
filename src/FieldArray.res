@@ -1,10 +1,9 @@
-// shadow global Dynamic with the impl chosen by FT
-
 module Context = {
   type structure<'output, 'element, 'empty> = {
-    // External validation for array recieves output from all valid children
-    // FieldArray does have this concept of filtering in IArray to consider, maybe we want to pass that last one in?
-    // or just pass the Store and let it filter? -AxM
+    @ocamldoc("External validation for array recieves output from all valid children
+    FieldArray does have this concept of filtering in IArray to consider, maybe we want to pass that last one in?
+    / or just pass the Store and let it filter? -AxM
+    ")
     validate?: array<'output> => Promise.t<Result.t<unit, string>>,
     element: 'element,
     empty?: () => array<'empty>,
@@ -52,7 +51,6 @@ type actions<'finput, 'factions, 'out> = {
   
   type error = [#Whole(string) | #Part]
 
-  // giving the Make functor this
   module type Make = (F: Field.T, I: IArray with type t = F.t ) => T
     with type input = array<F.input>
     and type inputElement = F.input

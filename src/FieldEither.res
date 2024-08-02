@@ -12,12 +12,12 @@ type error = [#Whole(string) | #Part]
 
 module Actions = FieldVector.Actions
 
-// the Tail module type is an extension of Field with some extras for
-// managing the recursive construction of FieldEither3,4,5...
-// Some elements of Field are baked in to include a non recursive
-// decoration so those need to be stripped back to structures that
-// can be split and recursed.
-
+@ocamldoc("the Tail module type is an extension of Field with some extras for
+managing the recursive construction of FieldEither3,4,5...
+Some elements of Field are baked in to include a non recursive
+decoration so those need to be stripped back to structures that
+can be split and recursed.
+")
 module type Tail = {
   include Field.T
   type contextInner
@@ -29,10 +29,11 @@ module type Tail = {
   let outputInner: inner => option<output>
   let validateInner: (bool, contextInner, inner) => Rxjs.t<Rxjs.foreign, Rxjs.void,inner>
 
-  // actionsInner is a collection of functions from the specific changes
-  // to a particular output value.  This is a functor with mapActionsInner
-  // which allows the actions to be lifted into their parents actions
-  // when needed
+  @ocmaldoc("actionsInner is a collection of functions from the specific changes
+  to a particular output value.  This is a functor with mapActionsInner
+  which allows the actions to be lifted into their parents actions
+  when needed
+  ")
   type actionsInner<'a>
   let mapActionsInner: (actionsInner<'a>, 'a => 'b) => actionsInner<'b>
   
@@ -51,12 +52,12 @@ module type Tail = {
 module Context = FieldVector.Context
 
 module Either0 = {
-  // Either0 is the terminal case of recursion in FieldEither.
-  // Its degenerate, holds only unit value, and occupies the final Right value in the
-  // Nested Eithers for state etc.
-  // All real values are Left, nested into Rights to place them in context.
+  @ocmaldoc("Either0 is the terminal case of recursion in FieldEither.
+  Its degenerate, holds only unit value, and occupies the final Right value in the
+  Nested Eithers for state etc.
+  All real values are Left, nested into Rights to place them in context.
+  ")
 
-  // TODO: Could be reduced to not use Either at all? - AxM
   type input = () 
   type inner = () 
   type output = () 
@@ -429,6 +430,7 @@ module Rec = {
   }
 }
 
+@ocamldoc("Applicatino of Base and Rec to make Either1")
 module Either1 = {
   type either<'a> = Either.Nested.t1<'a>
   type tuple<'a> = Tuple.Nested.tuple1<'a>
@@ -450,6 +452,7 @@ module Either1 = {
   ) => Rec.Make(A, Either0)
 }
 
+@ocamldoc("Application of Either1 and Rec to make Either2")
 module Either2 = {
   type either<'a, 'b> = Either.Nested.t2<'a, 'b>
   type tuple<'a, 'b> = Tuple.Nested.tuple2<'a, 'b>
@@ -474,6 +477,7 @@ module Either2 = {
   ) => Rec.Make(A, Either1.Make(B))
 }
 
+@ocamldoc("Application of Either2 and Rec to make Either3")
 module Either3 = {
   type either<'a, 'b, 'c> = Either.Nested.t3<'a, 'b, 'c>
   type tuple<'a, 'b, 'c> = Tuple.Nested.tuple3<'a, 'b, 'c>
@@ -503,6 +507,7 @@ module Either3 = {
   ) => Rec.Make(A, Either2.Make(B, C))
 }
 
+@ocamldoc("Application of Either3 and Rec to make Either4")
 module Either4 = {
   type either<'a, 'b, 'c, 'd> = Either.Nested.t4<'a, 'b, 'c, 'd>
   type tuple<'a, 'b, 'c, 'd> = Tuple.Nested.tuple4<'a, 'b, 'c, 'd>
@@ -541,6 +546,7 @@ module Either4 = {
   ) => Rec.Make(A, Either3.Make(B, C, D))
 }
 
+@ocamldoc("Application of Either4 and Rec to make Either5")
 module Either5 = {
   type either<'a, 'b, 'c, 'd, 'e> = Either.Nested.t5<'a, 'b, 'c, 'd, 'e>
   type tuple<'a, 'b, 'c, 'd, 'e> = Tuple.Nested.tuple5<'a, 'b, 'c, 'd, 'e>
@@ -583,6 +589,7 @@ module Either5 = {
   ) => Rec.Make(A, Either4.Make(B, C, D, E))
 }
 
+@ocamldoc("Application of Either5 and Rec to make Either6")
 module Either6 = {
   type either<'a, 'b, 'c, 'd, 'e, 'f> = Either.Nested.t6<'a, 'b, 'c, 'd, 'e, 'f>
   type tuple<'a, 'b, 'c, 'd, 'e, 'f> = Tuple.Nested.tuple6<'a, 'b, 'c, 'd, 'e, 'f>

@@ -1,4 +1,3 @@
-// shadow global Dynamic with the impl chosen by FT
 type context = unit
 type input = bool
 let showInput = (input: input) => `${input->string_of_bool}`

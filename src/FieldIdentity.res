@@ -5,10 +5,9 @@
 // but useful for dropdowns
 ")
 
-// shadow global Dynamic with the impl chosen by FT
-
-// T just says that a module provides a type t and an empty value
-// used for common use of FieldIdentity
+@ocamldoc("T just says that a module provides a type t and an empty value
+ used for common use of FieldIdentity
+")
 module type T = {
   type t
   let empty: t

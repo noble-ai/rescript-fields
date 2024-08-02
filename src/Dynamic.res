@@ -1,4 +1,5 @@
-// collecting actions available for operating on validation processes
+@@ocamldoc("Conveniences for dealing with Rjxs observables.")
+
 // type t<'a> = Rxjs.t<Rxjs.foreign, Rxjs.void, 'a>
 
 let return = Rxjs.return

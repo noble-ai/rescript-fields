@@ -1,9 +1,9 @@
-// prefer shadowing Dynamic
 open FieldProduct
 
-// FieldSum is a decoratin of FieldEither that allows you to map to your own sum type
-// as your input and output structures 
-// All the dynamic behavior is in FieldEither.
+@@ocamldoc("FieldSum is a decoratin of FieldEither that allows you to map to your own sum type
+as your input and output structures 
+All the dynamic behavior is in FieldEither.
+")
 
 module Sum1 = {
   module Tuple = Product1.Tuple

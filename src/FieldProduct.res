@@ -1,4 +1,4 @@
-// shadow global Dynamic with the impl chosen by FT
+@@ocamldoc("Extending FieldVector, A Field that composes multiple children, giving each child a name, and producing a record type as its output")
 
 module Tuple = Tuple.Nested
 

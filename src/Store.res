@@ -1,3 +1,14 @@
+@@ocamldoc(" Store.t is the common shape of state for each Field.
+ Each field will have a different instantaition of Store.t with different input, output, and error
+ based on its children, etc.
+
+ The Store.t can be in one of these five states
+ It holds an 'input value in every state so we can maintain the state of inner fields
+ as we transition between our states.
+ When we are valid we provide an 'output value that is the result of the validation
+ and when we are invalid we provide an error.
+ ")
+
 // Its a little annyoing to switch against the Store.t enum to know what state we're in
 // So provide an enum as convenience
 type enum = [#Init | #Dirty | #Busy | #Valid | #Invalid]
@@ -13,16 +24,6 @@ let enumToPretty = (e: enum) => {
 }
 
 let enumToA = (e: enum) => e->enumToPretty->String.toLowerCase
-
-  // Store.t is the common shape of state for each Field.
-  // Each field will have a different instantaition of Store.t with different input, output, and error
-  // based on its children, etc.
-
-  // The Store.t can be in one of these five states
-  // It holds an 'input value in every state so we can maintain the state of inner fields
-  // as we transition between our states.
-  // When we are valid we provide an 'output value that is the result of the validation
-  // and when we are invalid we provide an error.
 
   @deriving(accessors)
   type t<'inner, 'output, 'error> =

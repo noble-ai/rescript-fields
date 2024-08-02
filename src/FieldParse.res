@@ -1,7 +1,25 @@
+@@ocamldoc("A step up from FieldIdentity where the input type is string, and given an parse function, the remainder of the field opeerates on the type produced by parse")
+
 module type Interface = {
   type t
   let parse: string => Result.t<t, string>
   let show: t => string
+}
+
+module Actions = {
+  type t<'input, 'change> = {
+    clear: unit => 'change,
+    reset: unit => 'change,
+    validate: unit => 'change,
+    set: 'input => 'change,
+  }
+
+  let mapActions = (actions, fn) => {
+    clear: () => fn(actions.clear()),
+    reset: () => fn(actions.reset()),
+    validate: () => fn(actions.validate()),
+    set: input => fn(actions.set(input)),
+  }
 }
 
 module Make = (I: Interface) => {
@@ -16,27 +34,6 @@ module Make = (I: Interface) => {
   type validate = I.t => Promise.t<Result.t<unit, error>>
 
   type context = {validate?: validate, validateImmediate?: bool}
-
-  // Conveneincees for building context length
-  let min = x => Some((Some(x), None))
-  let max = x => Some((None, Some(x)))
-  let minmax = (min, max) => Some((Some(min), Some(max)))
-
-  module Actions = {
-    type t<'input, 'change> = {
-      clear: unit => 'change,
-      reset: unit => 'change,
-      validate: unit => 'change,
-      set: 'input => 'change,
-    }
-
-    let mapActions = (actions, fn) => {
-      clear: () => fn(actions.clear()),
-      reset: () => fn(actions.reset()),
-      validate: () => fn(actions.validate()),
-      set: input => fn(actions.set(input)),
-    }
-  }
 
   let logField = Dynamic.map(
     _,

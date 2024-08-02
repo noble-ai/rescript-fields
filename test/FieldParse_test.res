@@ -1,5 +1,4 @@
 open Vitest
-// shadow global Dynamic with the impl chosen by FT
 
 describe("Float", () => {
   module Subject = FieldParse.Float
