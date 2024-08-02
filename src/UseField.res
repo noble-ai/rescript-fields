@@ -28,7 +28,6 @@ module Make = (F: Field.T) => {
     React.useEffect0(() => {
       Promise.sleep(30)
       ->Promise.tap((_) => {
-        Console.log2("set init", init)
         init->Option.forEach(Rxjs.next(set))
       })
       ->Promise.void
