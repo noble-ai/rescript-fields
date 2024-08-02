@@ -1,3 +1,7 @@
+@ocamldoc("FieldOpt is a field that allows optional input values.
+This helps separate empty init from empty invalid states."
+)
+
 @deriving(accessors)
 type actions<'clear, 'opt, 'inner, 'validate> = {
   clear: 'clear,
