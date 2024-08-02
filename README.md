@@ -27,7 +27,7 @@ Each field is represented by a Field module that declares the storage, validatio
 
 ## Live example
 
-For a runnable eversion try `yarn install; yarn rescript build; yarn run examples:everything`
+`yarn install; yarn rescript build; yarn run examples:everything`
 
 ## Login Form Example
 
