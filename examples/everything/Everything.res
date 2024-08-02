@@ -35,8 +35,11 @@ module InputOptString = {
 
 module Status = {
 	@react.component
-	let make = (~enum: Store.enum, ~error) => {
-		<div className="status">{error->Option.or(enum->Store.enumToPretty)->React.string}</div>
+	let make = (~title=?, ~enum: Store.enum, ~error) => {
+		<div className="status">
+			{ title->Option.map(x => `${x}: `->React.string)->Option.or(React.null) }
+			{`${error->Option.or(enum->Store.enumToPretty)}`->React.string}
+		</div>
 	}
 }
 
@@ -439,7 +442,7 @@ module Address = {
 					| Military(form) => <AddressMilitary.Input form />
 					}
 				}
-				<Status enum={form.field->Field.enum} error={form.field->Field.printError}/>
+				<Status title="Address" enum={form.field->Field.enum} error={form.field->Field.printError}/>
 			</div>
 		}
 	}
@@ -507,7 +510,7 @@ module Addresses = {
 					</div>
 				})->React.array }
 				<div className="row">
-					<Status enum={form.field->Field.enum} error={form.field->Field.printError}/>
+					<Status title="Addresses" enum={form.field->Field.enum} error={form.field->Field.printError}/>
 				</div>
 				<div className="row">
 					<button  className="button-clear column column-20" onClick={handleAdd}>{"Add One"->React.string}</button>
@@ -528,15 +531,15 @@ let init: Field.input = [
 		street: "123 Hhaa",
 		city: "Fort Collines",
 		state: Some(#Alabama),
-		zip: Some("444"),
+		zip: Some("44400"),
 	}),
 	Military({
 		segment: Some(#Community),
 		numSegment: "300",
-		box: "abc",
+		box: "123",
 		branch: Some(#Apo),
 		theater: Some(#Europe),
-		zip: Some("")
+		zip: Some("99900")
 	})
 ]
 
