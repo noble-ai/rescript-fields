@@ -308,9 +308,9 @@ module Make: Make = (F: Field.T, I: IArray with type t = F.t) => {
       ->Dynamic.withLatestFrom(stateElements->Dynamic.startWith(firstInner))
       // scan accumulates state, but only so it can be passed to the combineLatestArray step
       ->Rxjs.pipe(Rxjs.scan( 
-        ( (_firsts: Array.t<Close.t<Form.t<F.t, F.actions<unit>>>>, dyns)
+        ( (firsts: Array.t<Close.t<Form.t<F.t, F.actions<unit>>>>, dyns)
         , (change: 'change, stateElements: Array.t<Close.t<Form.t<F.t, F.actions<unit>>>>)
-        , index)
+        , _sequence)
       : ( Array.t<Close.t<Form.t<F.t, F.actions<unit>>>>
         , Array.t<Dyn.dyn<Close.t<Form.t<F.t, F.actions<()>>>>>
         ) 
@@ -325,6 +325,7 @@ module Make: Make = (F: Field.T, I: IArray with type t = F.t) => {
         makeDynInit(context, initial, set)
       }
       | #Add(value) =>  {
+        let index = firsts->Array.length
         let setElement = set->Dynamic.keepMap(Array.get(_, index))
         let {first, dyn} = F.makeDyn(context.element, value, setElement, None)
         let dyn = dyn->Dynamic.startWith(Dynamic.return(first))
@@ -356,13 +357,12 @@ module Make: Make = (F: Field.T, I: IArray with type t = F.t) => {
     }, (firstInner, dynInner)))
     // Take the latest array of inner dyns, 
     ->Dynamic.withLatestFrom(stateElements->Dynamic.startWith(firstInner))
-    ->Dynamic.switchMap( (((firsts, dyns), stateElements): (
+    ->Dynamic.switchMap( (((_firsts, dyns), stateElements): (
         ( Array.t<Close.t<Form.t<F.t, F.actions<unit>>>>
         , Array.t<Dyn.dyn<Close.t<Form.t<F.t, F.actions<()>>>>>
         )
         , Array.t<Close.t<Form.t<F.t, F.actions<unit>>>>
-        )
-      ): Dyn.dyn<Array.t<Close.t<Form.t<F.t, F.actions<()>>>>> => {
+      )): Dyn.dyn<Array.t<Close.t<Form.t<F.t, F.actions<()>>>>> => {
 
       // When the array is empty, there are no events to animate combineLatestArray
       // So a default for []
