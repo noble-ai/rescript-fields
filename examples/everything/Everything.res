@@ -1,20 +1,5 @@
 module FieldLogin = Login.Field
 
-module InputString = {
-	@react.component
-	let make = (~value, ~set) => {
-		<input
-			value
-			onChange={e => {
-				e->ReactEvent.Form.preventDefault
-				e->ReactEvent.Form.stopPropagation
-				let target = e->ReactEvent.Form.target
-				target["value"]->set
-			}}
-		/>
-	}
-}
-
 module InputOptString = {
 	@react.component
 	let make = (~value, ~clear, ~set) => {
@@ -30,8 +15,6 @@ module InputOptString = {
 		/>
 	}
 }
-
-
 
 module Status = {
 	@react.component
@@ -102,16 +85,7 @@ module Zip = {
 		let make = (~form: Form.t<Field.t, Field.actions<()>>) => {
 			<div>
 				<label>{"Zip"->React.string}</label>
-				<input
-					value={form.field->Field.input->Option.or("")}
-					onChange={e => {
-						let target = e->ReactEvent.Form.target
-						switch target["value"] {
-							| "" => form.actions.clear()
-							| x => form.actions.inner.set(x)
-						}
-					}}
-				/>
+				<InputOptString value={form.field->Field.input} clear={form.actions.clear} set={form.actions.inner.set} />
 				<Status enum={form.field->Field.enum} error={form.field->Field.printError}/>
 			</div>
 		}
@@ -320,14 +294,14 @@ module AddressMilitary = {
 	}
 
 	module Int = {
-		module Field = FieldParse.Int
+		module Field = FieldOpt.Make(FieldParse.Int)
 		module Input = {
 			@react.component
 			let make = (~label, ~form: Fields.Form.t<Field.t, Field.actions<()>>) => {
 				<>
 					<div>
 						<label className="label">{label->React.string}</label>
-						<InputString value={form.field->Field.input} set=form.actions.set />
+						<InputOptString value={form.field->Field.input} set=form.actions.inner.set clear=form.actions.clear/>
 						<Status enum={form.field->Field.enum} error={form.field->Field.printError}/>
 					</div>
 				</>
@@ -435,7 +409,7 @@ module Address = {
 			let setMilitary = e => {
 				e->ReactEvent.Mouse.preventDefault
 				e->ReactEvent.Mouse.stopPropagation
-				form.actions.set(Military({segment: None, numSegment: "", box: "", branch: None, theater: None, zip: None}))
+				form.actions.set(Military({segment: None, numSegment: None, box: None, branch: None, theater: None, zip: None}))
 			}
 			<div>
 				<button className="button-clear" onClick={setStreet}>{"Street"->React.string}</button>
@@ -538,8 +512,8 @@ let init: Field.input = [
 	}),
 	Military({
 		segment: Some(#Community),
-		numSegment: "300",
-		box: "123",
+		numSegment: Some("300"),
+		box: Some("123"),
 		branch: Some(#Apo),
 		theater: Some(#Europe),
 		zip: Some("99900")
