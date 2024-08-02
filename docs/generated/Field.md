@@ -62,41 +62,27 @@ that a module passed to the function has each of these types and values.
 
 ### Field.T.validate
   
-`let validate: (bool, context, t) => Dynamic.t<t>`  
-
-
-### Field.T.change
-  
-`type change`  
+`let validate: (bool, context, t) => Rxjs.t<Rxjs.foreign, Rxjs.void, t>`  
 
 
 ### Field.T.actions
   
-`type actions`  
+`type actions<'change>`  
 
 
-### Field.T.actions
+### Field.T.mapActions
   
-`let actions: actions`  
+`let mapActions: (actions<'change>, 'change => 'b) => actions<'b>`  
 
 
-### Field.T.makeSet
+### Field.T.makeDyn
   
-`let makeSet: input => change`  
-
-
-### Field.T.showChange
-  
-`let showChange: change => string`  
-
-
-### Field.T.reduce
-  
-`let reduce: (
-  ~context: context,
-  Dynamic.t<t>,
-  Indexed.t<change>,
-) => Dynamic.t<t>`  
+`let makeDyn: (
+  context,
+  option<input>,
+  Rxjs.Observable.t<input>,
+  option<Rxjs.Observable.t<unit>>,
+) => Dyn.t<Close.t<Form.t<t, actions<unit>>>>`  
 
 
 ### Field.T.inner

@@ -55,41 +55,27 @@
 
 ### FieldCheck.validate
   
-`let validate: ('a, context, t) => Dynamic.t<t>`  
-
-
-### FieldCheck.change
-  
-`type change = [#Set(input)]`  
-
-
-### FieldCheck.makeSet
-  
-`let makeSet: 'a => [> #Set('a)]`  
-
-
-### FieldCheck.showChange
-  
-`let showChange: change => string`  
+`let validate: ('a, context, t) => Rxjs.t<Rxjs.foreign, Rxjs.void, t>`  
 
 
 ### FieldCheck.actions
   
-`type actions = {set: input => change}`  
+`type actions<'change> = {set: input => 'change}`  
 
 
-### FieldCheck.actions
+### FieldCheck.mapActions
   
-`let actions: actions`  
+`let mapActions: (actions<'a>, 'a => 'b) => actions<'b>`  
 
 
-### FieldCheck.reduce
+### FieldCheck.makeDyn
   
-`let reduce: (
-  ~context: context,
-  Dynamic.t<t>,
-  Indexed.t<change>,
-) => Dynamic.t<t>`  
+`let makeDyn: (
+  context,
+  option<input>,
+  Rxjs.Observable.t<input>,
+  option<Rxjs.Observable.t<unit>>,
+) => Dyn.t<Close.t<Form.t<t, actions<unit>>>>`  
 
 
 ### FieldCheck.inner

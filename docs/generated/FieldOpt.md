@@ -1,1 +1,1 @@
-invalid kind
+unhandled kind moduleAlias

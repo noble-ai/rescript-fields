@@ -3,11 +3,6 @@
 
 
 
-### Dynamic.t
-  
-`type t<'a> = Rxjs.t<Rxjs.foreign, Rxjs.void, 'a>`  
-
-
 ### Dynamic.return
   
 `let return: 'a => Rxjs.t<Rxjs.foreign, Rxjs.void, 'a>`  
@@ -25,7 +20,7 @@
 
 ### Dynamic.toHistory
   
-`let toHistory: t<'a> => Js.Promise.t<Array.t<'a>>`  
+`let toHistory: Rxjs.t<'c, 's, 'out> => Js.Promise.t<Array.t<'out>>`  
 
 
 ### Dynamic.startWith
@@ -118,22 +113,41 @@
 
 ### Dynamic.bind
   
-`let bind: (t<'a>, 'a => t<'b>) => t<'b>`  
+`let bind: (
+  Rxjs.t<'ca, 'sa, 'out>,
+  'out => Rxjs.t<Rxjs.foreign, Rxjs.void, 'b>,
+) => Rxjs.t<'ca, 'sa, 'b>`  
 
 
 ### Dynamic.merge
   
-`let merge: (t<'a>, 'a => t<'b>) => t<'b>`  
+`let merge: (
+  Rxjs.t<'ca, 'sa, 'a>,
+  'a => Rxjs.t<Rxjs.foreign, Rxjs.void, 'b>,
+) => Rxjs.t<'ca, 'sa, 'b>`  
 
 
 ### Dynamic.switchMap
   
-`let switchMap: (t<'a>, 'a => t<'b>) => t<'b>`  
+`let switchMap: (
+  Rxjs.t<'ca, 'sa, 'a>,
+  'a => Rxjs.t<Rxjs.foreign, Rxjs.void, 'b>,
+) => Rxjs.t<'ca, 'sa, 'b>`  
+
+
+### Dynamic.switchSequence
+  
+`let switchSequence: Rxjs.t<'a, 'b, Rxjs.t<'c, 'd, 'e>> => Rxjs.t<'a, 'b, 'e>`  
 
 
 ### Dynamic.tap
   
 `let tap: (Rxjs.t<'a, 'b, 'c>, 'c => unit) => Rxjs.t<'a, 'b, 'c>`  
+
+
+### Dynamic.tap_
+  
+`let tap_: (Rxjs.t<'a, 'b, 'c>, 'c => unit) => unit`  
 
 
 ### Dynamic.filter
@@ -176,6 +190,24 @@
 ### Dynamic.keepMap
   
 `let keepMap: (Rxjs.t<'a, 'b, 'c>, 'c => option<'d>) => Rxjs.t<'a, 'b, 'd>`  
+
+
+### Dynamic.contramap
+  
+`let contramap: (Rxjs.Observer.t<'a>, 'b => 'a) => Rxjs.Observer.t<'b>`  
+
+
+### Dynamic.contrafilter
+  
+`let contrafilter: (
+  Rxjs.Observer.t<'a>,
+  'b => option<'a>,
+) => Rxjs.Observer.t<'b>`  
+
+
+### Dynamic.contraCatOptions
+  
+`let contraCatOptions: Rxjs.Observer.t<'a> => Rxjs.Observer.t<option<'a>>`  
 
 
 ### Dynamic.partition2
@@ -285,7 +317,7 @@
 ### Dynamic.finalizeWithValue
   
 `let finalizeWithValue: (
-  t<'o>,
+  Rxjs.t<'c, 's, 'o>,
   option<'o> => unit,
 ) => Rxjs.t<Rxjs.foreign, Rxjs.void, 'o>`  
 
@@ -297,10 +329,33 @@
 
 ### Dynamic.jitter
   
-`let jitter: t<'a> => t<'a>`  
+`let jitter: Rxjs.t<'a, 'b, 'c> => Rxjs.t<'a, 'b, 'c>`  
+
+
+### Dynamic._log
+  
+`let _log: (
+  ~enable: bool=?,
+  Rxjs.t<'a, 'b, 'c>,
+  'd,
+) => Rxjs.t<'a, 'b, 'c>`  
 
 
 ### Dynamic.log
   
-`let log: (Rxjs.t<'a, 'b, 'c>, 'd) => Rxjs.t<'a, 'b, 'c>`  
+`let log: (
+  ~enable: bool=?,
+  Rxjs.t<'a, 'b, 'c>,
+  'd,
+) => Rxjs.t<'a, 'b, 'c>`  
+
+
+### Dynamic.log_
+  
+`let log_: (~enable: bool=?, Rxjs.t<'a, 'b, 'c>, 'd) => unit`  
+
+
+### Dynamic.mapLog
+  
+`let mapLog: (Rxjs.t<'a, 'b, 'c>, 'd, 'c => 'e) => Rxjs.t<'a, 'b, 'c>`  
 

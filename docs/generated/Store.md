@@ -15,7 +15,7 @@
 
 ### Store.enumToA
   
-`let enumToA: enum => Js.String2.t`  
+`let enumToA: enum => Prelude.String.t`  
 
 
 ### Store.t

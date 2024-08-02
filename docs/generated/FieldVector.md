@@ -25,7 +25,12 @@
   
 ### FieldVector.Context.t
   
-`type t<'e, 'v, 'i> = {empty?: 'e, validate?: 'v, inner: 'i}`  
+`type t<'e, 'v, 'i> = {
+  empty?: 'e,
+  validate?: 'v,
+  inner: 'i,
+  validateImmediate?: bool,
+}`  
 
 
 ### FieldVector.Context.empty
@@ -53,49 +58,28 @@
 ) => t<'b, 'd, 'f>`  
 
 
-### FieldVector.Change
-  
-  
-### FieldVector.Change.t
-  
-`type t<'input, 'inner> = [
-  | #Clear
-  | #Inner('inner)
-  | #Set('input)
-  | #Validate
-]`  
-
-
-### FieldVector.Change.makeSet
-  
-`let makeSet: 'a => [> #Set('a)]`  
-
-
-### FieldVector.Change.bimap
-  
-`let bimap: (
-  'a => 'b,
-  'c => 'd,
-  [< #Clear | #Inner('c) | #Set('a) | #Validate],
-) => [> #Clear | #Inner('d) | #Set('b) | #Validate]`  
-
-
-### FieldVector.Change.show
-  
-`let show: t<string, string> => string`  
-
-
 ### FieldVector.Actions
   
   
 ### FieldVector.Actions.t
   
-`type t<'input, 'inner, 'actionsInner> = {
-  set: 'input => Change.t<'input, 'inner>,
-  clear: unit => Change.t<'input, 'inner>,
-  inner: 'actionsInner,
-  validate: unit => Change.t<'input, 'inner>,
+`type t<'input, 'change, 'inner> = {
+  set: 'input => 'change,
+  clear: unit => 'change,
+  opt: option<'input> => 'change,
+  inner: 'inner,
+  validate: unit => 'change,
 }`  
+
+
+### FieldVector.Actions.trimap
+  
+`let trimap: (
+  t<'a, 'b, 'c>,
+  'd => 'a,
+  'b => 'e,
+  'c => 'f,
+) => t<'d, 'e, 'f>`  
 
 
 ### FieldVector.const
@@ -120,14 +104,6 @@
 >`  
 
 
-### FieldVector.Interface
-  
-  
-### FieldVector.Interface.validateImmediate
-  
-`let validateImmediate: bool`  
-
-
 ### FieldVector.Tail
   
   
@@ -136,9 +112,19 @@
 `type contextInner`  
 
 
+### FieldVector.Tail.context
+  
+`type context`  
+
+
 ### FieldVector.Tail.input
   
 `type input`  
+
+
+### FieldVector.Tail.t
+  
+`type t`  
 
 
 ### FieldVector.Tail.inner
@@ -149,11 +135,6 @@
 ### FieldVector.Tail.output
   
 `type output`  
-
-
-### FieldVector.Tail.t
-  
-`type t`  
 
 
 ### FieldVector.Tail.showInput
@@ -171,9 +152,14 @@
 `let set: input => t`  
 
 
+### FieldVector.Tail.emptyInner
+  
+`let emptyInner: contextInner => inner`  
+
+
 ### FieldVector.Tail.empty
   
-`let empty: contextInner => inner`  
+`let empty: context => inner`  
 
 
 ### FieldVector.Tail.hasEnum
@@ -188,47 +174,39 @@
 
 ### FieldVector.Tail.validateInner
   
-`let validateInner: (contextInner, inner) => Dynamic.t<inner>`  
-
-
-### FieldVector.Tail.changeInner
-  
-`type changeInner`  
-
-
-### FieldVector.Tail.showChangeInner
-  
-`let showChangeInner: changeInner => string`  
-
-
-### FieldVector.Tail.actions
-  
-`type actions`  
-
-
-### FieldVector.Tail.actions
-  
-`let actions: actions`  
-
-
-### FieldVector.Tail.reduceChannel
-  
-`let reduceChannel: (
-  ~contextInner: contextInner,
-  Dynamic.t<inner>,
-  Indexed.t<unit>,
-  changeInner,
-) => Dynamic.t<inner>`  
-
-
-### FieldVector.Tail.reduceSet
-  
-`let reduceSet: (
+`let validateInner: (
   contextInner,
-  Dynamic.t<inner>,
-  Indexed.t<unit>,
-  input,
-) => Dynamic.t<inner>`  
+  inner,
+) => Rxjs.t<Rxjs.foreign, Rxjs.void, inner>`  
+
+
+### FieldVector.Tail.actionsInner
+  
+`type actionsInner<'change>`  
+
+
+### FieldVector.Tail.mapActionsInner
+  
+`let mapActionsInner: (actionsInner<'change>, 'change => 'b) => actionsInner<'b>`  
+
+
+### FieldVector.Tail.partition
+  
+`type partition`  
+partition is opaque here but will be a composition of Form.t
+
+### FieldVector.Tail.splitInner
+  
+`let splitInner: (inner, actionsInner<unit>) => partition`  
+
+
+### FieldVector.Tail.makeDynInner
+  
+`let makeDynInner: (
+  contextInner,
+  option<input>,
+  Rxjs.Observable.t<input>,
+) => Dyn.t<Close.t<Form.t<inner, actionsInner<unit>>>>`  
 
 
 ### FieldVector.Tail.toInputInner
@@ -314,9 +292,14 @@
 `let set: unit => t`  
 
 
+### FieldVector.Vector0.emptyInner
+  
+`let emptyInner: contextInner => inner`  
+
+
 ### FieldVector.Vector0.empty
   
-`let empty: unit => inner`  
+`let empty: contextInner => inner`  
 
 
 ### FieldVector.Vector0.initInner
@@ -341,12 +324,12 @@
 
 ### FieldVector.Vector0.validateInner
   
-`let validateInner: ('a, inner) => Dynamic.t<inner>`  
+`let validateInner: ('a, inner) => Rxjs.t<Rxjs.foreign, Rxjs.void, inner>`  
 
 
 ### FieldVector.Vector0.validate
   
-`let validate: ('a, context, t) => Dynamic.t<t>`  
+`let validate: ('a, context, t) => Rxjs.t<Rxjs.foreign, Rxjs.void, t>`  
 
 
 ### FieldVector.Vector0.inner
@@ -389,63 +372,57 @@
 `let show: t => string`  
 
 
-### FieldVector.Vector0.changeInner
+### FieldVector.Vector0.actionsInner
   
-`type changeInner = unit`  
+`type actionsInner<'change> = unit`  
 
 
-### FieldVector.Vector0.showChangeInner
+### FieldVector.Vector0.mapActionsInner
   
-`let showChangeInner: changeInner => string`  
-
-
-### FieldVector.Vector0.change
-  
-`type change = unit`  
-
-
-### FieldVector.Vector0.showChange
-  
-`let showChange: unit => string`  
+`let mapActionsInner: ('a, 'b) => unit`  
 
 
 ### FieldVector.Vector0.actions
   
-`type actions = unit`  
+`type actions<'change> = Actions.t<
+  input,
+  'change,
+  actionsInner<'change>,
+>`  
 
 
-### FieldVector.Vector0.toChange
+### FieldVector.Vector0.mapActions
   
-`let toChange: ('a, 'b) => change`  
+`let mapActions: (Actions.t<'a, 'b, 'c>, 'c => 'd) => Actions.t<'a, unit, 'd>`  
 
 
-### FieldVector.Vector0.actions
+### FieldVector.Vector0.partition
   
-`let actions: actions`  
+`type partition = unit`  
 
 
-### FieldVector.Vector0.reduceChannel
+### FieldVector.Vector0.splitInner
   
-`let reduceChannel: (~contextInner: 'a, 'b, 'c, changeInner) => Dynamic.t<inner>`  
+`let splitInner: ('a, 'b) => unit`  
 
 
-### FieldVector.Vector0.reduceSet
+### FieldVector.Vector0.makeDynInner
   
-`let reduceSet: (
-  'a,
-  Dynamic.t<inner>,
-  Indexed.t<unit>,
-  'b,
-) => Dynamic.t<inner>`  
+`let makeDynInner: (
+  contextInner,
+  option<input>,
+  Rxjs.Observable.t<input>,
+) => Dyn.t<Close.t<Form.t<inner, actionsInner<unit>>>>`  
 
 
-### FieldVector.Vector0.reduce
+### FieldVector.Vector0.makeDyn
   
-`let reduce: (
-  ~context: context,
-  Dynamic.t<t>,
-  Indexed.t<change>,
-) => Dynamic.t<t>`  
+`let makeDyn: (
+  context,
+  option<input>,
+  Rxjs.Observable.t<input>,
+  option<Rxjs.Observable.t<unit>>,
+) => Dyn.t<Close.t<Form.t<t, actions<unit>>>>`  
 
 
 ### FieldVector.VectorRec
@@ -504,14 +481,19 @@
 `let set: input => t`  
 
 
+### FieldVector.VectorRec.Make.emptyInner
+  
+`let emptyInner: contextInner => inner`  
+
+
 ### FieldVector.VectorRec.Make.empty
   
-`let empty: contextInner => inner`  
+`let empty: context => inner`  
 
 
 ### FieldVector.VectorRec.Make.init
   
-`let init: contextInner => Store.t<inner, 'a, 'b>`  
+`let init: context => Store.t<inner, 'a, 'b>`  
 
 
 ### FieldVector.VectorRec.Make.validateOut
@@ -554,97 +536,118 @@
 ### FieldVector.VectorRec.Make.makeStore
   
 `let makeStore: (
-  ~validate: (inner, output) => Dynamic.t<t>,
+  ~validate: (inner, output) => Rxjs.t<
+    Rxjs.foreign,
+    Rxjs.void,
+    t,
+  >,
   inner,
-) => Dynamic.t<t>`  
+) => Rxjs.t<Rxjs.foreign, Rxjs.void, t>`  
 
 
 ### FieldVector.VectorRec.Make.validateInner
   
-`let validateInner: (contextInner, inner) => Dynamic.t<inner>`  
+`let validateInner: (
+  contextInner,
+  inner,
+) => Rxjs.t<Rxjs.foreign, Rxjs.void, inner>`  
 
 
 ### FieldVector.VectorRec.Make.validateImpl
   
-`let validateImpl: (context, t) => Dynamic.t<t>`  
+`let validateImpl: (context, t) => Rxjs.t<Rxjs.foreign, Rxjs.void, t>`  
 
 
 ### FieldVector.VectorRec.Make.validate
   
-`let validate: (bool, context, t) => Dynamic.t<t>`  
+`let validate: (bool, context, t) => Rxjs.t<Rxjs.foreign, Rxjs.void, t>`  
 
 
-### FieldVector.VectorRec.Make.changeInner
+### FieldVector.VectorRec.Make.actionsInner
   
-`type changeInner = Either.t<Head.change, Tail.changeInner>`  
+`type actionsInner<'change> = (
+  Head.actions<'change>,
+  Tail.actionsInner<'change>,
+)`  
 
 
-### FieldVector.VectorRec.Make.showChangeInner
+### FieldVector.VectorRec.Make.mapActionsInner
   
-`let showChangeInner: changeInner => string`  
-
-
-### FieldVector.VectorRec.Make.change
-  
-`type change = Change.t<input, changeInner>`  
-
-
-### FieldVector.VectorRec.Make.makeSet
-  
-`let makeSet: 'a => [> #Set('a)]`  
-
-
-### FieldVector.VectorRec.Make.showChange
-  
-`let showChange: change => string`  
+`let mapActionsInner: (
+  (Head.actions<'a>, Tail.actionsInner<'a>),
+  'a => 'b,
+) => (Head.actions<'b>, Tail.actionsInner<'b>)`  
 
 
 ### FieldVector.VectorRec.Make.actions
   
-`type actions = (Head.change => change, Tail.actions)`  
+`type actions<'change> = Actions.t<
+  input,
+  'change,
+  actionsInner<'change>,
+>`  
 
 
-### FieldVector.VectorRec.Make.actions
+### FieldVector.VectorRec.Make.mapActions
   
-`let actions: actions`  
+`let mapActions: (
+  Actions.t<
+    'a,
+    'b,
+    (Head.actions<'b>, Tail.actionsInner<'b>),
+  >,
+  'b => 'c,
+) => Actions.t<
+  'a,
+  'c,
+  (Head.actions<'c>, Tail.actionsInner<'c>),
+>`  
 
 
-### FieldVector.VectorRec.Make.reduceField
+### FieldVector.VectorRec.Make.partition
   
-`let reduceField: (
-  Rxjs.t<'a, 'b, ('c, 'd)>,
-  'e,
-  (Rxjs.t<'a, 'b, 'c>, 'e) => Rxjs.t<'f, 'g, 'h>,
-) => Rxjs.t<'f, 'g, ('h, 'd)>`  
+`type partition = (
+  Form.t<Head.t, Head.actions<unit>>,
+  Tail.partition,
+)`  
 
 
-### FieldVector.VectorRec.Make.reduceChannel
+### FieldVector.VectorRec.Make.splitInner
   
-`let reduceChannel: (
-  ~contextInner: contextInner,
-  Rxjs.t<Rxjs.foreign, Rxjs.void, (Head.t, Tail.inner)>,
-  Indexed.t<unit>,
-  changeInner,
-) => Rxjs.t<Rxjs.foreign, Rxjs.void, (Head.t, Tail.inner)>`  
+`let splitInner: (inner, actionsInner<unit>) => partition`  
 
 
-### FieldVector.VectorRec.Make.reduceSet
+### FieldVector.VectorRec.Make.split
   
-`let reduceSet: (
+`let split: Form.t<t, actions<unit>> => partition`  
+
+
+### FieldVector.VectorRec.Make.logField
+  
+`let logField: Rxjs.t<
+  'b,
+  'c,
+  Rxjs.t<'d, 'e, Close.t<Form.t<'t, 'a>>>,
+> => Rxjs.t<'b, 'c, Rxjs.t<'d, 'e, Close.t<Form.t<'t, 'a>>>>`  
+
+
+### FieldVector.VectorRec.Make.makeDynInner
+  
+`let makeDynInner: (
   contextInner,
-  Dynamic.t<inner>,
-  Indexed.t<unit>,
-  (Head.input, Tail.input),
-) => Dynamic.t<inner>`  
+  option<input>,
+  Rxjs.Observable.t<input>,
+) => Dyn.t<Close.t<Form.t<inner, actionsInner<unit>>>>`  
 
 
-### FieldVector.VectorRec.Make.reduce
+### FieldVector.VectorRec.Make.makeDyn
   
-`let reduce: (
-  ~context: context,
-  Dynamic.t<t>,
-  Indexed.t<change>,
-) => Dynamic.t<t>`  
+`let makeDyn: (
+  context,
+  option<input>,
+  Rxjs.Observable.t<input>,
+  option<Rxjs.Observable.t<unit>>,
+) => Dyn.t<Close.t<Form.t<t, actions<unit>>>>`  
 
 
 ### FieldVector.VectorRec.Make.toInputInner

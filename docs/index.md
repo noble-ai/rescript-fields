@@ -1,11 +1,59 @@
+# Close
+
+
+
+
+### Close.t
+  
+`type t<'pack> = {pack: 'pack, close: unit => unit}`  
+
+
+### Close.pack
+  
+`let pack: t<'pack> => 'pack`  
+
+
+### Close.close
+  
+`let close: (t<'pack>, unit) => unit`  
+
+
+### Close.map
+  
+`let map: (t<'a>, 'a => 'b) => t<'b>`  
+
+# Dyn
+
+
+
+
+### Dyn.dyn
+  
+`type dyn<'a> = Rxjs.Observable.t<Rxjs.Observable.t<'a>>`  
+
+
+### Dyn.t
+  
+`type t<'a> = {first: 'a, dyn: dyn<'a>}`  
+
+
+### Dyn.first
+  
+`let first: t<'a> => 'a`  
+
+
+### Dyn.dyn
+  
+`let dyn: t<'a> => dyn<'a>`  
+
+
+### Dyn.map
+  
+`let map: (t<'a>, 'a => 'b) => t<'b>`  
+
 # Dynamic
 
 
-
-
-### Dynamic.t
-  
-`type t<'a> = Rxjs.t<Rxjs.foreign, Rxjs.void, 'a>`  
 
 
 ### Dynamic.return
@@ -25,7 +73,7 @@
 
 ### Dynamic.toHistory
   
-`let toHistory: t<'a> => Js.Promise.t<Array.t<'a>>`  
+`let toHistory: Rxjs.t<'c, 's, 'out> => Js.Promise.t<Array.t<'out>>`  
 
 
 ### Dynamic.startWith
@@ -118,22 +166,41 @@
 
 ### Dynamic.bind
   
-`let bind: (t<'a>, 'a => t<'b>) => t<'b>`  
+`let bind: (
+  Rxjs.t<'ca, 'sa, 'out>,
+  'out => Rxjs.t<Rxjs.foreign, Rxjs.void, 'b>,
+) => Rxjs.t<'ca, 'sa, 'b>`  
 
 
 ### Dynamic.merge
   
-`let merge: (t<'a>, 'a => t<'b>) => t<'b>`  
+`let merge: (
+  Rxjs.t<'ca, 'sa, 'a>,
+  'a => Rxjs.t<Rxjs.foreign, Rxjs.void, 'b>,
+) => Rxjs.t<'ca, 'sa, 'b>`  
 
 
 ### Dynamic.switchMap
   
-`let switchMap: (t<'a>, 'a => t<'b>) => t<'b>`  
+`let switchMap: (
+  Rxjs.t<'ca, 'sa, 'a>,
+  'a => Rxjs.t<Rxjs.foreign, Rxjs.void, 'b>,
+) => Rxjs.t<'ca, 'sa, 'b>`  
+
+
+### Dynamic.switchSequence
+  
+`let switchSequence: Rxjs.t<'a, 'b, Rxjs.t<'c, 'd, 'e>> => Rxjs.t<'a, 'b, 'e>`  
 
 
 ### Dynamic.tap
   
 `let tap: (Rxjs.t<'a, 'b, 'c>, 'c => unit) => Rxjs.t<'a, 'b, 'c>`  
+
+
+### Dynamic.tap_
+  
+`let tap_: (Rxjs.t<'a, 'b, 'c>, 'c => unit) => unit`  
 
 
 ### Dynamic.filter
@@ -176,6 +243,24 @@
 ### Dynamic.keepMap
   
 `let keepMap: (Rxjs.t<'a, 'b, 'c>, 'c => option<'d>) => Rxjs.t<'a, 'b, 'd>`  
+
+
+### Dynamic.contramap
+  
+`let contramap: (Rxjs.Observer.t<'a>, 'b => 'a) => Rxjs.Observer.t<'b>`  
+
+
+### Dynamic.contrafilter
+  
+`let contrafilter: (
+  Rxjs.Observer.t<'a>,
+  'b => option<'a>,
+) => Rxjs.Observer.t<'b>`  
+
+
+### Dynamic.contraCatOptions
+  
+`let contraCatOptions: Rxjs.Observer.t<'a> => Rxjs.Observer.t<option<'a>>`  
 
 
 ### Dynamic.partition2
@@ -285,7 +370,7 @@
 ### Dynamic.finalizeWithValue
   
 `let finalizeWithValue: (
-  t<'o>,
+  Rxjs.t<'c, 's, 'o>,
   option<'o> => unit,
 ) => Rxjs.t<Rxjs.foreign, Rxjs.void, 'o>`  
 
@@ -297,12 +382,35 @@
 
 ### Dynamic.jitter
   
-`let jitter: t<'a> => t<'a>`  
+`let jitter: Rxjs.t<'a, 'b, 'c> => Rxjs.t<'a, 'b, 'c>`  
+
+
+### Dynamic._log
+  
+`let _log: (
+  ~enable: bool=?,
+  Rxjs.t<'a, 'b, 'c>,
+  'd,
+) => Rxjs.t<'a, 'b, 'c>`  
 
 
 ### Dynamic.log
   
-`let log: (Rxjs.t<'a, 'b, 'c>, 'd) => Rxjs.t<'a, 'b, 'c>`  
+`let log: (
+  ~enable: bool=?,
+  Rxjs.t<'a, 'b, 'c>,
+  'd,
+) => Rxjs.t<'a, 'b, 'c>`  
+
+
+### Dynamic.log_
+  
+`let log_: (~enable: bool=?, Rxjs.t<'a, 'b, 'c>, 'd) => unit`  
+
+
+### Dynamic.mapLog
+  
+`let mapLog: (Rxjs.t<'a, 'b, 'c>, 'd, 'c => 'e) => Rxjs.t<'a, 'b, 'c>`  
 
 # Field
 
@@ -368,41 +476,27 @@ that a module passed to the function has each of these types and values.
 
 ### Field.T.validate
   
-`let validate: (bool, context, t) => Dynamic.t<t>`  
-
-
-### Field.T.change
-  
-`type change`  
+`let validate: (bool, context, t) => Rxjs.t<Rxjs.foreign, Rxjs.void, t>`  
 
 
 ### Field.T.actions
   
-`type actions`  
+`type actions<'change>`  
 
 
-### Field.T.actions
+### Field.T.mapActions
   
-`let actions: actions`  
+`let mapActions: (actions<'change>, 'change => 'b) => actions<'b>`  
 
 
-### Field.T.makeSet
+### Field.T.makeDyn
   
-`let makeSet: input => change`  
-
-
-### Field.T.showChange
-  
-`let showChange: change => string`  
-
-
-### Field.T.reduce
-  
-`let reduce: (
-  ~context: context,
-  Dynamic.t<t>,
-  Indexed.t<change>,
-) => Dynamic.t<t>`  
+`let makeDyn: (
+  context,
+  option<input>,
+  Rxjs.Observable.t<input>,
+  option<Rxjs.Observable.t<unit>>,
+) => Dyn.t<Close.t<Form.t<t, actions<unit>>>>`  
 
 
 ### Field.T.inner
@@ -444,7 +538,6 @@ that a module passed to the function has each of these types and values.
   
 `let printErrorArray: Array.t<option<string>> => option<string>`  
 
-
 # FieldArray
 
 
@@ -455,11 +548,13 @@ that a module passed to the function has each of these types and values.
   
 ### FieldArray.Context.structure
   
-`type structure<'output, 'element> = {
+`type structure<'output, 'element, 'empty> = {
   validate?: array<'output> => Prelude.Promise.t<
     Prelude.Result.t<unit, string>,
   >,
   element: 'element,
+  empty?: unit => array<'empty>,
+  validateImmediate?: bool,
 }`  
 
 
@@ -474,19 +569,14 @@ that a module passed to the function has each of these types and values.
 ### FieldArray.IArray
   
   
+### FieldArray.IArray.t
+  
+`type t`  
+
+
 ### FieldArray.IArray.filter
   
-`let filter: array<F.t> => array<F.t>`  
-
-
-### FieldArray.IArray.empty
-  
-`let empty: Context.structure<F.output, F.context> => array<F.t>`  
-
-
-### FieldArray.IArray.validateImmediate
-  
-`let validateImmediate: bool`  
+`let filter: array<t> => array<t>`  
 
 
 ### FieldArray.filterIdentity
@@ -499,8 +589,286 @@ that a module passed to the function has each of these types and values.
 `let filterGrace: array<'t> => Array.t<'t>`  
 
 
+### FieldArray.actions
+  
+`type actions<'finput, 'factions, 'out> = {
+  set: array<'finput> => 'out,
+  add: option<'finput> => 'out,
+  remove: int => 'out,
+  opt: option<array<'finput>> => 'out,
+  clear: unit => 'out,
+  reset: unit => 'out,
+  index: int => option<'factions>,
+}`  
+
+
+### FieldArray.T
+  
+  
+### FieldArray.T.context
+  
+`type context`  
+
+
+### FieldArray.T.input
+  
+`type input`  
+
+
+### FieldArray.T.showInput
+  
+`let showInput: input => string`  
+
+
+### FieldArray.T.output
+  
+`type output`  
+
+
+### FieldArray.T.error
+  
+`type error`  
+
+
+### FieldArray.T.inner
+  
+`type inner`  
+
+
+### FieldArray.T.t
+  
+`type t`  
+
+
+### FieldArray.T.empty
+  
+`let empty: context => inner`  
+
+
+### FieldArray.T.init
+  
+`let init: context => t`  
+
+
+### FieldArray.T.set
+  
+`let set: input => t`  
+
+
+### FieldArray.T.validate
+  
+`let validate: (bool, context, t) => Rxjs.t<Rxjs.foreign, Rxjs.void, t>`  
+
+
+### FieldArray.T.actions
+  
+`type actions<'change>`  
+
+
+### FieldArray.T.mapActions
+  
+`let mapActions: (actions<'change>, 'change => 'b) => actions<'b>`  
+
+
+### FieldArray.T.makeDyn
+  
+`let makeDyn: (
+  context,
+  option<input>,
+  Rxjs.Observable.t<input>,
+  option<Rxjs.Observable.t<unit>>,
+) => Dyn.t<Close.t<Form.t<t, actions<unit>>>>`  
+
+
+### FieldArray.T.inner
+  
+`let inner: t => inner`  
+
+
+### FieldArray.T.input
+  
+`let input: t => input`  
+
+
+### FieldArray.T.output
+  
+`let output: t => option<output>`  
+
+
+### FieldArray.T.error
+  
+`let error: t => option<error>`  
+
+
+### FieldArray.T.enum
+  
+`let enum: t => Store.enum`  
+
+
+### FieldArray.T.show
+  
+`let show: t => string`  
+
+
+### FieldArray.T.printError
+  
+`let printError: t => option<string>`  
+
+
+### FieldArray.T.inputElement
+  
+`type inputElement`  
+
+
+### FieldArray.T.parted
+  
+`type parted`  
+
+
+### FieldArray.T.split
+  
+`let split: Form.t<t, actions<unit>> => parted`  
+
+
+### FieldArray.error
+  
+`type error = [#Part | #Whole(string)]`  
+
+
 ### FieldArray.Make
   
+  
+### FieldArray.Make.context
+  
+`type context = Context.structure<
+  F.output,
+  F.context,
+  F.input,
+>`  
+
+
+### FieldArray.Make.input
+  
+`type input = array<F.input>`  
+
+
+### FieldArray.Make.showInput
+  
+`let showInput: input => string`  
+
+
+### FieldArray.Make.output
+  
+`type output = array<F.output>`  
+
+
+### FieldArray.Make.error
+  
+`type error = error`  
+
+
+### FieldArray.Make.inner
+  
+`type inner = array<F.t>`  
+
+
+### FieldArray.Make.t
+  
+`type t = Store.t<array<F.t>, array<F.output>, error>`  
+
+
+### FieldArray.Make.empty
+  
+`let empty: context => inner`  
+
+
+### FieldArray.Make.init
+  
+`let init: context => t`  
+
+
+### FieldArray.Make.set
+  
+`let set: input => t`  
+
+
+### FieldArray.Make.validate
+  
+`let validate: (bool, context, t) => Rxjs.t<Rxjs.foreign, Rxjs.void, t>`  
+
+
+### FieldArray.Make.actions
+  
+`type actions<'change> = actions<
+  F.input,
+  F.actions<'change>,
+  'change,
+>`  
+
+
+### FieldArray.Make.mapActions
+  
+`let mapActions: (actions<'change>, 'change => 'b) => actions<'b>`  
+
+
+### FieldArray.Make.makeDyn
+  
+`let makeDyn: (
+  context,
+  option<input>,
+  Rxjs.Observable.t<input>,
+  option<Rxjs.Observable.t<unit>>,
+) => Dyn.t<Close.t<Form.t<t, actions<unit>>>>`  
+
+
+### FieldArray.Make.inner
+  
+`let inner: t => inner`  
+
+
+### FieldArray.Make.input
+  
+`let input: t => input`  
+
+
+### FieldArray.Make.output
+  
+`let output: t => option<output>`  
+
+
+### FieldArray.Make.error
+  
+`let error: t => option<error>`  
+
+
+### FieldArray.Make.enum
+  
+`let enum: t => Store.enum`  
+
+
+### FieldArray.Make.show
+  
+`let show: t => string`  
+
+
+### FieldArray.Make.printError
+  
+`let printError: t => option<string>`  
+
+
+### FieldArray.Make.inputElement
+  
+`type inputElement = F.input`  
+
+
+### FieldArray.Make.parted
+  
+`type parted = array<Form.t<F.t, F.actions<unit>>>`  
+
+
+### FieldArray.Make.split
+  
+`let split: Form.t<t, actions<unit>> => parted`  
 
 # FieldCheck
 
@@ -559,41 +927,27 @@ that a module passed to the function has each of these types and values.
 
 ### FieldCheck.validate
   
-`let validate: ('a, context, t) => Dynamic.t<t>`  
-
-
-### FieldCheck.change
-  
-`type change = [#Set(input)]`  
-
-
-### FieldCheck.makeSet
-  
-`let makeSet: 'a => [> #Set('a)]`  
-
-
-### FieldCheck.showChange
-  
-`let showChange: change => string`  
+`let validate: ('a, context, t) => Rxjs.t<Rxjs.foreign, Rxjs.void, t>`  
 
 
 ### FieldCheck.actions
   
-`type actions = {set: input => change}`  
+`type actions<'change> = {set: input => 'change}`  
 
 
-### FieldCheck.actions
+### FieldCheck.mapActions
   
-`let actions: actions`  
+`let mapActions: (actions<'a>, 'a => 'b) => actions<'b>`  
 
 
-### FieldCheck.reduce
+### FieldCheck.makeDyn
   
-`let reduce: (
-  ~context: context,
-  Dynamic.t<t>,
-  Indexed.t<change>,
-) => Dynamic.t<t>`  
+`let makeDyn: (
+  context,
+  option<input>,
+  Rxjs.Observable.t<input>,
+  option<Rxjs.Observable.t<unit>>,
+) => Dyn.t<Close.t<Form.t<t, actions<unit>>>>`  
 
 
 ### FieldCheck.inner
@@ -630,104 +984,7 @@ that a module passed to the function has each of these types and values.
   
 `let printError: t => option<'a>`  
 
-# FieldChoice
-
-
-
-
-### FieldChoice.Make
-  
-  
-### FieldChoice.Make.context
-  
-`type context = array<T.t>`  
-
-
-### FieldChoice.Make.input
-  
-`type input = T.t`  
-
-
-### FieldChoice.Make.output
-  
-`type output = T.t`  
-
-
-### FieldChoice.Make.error
-  
-`type error = unit`  
-
-
-### FieldChoice.Make.inner
-  
-`type inner = T.t`  
-
-
-### FieldChoice.Make.t
-  
-`type t = Store.t<inner, output, error>`  
-
-
-### FieldChoice.Make.empty
-  
-`let empty: Array.t<'a> => 'a`  
-
-
-### FieldChoice.Make.init
-  
-`let init: context => Store.t<T.t, 'a, 'b>`  
-
-
-### FieldChoice.Make.set
-  
-`let set: 'a => Store.t<'a, 'b, 'c>`  
-
-
-### FieldChoice.Make.validate
-  
-`let validate: (~force: bool=?, 'a, t) => Dynamic.t<t>`  
-
-
-### FieldChoice.Make.change
-  
-`type change = T.t`  
-
-
-### FieldChoice.Make.reduce
-  
-`let reduce: (~context: context, t, Indexed.t<change>) => Dynamic.t<t>`  
-
-
-### FieldChoice.Make.enum
-  
-`let enum: Store.t<'a, 'b, 'c> => Store.enum`  
-
-
-### FieldChoice.Make.inner
-  
-`let inner: Store.t<'a, 'b, 'c> => 'a`  
-
-
-### FieldChoice.Make.input
-  
-`let input: Store.t<'a, 'b, 'c> => 'a`  
-
-
-### FieldChoice.Make.error
-  
-`let error: Store.t<'a, 'b, 'c> => option<'c>`  
-
-
-### FieldChoice.Make.output
-  
-`let output: Store.t<'a, 'b, 'c> => option<'b>`  
-
-
-### FieldChoice.Make.printError
-  
-`let printError: 'a => option<'b>`  
-
-invalid kind
+unhandled kind moduleAlias
 # FieldEmpty
 
 
@@ -737,241 +994,10 @@ Here as a touchpoint for copypaste
 
 
 
-invalid kind
-invalid kind
-invalid kind
-invalid kind
-# FieldString
-
-
-
-
-### FieldString.error
-  
-`type error = [
-  | #Empty
-  | #External(string)
-  | #TooLong
-  | #TooShort
-]`  
-
-
-### FieldString.validate
-  
-`type validate = string => Prelude.Promise.t<
-  Prelude.Result.t<string, error>,
->`  
-
-
-### FieldString.context
-  
-`type context = {validate?: validate}`  
-
-
-### FieldString.length
-  
-`let length: (~min: int=?, ~max: int=?, unit) => validate`  
-
-
-### FieldString.min
-  
-`let min: 'a => option<(option<'a>, option<'b>)>`  
-
-
-### FieldString.max
-  
-`let max: 'a => option<(option<'b>, option<'a>)>`  
-
-
-### FieldString.minmax
-  
-`let minmax: ('a, 'b) => option<(option<'a>, option<'b>)>`  
-
-
-### FieldString.input
-  
-`type input = string`  
-
-
-### FieldString.output
-  
-`type output = string`  
-
-
-### FieldString.inner
-  
-`type inner = string`  
-
-
-### FieldString.t
-  
-`type t = Store.t<inner, output, error>`  
-
-
-### FieldString.IString
-  
-  
-### FieldString.IString.validateImmediate
-  
-`let validateImmediate: bool`  
-
-
-### FieldString.change
-  
-`type change<'set> = [
-  | #Clear
-  | #Reset
-  | #Set('set)
-  | #Validate
-]`  
-
-
-### FieldString.actions
-  
-`type actions<'set> = {
-  clear: unit => change<'set>,
-  reset: unit => change<'set>,
-  validate: unit => change<'set>,
-  set: 'set => change<'set>,
-}`  
-
-
-### FieldString.Make
-  
-  
-### FieldString.Make.error
-  
-`type error = error`  
-
-
-### FieldString.Make.validate
-  
-`type validate = validate`  
-
-
-### FieldString.Make.context
-  
-`type context = context`  
-
-
-### FieldString.Make.input
-  
-`type input = input`  
-
-
-### FieldString.Make.output
-  
-`type output = output`  
-
-
-### FieldString.Make.inner
-  
-`type inner = inner`  
-
-
-### FieldString.Make.t
-  
-`type t = t`  
-
-
-### FieldString.Make.showInput
-  
-`let showInput: input => string`  
-
-
-### FieldString.Make.empty
-  
-`let empty: 'a => string`  
-
-
-### FieldString.Make.init
-  
-`let init: 'a => Store.t<string, 'b, 'c>`  
-
-
-### FieldString.Make.set
-  
-`let set: 'a => Store.t<'a, 'b, 'c>`  
-
-
-### FieldString.Make.validate
-  
-`let validate: (bool, context, t) => Dynamic.t<t>`  
-
-
-### FieldString.Make.change
-  
-`type change = change<input>`  
-
-
-### FieldString.Make.makeSet
-  
-`let makeSet: 'a => [> #Set('a)]`  
-
-
-### FieldString.Make.showChange
-  
-`let showChange: change => string`  
-
-
-### FieldString.Make.actions
-  
-`type actions = actions<input>`  
-
-
-### FieldString.Make.actions
-  
-`let actions: actions<'a>`  
-
-
-### FieldString.Make.reduce
-  
-`let reduce: (
-  ~context: context,
-  Dynamic.t<t>,
-  Indexed.t<change>,
-) => Dynamic.t<t>`  
-
-
-### FieldString.Make.enum
-  
-`let enum: Store.t<'a, 'b, 'c> => Store.enum`  
-
-
-### FieldString.Make.inner
-  
-`let inner: Store.t<'a, 'b, 'c> => 'a`  
-
-
-### FieldString.Make.input
-  
-`let input: Store.t<'a, 'b, 'c> => 'a`  
-
-
-### FieldString.Make.output
-  
-`let output: Store.t<'a, 'b, 'c> => option<'b>`  
-
-
-### FieldString.Make.error
-  
-`let error: Store.t<'a, 'b, 'c> => option<'c>`  
-
-
-### FieldString.Make.show
-  
-`let show: t => string`  
-
-
-### FieldString.Make.printError
-  
-`let printError: t => option<string>`  
-
-
-### FieldString.contextNonEmpty
-  
-`let contextNonEmpty: context`  
-
+unhandled kind moduleAlias
+unhandled kind moduleAlias
+unhandled kind moduleAlias
+unhandled kind moduleAlias
 # FieldSum
 
 
@@ -1027,7 +1053,12 @@ invalid kind
   
 ### FieldVector.Context.t
   
-`type t<'e, 'v, 'i> = {empty?: 'e, validate?: 'v, inner: 'i}`  
+`type t<'e, 'v, 'i> = {
+  empty?: 'e,
+  validate?: 'v,
+  inner: 'i,
+  validateImmediate?: bool,
+}`  
 
 
 ### FieldVector.Context.empty
@@ -1055,49 +1086,28 @@ invalid kind
 ) => t<'b, 'd, 'f>`  
 
 
-### FieldVector.Change
-  
-  
-### FieldVector.Change.t
-  
-`type t<'input, 'inner> = [
-  | #Clear
-  | #Inner('inner)
-  | #Set('input)
-  | #Validate
-]`  
-
-
-### FieldVector.Change.makeSet
-  
-`let makeSet: 'a => [> #Set('a)]`  
-
-
-### FieldVector.Change.bimap
-  
-`let bimap: (
-  'a => 'b,
-  'c => 'd,
-  [< #Clear | #Inner('c) | #Set('a) | #Validate],
-) => [> #Clear | #Inner('d) | #Set('b) | #Validate]`  
-
-
-### FieldVector.Change.show
-  
-`let show: t<string, string> => string`  
-
-
 ### FieldVector.Actions
   
   
 ### FieldVector.Actions.t
   
-`type t<'input, 'inner, 'actionsInner> = {
-  set: 'input => Change.t<'input, 'inner>,
-  clear: unit => Change.t<'input, 'inner>,
-  inner: 'actionsInner,
-  validate: unit => Change.t<'input, 'inner>,
+`type t<'input, 'change, 'inner> = {
+  set: 'input => 'change,
+  clear: unit => 'change,
+  opt: option<'input> => 'change,
+  inner: 'inner,
+  validate: unit => 'change,
 }`  
+
+
+### FieldVector.Actions.trimap
+  
+`let trimap: (
+  t<'a, 'b, 'c>,
+  'd => 'a,
+  'b => 'e,
+  'c => 'f,
+) => t<'d, 'e, 'f>`  
 
 
 ### FieldVector.const
@@ -1122,14 +1132,6 @@ invalid kind
 >`  
 
 
-### FieldVector.Interface
-  
-  
-### FieldVector.Interface.validateImmediate
-  
-`let validateImmediate: bool`  
-
-
 ### FieldVector.Tail
   
   
@@ -1138,9 +1140,19 @@ invalid kind
 `type contextInner`  
 
 
+### FieldVector.Tail.context
+  
+`type context`  
+
+
 ### FieldVector.Tail.input
   
 `type input`  
+
+
+### FieldVector.Tail.t
+  
+`type t`  
 
 
 ### FieldVector.Tail.inner
@@ -1151,11 +1163,6 @@ invalid kind
 ### FieldVector.Tail.output
   
 `type output`  
-
-
-### FieldVector.Tail.t
-  
-`type t`  
 
 
 ### FieldVector.Tail.showInput
@@ -1173,9 +1180,14 @@ invalid kind
 `let set: input => t`  
 
 
+### FieldVector.Tail.emptyInner
+  
+`let emptyInner: contextInner => inner`  
+
+
 ### FieldVector.Tail.empty
   
-`let empty: contextInner => inner`  
+`let empty: context => inner`  
 
 
 ### FieldVector.Tail.hasEnum
@@ -1190,47 +1202,39 @@ invalid kind
 
 ### FieldVector.Tail.validateInner
   
-`let validateInner: (contextInner, inner) => Dynamic.t<inner>`  
-
-
-### FieldVector.Tail.changeInner
-  
-`type changeInner`  
-
-
-### FieldVector.Tail.showChangeInner
-  
-`let showChangeInner: changeInner => string`  
-
-
-### FieldVector.Tail.actions
-  
-`type actions`  
-
-
-### FieldVector.Tail.actions
-  
-`let actions: actions`  
-
-
-### FieldVector.Tail.reduceChannel
-  
-`let reduceChannel: (
-  ~contextInner: contextInner,
-  Dynamic.t<inner>,
-  Indexed.t<unit>,
-  changeInner,
-) => Dynamic.t<inner>`  
-
-
-### FieldVector.Tail.reduceSet
-  
-`let reduceSet: (
+`let validateInner: (
   contextInner,
-  Dynamic.t<inner>,
-  Indexed.t<unit>,
-  input,
-) => Dynamic.t<inner>`  
+  inner,
+) => Rxjs.t<Rxjs.foreign, Rxjs.void, inner>`  
+
+
+### FieldVector.Tail.actionsInner
+  
+`type actionsInner<'change>`  
+
+
+### FieldVector.Tail.mapActionsInner
+  
+`let mapActionsInner: (actionsInner<'change>, 'change => 'b) => actionsInner<'b>`  
+
+
+### FieldVector.Tail.partition
+  
+`type partition`  
+partition is opaque here but will be a composition of Form.t
+
+### FieldVector.Tail.splitInner
+  
+`let splitInner: (inner, actionsInner<unit>) => partition`  
+
+
+### FieldVector.Tail.makeDynInner
+  
+`let makeDynInner: (
+  contextInner,
+  option<input>,
+  Rxjs.Observable.t<input>,
+) => Dyn.t<Close.t<Form.t<inner, actionsInner<unit>>>>`  
 
 
 ### FieldVector.Tail.toInputInner
@@ -1316,9 +1320,14 @@ invalid kind
 `let set: unit => t`  
 
 
+### FieldVector.Vector0.emptyInner
+  
+`let emptyInner: contextInner => inner`  
+
+
 ### FieldVector.Vector0.empty
   
-`let empty: unit => inner`  
+`let empty: contextInner => inner`  
 
 
 ### FieldVector.Vector0.initInner
@@ -1343,12 +1352,12 @@ invalid kind
 
 ### FieldVector.Vector0.validateInner
   
-`let validateInner: ('a, inner) => Dynamic.t<inner>`  
+`let validateInner: ('a, inner) => Rxjs.t<Rxjs.foreign, Rxjs.void, inner>`  
 
 
 ### FieldVector.Vector0.validate
   
-`let validate: ('a, context, t) => Dynamic.t<t>`  
+`let validate: ('a, context, t) => Rxjs.t<Rxjs.foreign, Rxjs.void, t>`  
 
 
 ### FieldVector.Vector0.inner
@@ -1391,63 +1400,57 @@ invalid kind
 `let show: t => string`  
 
 
-### FieldVector.Vector0.changeInner
+### FieldVector.Vector0.actionsInner
   
-`type changeInner = unit`  
+`type actionsInner<'change> = unit`  
 
 
-### FieldVector.Vector0.showChangeInner
+### FieldVector.Vector0.mapActionsInner
   
-`let showChangeInner: changeInner => string`  
-
-
-### FieldVector.Vector0.change
-  
-`type change = unit`  
-
-
-### FieldVector.Vector0.showChange
-  
-`let showChange: unit => string`  
+`let mapActionsInner: ('a, 'b) => unit`  
 
 
 ### FieldVector.Vector0.actions
   
-`type actions = unit`  
+`type actions<'change> = Actions.t<
+  input,
+  'change,
+  actionsInner<'change>,
+>`  
 
 
-### FieldVector.Vector0.toChange
+### FieldVector.Vector0.mapActions
   
-`let toChange: ('a, 'b) => change`  
+`let mapActions: (Actions.t<'a, 'b, 'c>, 'c => 'd) => Actions.t<'a, unit, 'd>`  
 
 
-### FieldVector.Vector0.actions
+### FieldVector.Vector0.partition
   
-`let actions: actions`  
+`type partition = unit`  
 
 
-### FieldVector.Vector0.reduceChannel
+### FieldVector.Vector0.splitInner
   
-`let reduceChannel: (~contextInner: 'a, 'b, 'c, changeInner) => Dynamic.t<inner>`  
+`let splitInner: ('a, 'b) => unit`  
 
 
-### FieldVector.Vector0.reduceSet
+### FieldVector.Vector0.makeDynInner
   
-`let reduceSet: (
-  'a,
-  Dynamic.t<inner>,
-  Indexed.t<unit>,
-  'b,
-) => Dynamic.t<inner>`  
+`let makeDynInner: (
+  contextInner,
+  option<input>,
+  Rxjs.Observable.t<input>,
+) => Dyn.t<Close.t<Form.t<inner, actionsInner<unit>>>>`  
 
 
-### FieldVector.Vector0.reduce
+### FieldVector.Vector0.makeDyn
   
-`let reduce: (
-  ~context: context,
-  Dynamic.t<t>,
-  Indexed.t<change>,
-) => Dynamic.t<t>`  
+`let makeDyn: (
+  context,
+  option<input>,
+  Rxjs.Observable.t<input>,
+  option<Rxjs.Observable.t<unit>>,
+) => Dyn.t<Close.t<Form.t<t, actions<unit>>>>`  
 
 
 ### FieldVector.VectorRec
@@ -1506,14 +1509,19 @@ invalid kind
 `let set: input => t`  
 
 
+### FieldVector.VectorRec.Make.emptyInner
+  
+`let emptyInner: contextInner => inner`  
+
+
 ### FieldVector.VectorRec.Make.empty
   
-`let empty: contextInner => inner`  
+`let empty: context => inner`  
 
 
 ### FieldVector.VectorRec.Make.init
   
-`let init: contextInner => Store.t<inner, 'a, 'b>`  
+`let init: context => Store.t<inner, 'a, 'b>`  
 
 
 ### FieldVector.VectorRec.Make.validateOut
@@ -1556,97 +1564,118 @@ invalid kind
 ### FieldVector.VectorRec.Make.makeStore
   
 `let makeStore: (
-  ~validate: (inner, output) => Dynamic.t<t>,
+  ~validate: (inner, output) => Rxjs.t<
+    Rxjs.foreign,
+    Rxjs.void,
+    t,
+  >,
   inner,
-) => Dynamic.t<t>`  
+) => Rxjs.t<Rxjs.foreign, Rxjs.void, t>`  
 
 
 ### FieldVector.VectorRec.Make.validateInner
   
-`let validateInner: (contextInner, inner) => Dynamic.t<inner>`  
+`let validateInner: (
+  contextInner,
+  inner,
+) => Rxjs.t<Rxjs.foreign, Rxjs.void, inner>`  
 
 
 ### FieldVector.VectorRec.Make.validateImpl
   
-`let validateImpl: (context, t) => Dynamic.t<t>`  
+`let validateImpl: (context, t) => Rxjs.t<Rxjs.foreign, Rxjs.void, t>`  
 
 
 ### FieldVector.VectorRec.Make.validate
   
-`let validate: (bool, context, t) => Dynamic.t<t>`  
+`let validate: (bool, context, t) => Rxjs.t<Rxjs.foreign, Rxjs.void, t>`  
 
 
-### FieldVector.VectorRec.Make.changeInner
+### FieldVector.VectorRec.Make.actionsInner
   
-`type changeInner = Either.t<Head.change, Tail.changeInner>`  
+`type actionsInner<'change> = (
+  Head.actions<'change>,
+  Tail.actionsInner<'change>,
+)`  
 
 
-### FieldVector.VectorRec.Make.showChangeInner
+### FieldVector.VectorRec.Make.mapActionsInner
   
-`let showChangeInner: changeInner => string`  
-
-
-### FieldVector.VectorRec.Make.change
-  
-`type change = Change.t<input, changeInner>`  
-
-
-### FieldVector.VectorRec.Make.makeSet
-  
-`let makeSet: 'a => [> #Set('a)]`  
-
-
-### FieldVector.VectorRec.Make.showChange
-  
-`let showChange: change => string`  
+`let mapActionsInner: (
+  (Head.actions<'a>, Tail.actionsInner<'a>),
+  'a => 'b,
+) => (Head.actions<'b>, Tail.actionsInner<'b>)`  
 
 
 ### FieldVector.VectorRec.Make.actions
   
-`type actions = (Head.change => change, Tail.actions)`  
+`type actions<'change> = Actions.t<
+  input,
+  'change,
+  actionsInner<'change>,
+>`  
 
 
-### FieldVector.VectorRec.Make.actions
+### FieldVector.VectorRec.Make.mapActions
   
-`let actions: actions`  
+`let mapActions: (
+  Actions.t<
+    'a,
+    'b,
+    (Head.actions<'b>, Tail.actionsInner<'b>),
+  >,
+  'b => 'c,
+) => Actions.t<
+  'a,
+  'c,
+  (Head.actions<'c>, Tail.actionsInner<'c>),
+>`  
 
 
-### FieldVector.VectorRec.Make.reduceField
+### FieldVector.VectorRec.Make.partition
   
-`let reduceField: (
-  Rxjs.t<'a, 'b, ('c, 'd)>,
-  'e,
-  (Rxjs.t<'a, 'b, 'c>, 'e) => Rxjs.t<'f, 'g, 'h>,
-) => Rxjs.t<'f, 'g, ('h, 'd)>`  
+`type partition = (
+  Form.t<Head.t, Head.actions<unit>>,
+  Tail.partition,
+)`  
 
 
-### FieldVector.VectorRec.Make.reduceChannel
+### FieldVector.VectorRec.Make.splitInner
   
-`let reduceChannel: (
-  ~contextInner: contextInner,
-  Rxjs.t<Rxjs.foreign, Rxjs.void, (Head.t, Tail.inner)>,
-  Indexed.t<unit>,
-  changeInner,
-) => Rxjs.t<Rxjs.foreign, Rxjs.void, (Head.t, Tail.inner)>`  
+`let splitInner: (inner, actionsInner<unit>) => partition`  
 
 
-### FieldVector.VectorRec.Make.reduceSet
+### FieldVector.VectorRec.Make.split
   
-`let reduceSet: (
+`let split: Form.t<t, actions<unit>> => partition`  
+
+
+### FieldVector.VectorRec.Make.logField
+  
+`let logField: Rxjs.t<
+  'b,
+  'c,
+  Rxjs.t<'d, 'e, Close.t<Form.t<'t, 'a>>>,
+> => Rxjs.t<'b, 'c, Rxjs.t<'d, 'e, Close.t<Form.t<'t, 'a>>>>`  
+
+
+### FieldVector.VectorRec.Make.makeDynInner
+  
+`let makeDynInner: (
   contextInner,
-  Dynamic.t<inner>,
-  Indexed.t<unit>,
-  (Head.input, Tail.input),
-) => Dynamic.t<inner>`  
+  option<input>,
+  Rxjs.Observable.t<input>,
+) => Dyn.t<Close.t<Form.t<inner, actionsInner<unit>>>>`  
 
 
-### FieldVector.VectorRec.Make.reduce
+### FieldVector.VectorRec.Make.makeDyn
   
-`let reduce: (
-  ~context: context,
-  Dynamic.t<t>,
-  Indexed.t<change>,
-) => Dynamic.t<t>`  
+`let makeDyn: (
+  context,
+  option<input>,
+  Rxjs.Observable.t<input>,
+  option<Rxjs.Observable.t<unit>>,
+) => Dyn.t<Close.t<Form.t<t, actions<unit>>>>`  
 
 
 ### FieldVector.VectorRec.Make.toInputInner
@@ -1726,7 +1755,36 @@ invalid kind
 ### FieldVector.Vector7
   
 
-invalid kind
+unhandled kind moduleAlias
+# Form
+
+
+In traversing a field tree, it gets painful to manage adjusting your field type and the change nesting in parallel.  
+	but we know enough in fields to do that parallel partition for you.  
+	this type then contains a field and actions appropriate for one level in the tree.  
+	onChange also included in cases where you have a change directly at the level of this field  
+	and havnt yet or cant convert to actions. I go back and forth about functionalalizing. but the deeply nested change typese  
+	were hard for people to reason about....
+
+### Form.t
+  
+`type t<'f, 'actions> = {field: 'f, actions: 'actions}`  
+
+
+### Form.field
+  
+`let field: t<'f, 'actions> => 'f`  
+
+
+### Form.actions
+  
+`let actions: t<'f, 'actions> => 'actions`  
+
+
+### Form.bimap
+  
+`let bimap: (t<'a, 'b>, 'a => 'c, 'b => 'd) => t<'c, 'd>`  
+
 # Indexed
 
 
@@ -1822,7 +1880,7 @@ invalid kind
 
 ### Store.enumToA
   
-`let enumToA: enum => Js.String2.t`  
+`let enumToA: enum => Prelude.String.t`  
 
 
 ### Store.t
@@ -1899,209 +1957,19 @@ invalid kind
 
 
 
-### UseField.change
-  
-`type change<'change, 'update, 'complete> = {
-  change: 'change,
-  onUpdate?: 'update,
-  onComplete?: 'complete,
-}`  
-
-
-### UseField.applyLatest
-  
-`let applyLatest: (
-  ~setfield: ('a => 'b) => unit,
-  ~subject: Rxjs.t<'c, Rxjs.source<'b>, 'd>,
-  Rxjs.t<'e, 'f, 'b>,
-) => Rxjs.t<'e, 'f, 'b>`  
-
-
-### UseField.applyUpdate
-  
-`let applyUpdate: (
-  ~onUpdate: 'a => 'b=?,
-  Rxjs.t<'c, 'd, 'a>,
-) => Rxjs.t<'c, 'd, 'a>`  
-
-
-### UseField.applyComplete
-  
-`let applyComplete: (
-  ~onComplete: 'a => 'b=?,
-  Rxjs.t<'c, 'd, 'a>,
-) => Rxjs.t<'c, 'd, 'a>`  
-
-
-### UseField.applyOut
-  
-`let applyOut: (
-  ~value: 'a,
-  ~index: int,
-  ~out: Rxjs.t<'c, Rxjs.source<(int, 'a)>, 'o>,
-  Rxjs.t<'b, 'd, 'e>,
-) => Rxjs.t<'b, 'd, 'e>`  
-
-
-### UseField.applyChange
-  
-`let applyChange: (
-  ~reduce: (
-    Rxjs.t<Rxjs.foreign, Rxjs.void, 'a>,
-    Indexed.t<'ch>,
-  ) => Rxjs.t<Rxjs.foreign, Rxjs.void, 'b>,
-  ~subject: Rxjs.t<'c, Rxjs.source<'b>, 'a>,
-  ~setfield: ('d => 'b) => unit,
-  ~changeOut: Rxjs.t<
-    'e,
-    Rxjs.source<
-      (int, change<'ch, 'b => 'f, option<'b> => 'g>),
-    >,
-    'h,
-  >,
-  ~show: 'i,
-  int,
-  change<'ch, 'b => 'f, option<'b> => 'g>,
-) => Rxjs.t<Rxjs.foreign, Rxjs.void, 'b>`  
-
-
-### UseField.applyValidate
-  
-`let applyValidate: (
-  ~validate: (bool, 'a, 'b) => Rxjs.t<
-    Rxjs.foreign,
-    Rxjs.void,
-    'c,
-  >,
-  ~subject: Rxjs.t<'d, Rxjs.source<'c>, 'b>,
-  ~context: 'a,
-  ~setfield: ('e => 'c) => unit,
-  ('c => 'f, 'c => 'g),
-) => Rxjs.t<Rxjs.foreign, Rxjs.void, 'c>`  
-
-
-### UseField.applyFlush
-  
-`let applyFlush: (
-  ~subject: Rxjs.t<'a, 'b, 'c>,
-  'c => 'd,
-) => Rxjs.t<Rxjs.foreign, Rxjs.void, 'c>`  
-
-
-### UseField.keyByIndex
-  
-`let keyByIndex: Rxjs.t<'a, 'b, 'c> => Rxjs.t<'a, 'b, (int, 'c)>`  
-
-
-### UseField.scanActive
-  
-`let scanActive: (
-  Rxjs.t<'ca, 'sa, (int, 'a)>,
-  Rxjs.t<'cr, 'sr, (int, 'a)>,
-) => Rxjs.t<Rxjs.foreign, Rxjs.void, Prelude.Map.t<int, 'a>>`  
-
-
-### UseField.traverseIndexed
-  
-`let traverseIndexed: ('a => option<'b>, (int, 'a)) => option<(int, 'b)>`  
-
-
 ### UseField.Make
   
   
-### UseField.Make.input
+### UseField.Make.ret
   
-`type input = F.input`  
-
-
-### UseField.Make.output
-  
-`type output = F.output`  
-
-
-### UseField.Make.context
-  
-`type context = F.context`  
-
-
-### UseField.Make.reduce
-  
-`type reduce = (
-  ~onUpdate: F.t => unit=?,
-  ~onComplete: option<F.t> => unit=?,
-  F.change,
-) => unit`  
-
-
-### UseField.Make.return
-  
-`type return = {
-  field: F.t,
-  input: F.input,
-  output: option<F.output>,
-  reduce: reduce,
-  reducePromise: F.change => Prelude.Promise.t<option<F.t>>,
-  validate: (
-    ~onChange: F.t => unit,
-    ~onComplete: F.t => unit,
-  ) => unit,
-  validatePromise: unit => Prelude.Promise.t<F.t>,
-  flush: unit => Prelude.Promise.t<F.t>,
-  handleSubmit: (
-    F.output => Prelude.Promise.t<unit>,
-    ReactEvent.Form.t,
-  ) => unit,
-  handleOutput: (
-    F.output => Prelude.Promise.t<unit>,
-  ) => unit,
-}`  
-
-
-### UseField.Make.change
-  
-`type change = change<
-  F.change,
-  F.t => unit,
-  option<F.t> => unit,
->`  
-
-
-### UseField.Make.validate
-  
-`type validate = (F.t => unit, F.t => unit)`  
-
-
-### UseField.Make.sync
-  
-`type sync = [#Flush(F.t => unit) | #Validate(validate)]`  
-
-
-### UseField.Make.submit
-  
-`type submit = F.output => Prelude.Promise.t<unit>`  
-
-
-### UseField.Make.operation
-  
-`type operation = [#Change(change) | #Sync(sync)]`  
-
-
-### UseField.Make.toChange
-  
-`let toChange: [> #Change('a)] => option<'a>`  
-
-
-### UseField.Make.onCompleteOutput
-  
-`let onCompleteOutput: (submit, F.t) => unit`  
+`type ret = Form.t<F.t, F.actions<unit>>`  
 
 
 ### UseField.Make.use
   
 `let use: (
-  ~context: context,
-  ~init: F.input=?,
-  ~validateInit: bool=?,
-  unit,
-) => return`  
+  ~context: F.context,
+  ~init: option<F.input>,
+  ~validateInit: 'a,
+) => ret`  
 
