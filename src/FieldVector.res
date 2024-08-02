@@ -363,6 +363,45 @@ module VectorRec = {
 
     {first, dyn}
   }
+    
+  let toInputInner = (inner: inner) => (Head.input, Tail.toInputInner)->Tuple.Tuple2.napply(inner)
+  let input = (store: t) =>
+    (Head.input, Tail.toInputInner)->Tuple.Tuple2.napply(store->Store.inner)
+
+  let inner = Store.inner
+  let output = Store.output
+  let error = Store.error
+  let enum = Store.toEnum
+
+  let printErrorInner = (inner: inner) => {
+    let (head, tail) = (Head.printError, Tail.printErrorInner)->Tuple.Tuple2.napply(inner)
+    Array.concat([head], tail)
+  }
+
+  let printError = (store: t) => {
+    store
+    ->Store.error
+    ->Option.map(error => {
+      switch error {
+      | #Whole(error) => error
+      | #Part => store->Store.inner->printErrorInner->Array.catOptions->Array.joinWith(", ")
+      }
+    })
+  }
+
+  let showInner = (inner: inner) => {
+    let (head, tail) = (Head.show, Tail.showInner)->Tuple.Tuple2.napply(inner)
+    Array.concat([head], tail)
+  }
+
+  let show = (store: t): string => {
+    `Vector3{
+      state: ${store->enum->Store.enumToPretty},
+      error: ${store->printError->Option.or("None")},
+      children: {
+        ${showInner(store->inner)->Array.joinWith(",\n")}
+      }}`
+  }
 
   let makeDyn = (context: context, initial: option<input>, setOuter: Rxjs.Observable.t<input>, valOuter: option<Rxjs.Observable.t<()>>)
     : Dyn.t<Close.t<Form.t<t, actions<()>>>>
@@ -397,66 +436,52 @@ module VectorRec = {
     let close = Rxjs.next(complete)
 
     let first: Close.t<Form.t<'f, 'a>> = {pack: { field, actions: actionsFirst }, close}
+    let state = Rxjs.Subject.makeBehavior(first)
+
+    let dynInnerValidated = dynInner
+      ->Dynamic.map(Dynamic.switchMap(_, (inner: Close.t<Form.t<'fa, 'ai>>) => 
+        makeStore(~validate=fnValidate, inner.pack.field)
+        ->Dynamic.map( (field): Close.t<Form.t<'f, actions<()>>> => {
+          pack: {
+            field,
+            actions: {
+              ...actionsFirst,
+              inner: inner.pack.actions,
+            }
+          },
+          close
+        })
+      ))
+    
+    let validated = 
+      val
+      ->Dynamic.withLatestFrom(state)
+      ->Dynamic.map(((_, state:  Close.t<Form.t<t, 'a>>)) => {
+        makeStore(~validate=fnValidate, state.pack.field->inner)
+        ->Dynamic.map( (field): Close.t<Form.t<'f, actions<()>>> => {
+          pack: {
+            field,
+            actions: state.pack.actions
+          },
+          close
+        })
+      })
+
+    let memoState = Dynamic.map(
+      _,
+      Dynamic.tap(_, (x: Close.t<Form.t<t, 'a>>) => {
+        Rxjs.next(state, x)
+      }),
+    )
 
     let dyn = 
-      dynInner
-      ->Dynamic.map(Dynamic.switchMap(_, (inner: Close.t<Form.t<'fa, 'ai>>) => 
-      makeStore(~validate=fnValidate, inner.pack.field)
-      ->Dynamic.map( (field): Close.t<Form.t<'f, actions<()>>> => {
-        pack: {
-          field,
-          actions: {
-            ...actionsFirst,
-            inner: inner.pack.actions,
-          }
-        },
-        close
-      })
-    ))
-    ->Rxjs.pipe(Rxjs.shareReplay(1))
-    ->Rxjs.pipe(Rxjs.takeUntil(complete))
+      Rxjs.merge2(dynInnerValidated, validated)
+      ->memoState
+      ->Rxjs.pipe(Rxjs.shareReplay(1))
+      ->Rxjs.pipe(Rxjs.takeUntil(complete))
 
     {first, dyn}
   }
-
-    let toInputInner = (inner: inner) => (Head.input, Tail.toInputInner)->Tuple.Tuple2.napply(inner)
-    let input = (store: t) =>
-      (Head.input, Tail.toInputInner)->Tuple.Tuple2.napply(store->Store.inner)
-
-    let inner = Store.inner
-    let output = Store.output
-    let error = Store.error
-    let enum = Store.toEnum
-
-    let printErrorInner = (inner: inner) => {
-      let (head, tail) = (Head.printError, Tail.printErrorInner)->Tuple.Tuple2.napply(inner)
-      Array.concat([head], tail)
-    }
-
-    let printError = (store: t) => {
-      store
-      ->Store.error
-      ->Option.map(error => {
-        switch error {
-        | #Whole(error) => error
-        | #Part => store->Store.inner->printErrorInner->Array.catOptions->Array.joinWith(", ")
-        }
-      })
-    }
-
-    let showInner = (inner: inner) => {
-      let (head, tail) = (Head.show, Tail.showInner)->Tuple.Tuple2.napply(inner)
-      Array.concat([head], tail)
-    }
-
-    let show = (store: t): string => {
-      `Vector3{
-        state: ${store->enum->Store.enumToPretty},
-        error: ${store->printError->Option.or("None")},
-        children: {
-          ${showInner(store->inner)->Array.joinWith(",\n")}
-        }}`
-    }
   }
 }
 
