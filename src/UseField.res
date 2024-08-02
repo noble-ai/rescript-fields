@@ -2,7 +2,7 @@
 module Make = (F: Field.T) => {
   type ret = Form.t<F.t, F.actions<()>>
   let use = (. ~context: F.context, ~init: option<F.input>, ~validateInit): ret => {
-    let (first, dyn, set) = React.useMemo0( () => {
+    let (first, dyn, set, validate) = React.useMemo0( () => {
       let set = 
         init
         ->Option.map(Rxjs.Subject.make)
@@ -14,7 +14,7 @@ module Make = (F: Field.T) => {
       let {first, dyn} = F.makeDyn(context, init, set->Rxjs.toObservable, validate->Rxjs.toObservable->Some)
       let dyn = dyn->Dynamic.switchSequence
 
-      (first, dyn, set)
+      (first, dyn, set, validate)
     })
 
 
@@ -27,11 +27,14 @@ module Make = (F: Field.T) => {
     })
     
     React.useEffect0(() => {
-      Promise.sleep(30)
-      ->Promise.tap((_) => {
+      // Promise.sleep(30)
+      // ->Promise.tap((_) => {
         init->Option.forEach(Rxjs.next(set))
-      })
-      ->Promise.void
+      // })
+      // ->Promise.void
+      if validateInit {
+        Rxjs.next(validate, ())
+      }
       None
     })
 
