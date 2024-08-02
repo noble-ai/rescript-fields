@@ -42,26 +42,6 @@ type actions<'finput, 'factions, 'out> = {
   index: (int) => option<'factions>,
 }
   
-let changeElements = (make: (int, 'input) => 'out) => {
-  (. change: Rxjs.t<'class, 'source, 'change>): Rxjs.t<'co, 'so, array<'out>> => {
-    Rxjs.Observable.make(observer => {
-      let children = ref([])
-      let sub = change->Rxjs.subscribe({
-        next: (. change: 'change) => {
-          children.contents = switch change {
-            | #Add(input) => children.contents->Array.length->make(input)->Array.append(children.contents, _)
-            | #Remove(index) => children.contents->Array.remove(index)
-            | #Set(input) => input->Array.mapi( (x, i) => make(i, Some(x)))
-          }
-          observer.next(. children.contents)
-        },
-        error:observer.error,
-        complete:observer.complete,
-      })
-      Some(() => Rxjs.unsubscribe(sub))
-    })
-  }
-}
 
   module type T = {
     include Field.T

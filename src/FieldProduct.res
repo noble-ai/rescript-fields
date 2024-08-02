@@ -1,7 +1,6 @@
 // shadow global Dynamic with the impl chosen by FT
 
 module Tuple = Tuple.Nested
-module Change = FieldVector.Change
 
 type error = [#Whole(string) | #Part]
 type resultValidate = Promise.t<Result.t<unit, string>>

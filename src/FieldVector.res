@@ -35,29 +35,6 @@ module Context = {
   }
 }
 
-module Change = {
-  type t<'input, 'inner> = [#Set('input) | #Clear | #Inner('inner) | #Validate]
-  let makeSet = (x ) => #Set(x)
-
-  let bimap = (f, g, c) => {
-    switch c {
-    | #Set(input) => #Set(f(input))
-    | #Clear => #Clear
-    | #Inner(inner) => #Inner(g(inner))
-    | #Validate => #Validate
-    }
-  }
-
-  let show = (c: t<string, string>) => {
-    switch c {
-    | #Set(input) => `Set(${input})`
-    | #Clear => "Clear"
-    | #Inner(inner) => `Inner(${inner})`
-    | #Validate => "Validate"
-    }
-  }
-}
-
 module Actions = {
   type t<'input, 'change, 'inner> = {
     set: 'input => 'change,
@@ -69,14 +46,6 @@ module Actions = {
 
     inner: 'inner,
     validate: () => 'change,
-  }
-
-  let make = (actionsInner) => {
-    set: input => #Set(input),
-    clear: () => #Clear,
-    opt: input => input->Option.map(x => #Set(x))->Option.or(#Clear),
-    inner: actionsInner,
-    validate: () => #Validate,
   }
 
   let trimap = (actions, fnInput, fn, fnInner) => {
