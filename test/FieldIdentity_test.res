@@ -21,7 +21,7 @@ describe("FieldIdentity", () => {
         let {first, dyn} = Subject.makeDyn(context, None, set->Rxjs.toObservable, validate->Rxjs.toObservable->Some)
         let current: ref<'a> = {contents: first}
 
-        let res = dyn->Dynamic.switchSequence->FieldArray_test.applyCurrent(current)->Dynamic.toPromise
+        let res = dyn->Dynamic.switchSequence->Current.apply(current)->Dynamic.toPromise
 
         set->Rxjs.next(3.0)
         current.contents.close()
@@ -36,7 +36,7 @@ describe("FieldIdentity", () => {
         let {first, dyn} = Subject.makeDyn(context, None, set->Rxjs.toObservable, validate->Rxjs.toObservable->Some)
         let current: ref<'a> = {contents: first}
 
-        let res = dyn->Dynamic.switchSequence->FieldArray_test.applyCurrent(current)->Dynamic.toHistory
+        let res = dyn->Dynamic.switchSequence->Current.apply(current)->Dynamic.toHistory
 
         set->Rxjs.next(3.0)
         validate->Rxjs.next()
@@ -60,7 +60,7 @@ describe("FieldIdentity", () => {
         let {first, dyn} = Subject.makeDyn(context, None, set->Rxjs.toObservable, validate->Rxjs.toObservable->Some)
         let current: ref<'a> = {contents: first}
 
-        let res = dyn->Dynamic.switchSequence->FieldArray_test.applyCurrent(current)->Dynamic.toPromise
+        let res = dyn->Dynamic.switchSequence->Current.apply(current)->Dynamic.toPromise
 
         first.pack.actions.set(3.0)
         first.close()
@@ -75,7 +75,7 @@ describe("FieldIdentity", () => {
         let {first, dyn} = Subject.makeDyn(context, None, set->Rxjs.toObservable, validate->Rxjs.toObservable->Some)
         let current: ref<'a> = {contents: first}
 
-        let res = dyn->Dynamic.switchSequence->FieldArray_test.applyCurrent(current)->Dynamic.toPromise
+        let res = dyn->Dynamic.switchSequence->Current.apply(current)->Dynamic.toPromise
 
         first.pack.actions.set(3.0)
         first.pack.actions.clear()
@@ -94,7 +94,7 @@ describe("FieldIdentity", () => {
             let {first, dyn} = Subject.makeDyn(context, None, set->Rxjs.toObservable, validate->Rxjs.toObservable->Some)
             let current: ref<'a> = {contents: first}
 
-            let res = dyn->Dynamic.switchSequence->FieldArray_test.applyCurrent(current)->Dynamic.toPromise
+            let res = dyn->Dynamic.switchSequence->Current.apply(current)->Dynamic.toPromise
 
             current.contents.pack.actions.set(3.0)
             current.contents.pack.actions.opt(value)
