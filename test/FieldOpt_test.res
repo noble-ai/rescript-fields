@@ -35,7 +35,7 @@ describe("FieldOpt", () => {
           let {first, dyn} = Subject.makeDyn(context, None, set->Rxjs.toObservable, val->Rxjs.toObservable->Some) 
           let current: ref<'a> = {contents: first}
 
-          let hist = dyn->Dynamic.switchSequence->FieldArray_test.applyCurrent(current)->Dynamic.toHistory
+          let hist = dyn->Dynamic.switchSequence->Current.apply(current)->Dynamic.toHistory
 
           values->Array.forEach(Rxjs.next(set))
 
@@ -86,7 +86,7 @@ describe("FieldOpt", () => {
           let {first, dyn} = Subject.makeDyn(context, None, set->Rxjs.toObservable, val->Rxjs.toObservable->Some) 
           let current: ref<'a> = {contents: first}
 
-          let hist = dyn->Dynamic.switchSequence->FieldArray_test.applyCurrent(current)->Dynamic.toHistory
+          let hist = dyn->Dynamic.switchSequence->Current.apply(current)->Dynamic.toHistory
 
           Rxjs.next(set, Some("3"))
           Rxjs.next(set, Some("5"))
@@ -130,7 +130,7 @@ describe("FieldOpt", () => {
             let {first, dyn} = Subject.makeDyn(context, None, set->Rxjs.toObservable, val->Rxjs.toObservable->Some) 
             let current: ref<'a> = {contents: first}
 
-            let hist = dyn->Dynamic.switchSequence->FieldArray_test.applyCurrent(current)->Dynamic.toHistory
+            let hist = dyn->Dynamic.switchSequence->Current.apply(current)->Dynamic.toHistory
 
             current.contents.pack.actions.opt(Some("3"))
             current.contents.pack.actions.opt(None)

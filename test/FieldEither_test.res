@@ -22,7 +22,7 @@ describe("FieldEither", () => {
 
               let res = dyn
                 ->Dynamic.switchSequence
-                ->FieldArray_test.applyCurrent(current)
+                ->Current.apply(current)
                 ->Dynamic.toHistory
 
               set->Rxjs.next(value)
@@ -47,7 +47,7 @@ describe("FieldEither", () => {
               let current: ref<'a> = {contents: first}
 
                 let res = dyn->Dynamic.switchSequence
-                ->FieldArray_test.applyCurrent(current)
+                ->Current.apply(current)
                 ->Dynamic.toPromise
 
                 Rxjs.next(set, Either.Left("3"))
@@ -70,7 +70,7 @@ describe("FieldEither", () => {
 
                 let res = dyn
                 ->Dynamic.switchSequence
-                ->FieldArray_test.applyCurrent(current)
+                ->Current.apply(current)
                 ->Dynamic.toPromise
 
                 Rxjs.next(set, Either.Left("3"))
@@ -118,7 +118,7 @@ describe("FieldEither", () => {
 
               let res = dyn
                 ->Dynamic.switchSequence
-                ->FieldArray_test.applyCurrent(current)
+                ->Current.apply(current)
                 ->Dynamic.toPromise
 
               values->Array.forEach(Rxjs.next(set))
@@ -139,7 +139,7 @@ describe("FieldEither", () => {
                 let current: ref<'a> = {contents: first}
               let res = dyn
               ->Dynamic.switchSequence
-              ->FieldArray_test.applyCurrent(current)
+              ->Current.apply(current)
               ->Dynamic.toPromise
 
               Rxjs.next(set, Either.Left("3"))
@@ -162,7 +162,7 @@ describe("FieldEither", () => {
                 let current: ref<'a> = {contents: first}
               let res = dyn
               ->Dynamic.switchSequence
-              ->FieldArray_test.applyCurrent(current)
+              ->Current.apply(current)
               ->Dynamic.toHistory
 
               Promise.return()
@@ -200,7 +200,7 @@ describe("FieldEither", () => {
                 let current: ref<'a> = {contents: first}
                 let res = dyn
                 ->Dynamic.switchSequence
-                ->FieldArray_test.applyCurrent(current)
+                ->Current.apply(current)
                 ->Dynamic.toPromise
 
                 Rxjs.next(set, Either.Left("3"))
@@ -223,7 +223,7 @@ describe("FieldEither", () => {
                 let current: ref<'a> = {contents: first}
                 let res = dyn
                 ->Dynamic.switchSequence
-                ->FieldArray_test.applyCurrent(current)
+                ->Current.apply(current)
                 ->Dynamic.toPromise
 
                 Rxjs.next(set, Either.Left("3"))
@@ -247,7 +247,7 @@ describe("FieldEither", () => {
               let current: ref<'a> = {contents: first}
               let res = dyn
               ->Dynamic.switchSequence
-              ->FieldArray_test.applyCurrent(current)
+              ->Current.apply(current)
               ->Dynamic.toPromise
 
               Rxjs.next(set, Either.Left("3"))

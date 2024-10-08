@@ -56,7 +56,7 @@ describe("FieldSum", () => {
             let validate = Rxjs.Subject.makeEmpty()
             let {first, dyn} = Subject.makeDyn(context, None, set->Rxjs.toObservable, validate->Rxjs.toObservable->Some)
             let current: ref<'a> = {contents: first}
-            let res = dyn->Dynamic.switchSequence->FieldArray_test.applyCurrent(current)->Dynamic.toPromise
+            let res = dyn->Dynamic.switchSequence->Current.apply(current)->Dynamic.toPromise
 
             values->Array.forEach(Rxjs.next(set))
             current.contents.close()

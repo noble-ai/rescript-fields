@@ -42,7 +42,7 @@ describe("FieldProduct", () => {
 							let {first, dyn} = Subject.makeDyn(context, None, set->Rxjs.toObservable, val->Rxjs.toObservable->Some)
 							let current: ref<'a> = {contents: first}
 
-							let res = dyn->Dynamic.switchSequence->FieldArray_test.applyCurrent(current)->Dynamic.toPromise
+							let res = dyn->Dynamic.switchSequence->Current.apply(current)->Dynamic.toPromise
 
 							set->Rxjs.next({left: "haha", right: "nono"})
 							current.contents.close()
@@ -62,7 +62,7 @@ describe("FieldProduct", () => {
 						let {first, dyn} = Subject.makeDyn(context, None, set->Rxjs.toObservable, val->Rxjs.toObservable->Some)
 						let current: ref<'a> = {contents: first}
 
-						let res = dyn->Dynamic.switchSequence->FieldArray_test.applyCurrent(current)->Dynamic.toPromise
+						let res = dyn->Dynamic.switchSequence->Current.apply(current)->Dynamic.toPromise
 
 						set->Rxjs.next({left: "haha", right: "nono"})
 						Promise.sleep(100)
@@ -109,7 +109,7 @@ describe("FieldProduct", () => {
 						let {first, dyn} = Subject.makeDyn(context, None, set->Rxjs.toObservable, val->Rxjs.toObservable->Some)
 						let current: ref<'a> = {contents: first}
 
-						let res = dyn->Dynamic.switchSequence->FieldArray_test.applyCurrent(current)->Dynamic.toPromise
+						let res = dyn->Dynamic.switchSequence->Current.apply(current)->Dynamic.toPromise
 
 						set->Rxjs.next({left: "haha", right: "nono"})
 						set->Rxjs.next({left: "nono", right: "haha"})
@@ -127,7 +127,7 @@ describe("FieldProduct", () => {
 							let {first, dyn} = Subject.makeDyn(context, None, set->Rxjs.toObservable, val->Rxjs.toObservable->Some)
 							let current: ref<'a> = {contents: first}
 
-							let res = dyn->Dynamic.switchSequence->FieldArray_test.applyCurrent(current)->Dynamic.toPromise
+							let res = dyn->Dynamic.switchSequence->Current.apply(current)->Dynamic.toPromise
 
 							set->Rxjs.next({left: "haha", right: "nono"})
 							Promise.sleep(100)
@@ -185,7 +185,7 @@ describe("FieldProduct", () => {
 						let {first, dyn} = Subject.makeDyn(context, None, set->Rxjs.toObservable, val->Rxjs.toObservable->Some)
 						let current: ref<'a> = {contents: first}
 
-						let res = dyn->Dynamic.switchSequence->FieldArray_test.applyCurrent(current)->Dynamic.toPromise
+						let res = dyn->Dynamic.switchSequence->Current.apply(current)->Dynamic.toPromise
 
 						// let hist = dyn->Dynamic.toHistory
 						set->Rxjs.next({left: "haha", right: "nono"})
@@ -214,7 +214,7 @@ describe("FieldProduct", () => {
 							let {first, dyn} = Subject.makeDyn(context, None, set->Rxjs.toObservable, val->Rxjs.toObservable->Some)
 							let current: ref<'a> = {contents: first}
 
-							let res = dyn->Dynamic.switchSequence->FieldArray_test.applyCurrent(current)->Dynamic.toPromise
+							let res = dyn->Dynamic.switchSequence->Current.apply(current)->Dynamic.toPromise
 
 							set->Rxjs.next({left: "haha", right: "nono"})
 							Promise.sleep(100)
@@ -258,7 +258,7 @@ describe("FieldProduct", () => {
 						let {first, dyn} = Subject.makeDyn(context, None, set->Rxjs.toObservable, val->Rxjs.toObservable->Some)
 						let current: ref<'a> = {contents: first}
 
-						let res = dyn->Dynamic.switchSequence->FieldArray_test.applyCurrent(current)->Dynamic.toPromise
+						let res = dyn->Dynamic.switchSequence->Current.apply(current)->Dynamic.toPromise
 
 						set->Rxjs.next({left: "haha", right: "nono"})
 						current.contents.close()
@@ -275,7 +275,7 @@ describe("FieldProduct", () => {
 							let {first, dyn} = Subject.makeDyn(context, None, set->Rxjs.toObservable, val->Rxjs.toObservable->Some)
 							let current: ref<'a> = {contents: first}
 
-							let res = dyn->Dynamic.switchSequence->FieldArray_test.applyCurrent(current)->Dynamic.toPromise
+							let res = dyn->Dynamic.switchSequence->Current.apply(current)->Dynamic.toPromise
 
 							set->Rxjs.next({left: "haha", right: "nono"})
 							Promise.sleep(100)
@@ -322,7 +322,7 @@ describe("FieldProduct", () => {
 						let {first, dyn} = Subject.makeDyn(context, None, set->Rxjs.toObservable, val->Rxjs.toObservable->Some)
 						let current: ref<'a> = {contents: first}
 
-						let res = dyn->Dynamic.switchSequence->FieldArray_test.applyCurrent(current)->Dynamic.toPromise
+						let res = dyn->Dynamic.switchSequence->Current.apply(current)->Dynamic.toPromise
 
 						set->Rxjs.next({left: "haha", right: "nono"})
 						set->Rxjs.next({left: "nono", right: "haha"})
@@ -340,7 +340,7 @@ describe("FieldProduct", () => {
 							let {first, dyn} = Subject.makeDyn(context, None, set->Rxjs.toObservable, val->Rxjs.toObservable->Some)
 							let current: ref<'a> = {contents: first}
 
-							let res = dyn->Dynamic.switchSequence->FieldArray_test.applyCurrent(current)->Dynamic.toPromise
+							let res = dyn->Dynamic.switchSequence->Current.apply(current)->Dynamic.toPromise
 
 							set->Rxjs.next({left: "haha", right: "nono"})
 							Promise.sleep(100)
@@ -396,7 +396,7 @@ describe("FieldProduct", () => {
 						let {first, dyn} = Subject.makeDyn(context, None, set->Rxjs.toObservable, val->Rxjs.toObservable->Some)
 						let current: ref<'a> = {contents: first}
 
-						let res = dyn->Dynamic.switchSequence->FieldArray_test.applyCurrent(current)->Dynamic.toPromise
+						let res = dyn->Dynamic.switchSequence->Current.apply(current)->Dynamic.toPromise
 
 						set->Rxjs.next({left: "haha", right: "nono"})
 						set->Rxjs.next({left: "nono", right: "haha"})
@@ -422,7 +422,7 @@ describe("FieldProduct", () => {
 						let {first, dyn} = Subject.makeDyn(context, None, set->Rxjs.toObservable, val->Rxjs.toObservable->Some)
 						let current: ref<'a> = {contents: first}
 
-						let res = dyn->Dynamic.switchSequence->FieldArray_test.applyCurrent(current)->Dynamic.toPromise
+						let res = dyn->Dynamic.switchSequence->Current.apply(current)->Dynamic.toPromise
 
 						set->Rxjs.next({left: "haha", right: "nono"})
 						Promise.sleep(100)

@@ -46,7 +46,7 @@ describe("Float", () => {
         // close function is static in FieldParse so we can use the first one at the end
         let {first, dyn} = Subject.makeDyn(context, None, set->Rxjs.toObservable, val->Rxjs.toObservable->Some)
         let current: ref<'a> = {contents: first}
-        let res = dyn->Dynamic.switchSequence->FieldArray_test.applyCurrent(current)->Dynamic.toPromise
+        let res = dyn->Dynamic.switchSequence->Current.apply(current)->Dynamic.toPromise
 
         set->Rxjs.next("3")
         current.contents.close()
@@ -63,7 +63,7 @@ describe("Float", () => {
         // close function is static in FieldParse so we can use the first one at the end
         let {first, dyn} = Subject.makeDyn(context, None, set->Rxjs.toObservable, val->Rxjs.toObservable->Some)
         let current: ref<'a> = {contents: first}
-        let res = dyn->Dynamic.switchSequence->FieldArray_test.applyCurrent(current)->Dynamic.toHistory
+        let res = dyn->Dynamic.switchSequence->Current.apply(current)->Dynamic.toHistory
 
         set->Rxjs.next("3")
         val->Rxjs.next()
@@ -82,7 +82,7 @@ describe("Float", () => {
         // close function is static in FieldParse so we can use the first one at the end
         let {first, dyn} = Subject.makeDyn(context, None, set->Rxjs.toObservable, val->Rxjs.toObservable->Some)
         let current: ref<'a> = {contents: first}
-        let res = dyn->Dynamic.switchSequence->FieldArray_test.applyCurrent(current)->Dynamic.toPromise
+        let res = dyn->Dynamic.switchSequence->Current.apply(current)->Dynamic.toPromise
 
         current.contents.pack.actions.set("3")
         current.contents.close()
@@ -100,7 +100,7 @@ describe("Float", () => {
         // close function is static in FieldParse so we can use the first one at the end
         let {first, dyn} = Subject.makeDyn(context, None, set->Rxjs.toObservable, val->Rxjs.toObservable->Some)
         let current: ref<'a> = {contents: first}
-        let res = dyn->Dynamic.switchSequence->FieldArray_test.applyCurrent(current)->Dynamic.toPromise
+        let res = dyn->Dynamic.switchSequence->Current.apply(current)->Dynamic.toPromise
         current.contents.pack.actions.set("3")
         current.contents.pack.actions.clear()
         current.contents.close()
@@ -118,7 +118,7 @@ describe("Float", () => {
         // close function is static in FieldParse so we can use the first one at the end
         let {first, dyn} = Subject.makeDyn(context, None, set->Rxjs.toObservable, val->Rxjs.toObservable->Some)
         let current: ref<'a> = {contents: first}
-        let res = dyn->Dynamic.switchSequence->FieldArray_test.applyCurrent(current)->Dynamic.toHistory
+        let res = dyn->Dynamic.switchSequence->Current.apply(current)->Dynamic.toHistory
 
         current.contents.pack.actions.set("3")
         current.contents.pack.actions.validate()
@@ -143,7 +143,7 @@ describe("Float", () => {
         // close function is static in FieldParse so we can use the first one at the end
         let {first, dyn} = Subject.makeDyn(context, None, set->Rxjs.toObservable, val->Rxjs.toObservable->Some)
         let current: ref<'a> = {contents: first}
-        let res = dyn->Dynamic.switchSequence->FieldArray_test.applyCurrent(current)->Dynamic.toHistory
+        let res = dyn->Dynamic.switchSequence->Current.apply(current)->Dynamic.toHistory
 
         current.contents.pack.actions.set("20")
         current.contents.pack.actions.set("2")
@@ -180,7 +180,7 @@ describe("FieldParse.String", () => {
 					let val = Rxjs.Subject.makeEmpty()
 					let {first, dyn} = Field.makeDyn(context, None, set->Rxjs.toObservable, val->Rxjs.toObservable->Some)
 					let current: ref<'a> = {contents: first}
-					let res = dyn->Dynamic.switchSequence->FieldArray_test.applyCurrent(current)->Dynamic.toHistory
+					let res = dyn->Dynamic.switchSequence->Current.apply(current)->Dynamic.toHistory
 
 					current.contents.pack.actions.reset()
 					current.contents.close()
@@ -211,7 +211,7 @@ describe("FieldParse.String", () => {
 				let val = Rxjs.Subject.makeEmpty()
 				let {first, dyn} = Field.makeDyn(context, None, set->Rxjs.toObservable, val->Rxjs.toObservable->Some)
 					let current: ref<'a> = {contents: first}
-				let res = dyn->Dynamic.switchSequence->FieldArray_test.applyCurrent(current)->Dynamic.toHistory
+				let res = dyn->Dynamic.switchSequence->Current.apply(current)->Dynamic.toHistory
 
 
 				current.contents.pack.actions.validate()
@@ -241,7 +241,7 @@ describe("FieldParse.String", () => {
 
 				let {first, dyn} = Field.makeDyn(context, None, set->Rxjs.toObservable, val->Rxjs.toObservable->Some)
 					let current: ref<'a> = {contents: first}
-				let res = dyn->Dynamic.switchSequence->FieldArray_test.applyCurrent(current)->Dynamic.toHistory
+				let res = dyn->Dynamic.switchSequence->Current.apply(current)->Dynamic.toHistory
 
 				current.contents.pack.actions.validate()
 				current.contents.pack.actions.set(value)
@@ -293,7 +293,7 @@ describe("FieldParse.String", () => {
 				let val = Rxjs.Subject.makeEmpty()
 				let {first, dyn} = Field.makeDyn(context, None, set->Rxjs.toObservable, val->Rxjs.toObservable->Some)
 					let current: ref<'a> = {contents: first}
-				let res = dyn->Dynamic.switchSequence->FieldArray_test.applyCurrent(current)->Dynamic.toHistory
+				let res = dyn->Dynamic.switchSequence->Current.apply(current)->Dynamic.toHistory
 
 				current.contents.pack.actions.validate()
 				current.contents.pack.actions.set(slow)
