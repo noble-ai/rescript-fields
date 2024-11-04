@@ -18,6 +18,7 @@
     "test": "yarn vitest",
     "pub": "yarn publish --scope nobleai --access public",
     "examples:login": "yarn vite dev --open examples/login/",
+    "examples:loginArray": "yarn vite dev --open examples/loginArray/",
     "examples:everything": "yarn vite dev --open examples/everything/",
     "docs": "make all"
   },
