@@ -123,7 +123,7 @@ module Sum1 = {
       Inner.makeDyn(context->contextToTuple, initial->Option.map(toEither), set->Dynamic.map(toEither), val)
       ->Dyn.map(Close.map(_, packFromEither))
     }
-  
+
     let input = (store: t): input => store->storeToEither->Inner.input->fromEither
     let inner = Store.inner
     let output = Store.output

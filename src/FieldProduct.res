@@ -86,7 +86,7 @@ module Product1 = {
 
   module Make: Make = (Gen: Generic, A: Field.T) => {
     module A = A
-    module Vector = FieldVector.Vector1.Make(A)
+    module Inner = FieldVector.Vector1.Make(A)
     type input = Gen.structure<A.input>
     type inner = Gen.structure<A.t>
     type output = Gen.structure<A.output>
@@ -104,17 +104,17 @@ module Product1 = {
     let storeToTuple = Store.bimap(_, toTuple, toTuple)
 
     let validateToTuple = Option.map(_, v => out => out->fromTuple->v)
-    let contextToTuple = (context: context): Vector.context => {
+    let contextToTuple = (context: context): Inner.context => {
       let inner = context.inner->toTuple
-      let empty: option<Vector.input> = context.empty->Option.map(toTuple)
+      let empty: option<Inner.input> = context.empty->Option.map(toTuple)
       let validate = context.validate->validateToTuple
       {?empty, ?validate, inner, validateImmediate: ?context.validateImmediate}
     }
 
-    let showInput = (x: input) => x->toTuple->Vector.showInput
+    let showInput = (x: input) => x->toTuple->Inner.showInput
 
-    let set = (x: input): t => x->toTuple->Vector.set->storeToStructure
-    let empty = (context): inner => context->contextToTuple->FieldVector.Context.inner->Vector.emptyInner->fromTuple
+    let set = (x: input): t => x->toTuple->Inner.set->storeToStructure
+    let empty = (context): inner => context->contextToTuple->FieldVector.Context.inner->Inner.emptyInner->fromTuple
     let init = (context: context): t => context->empty->Store.init
 
     let inner = Store.inner
@@ -122,27 +122,27 @@ module Product1 = {
     let error = Store.error
     let enum = Store.toEnum
     
-    let printError = (store: t) => store->storeToTuple->Vector.printError
+    let printError = (store: t) => store->storeToTuple->Inner.printError
 
     let show = (store: t): string => {
       `Product1{
         state: ${store->enum->Store.enumToPretty},
         error: ${store->printError->Option.or("None")},
         children: {
-          ${store->inner->toTuple->Vector.showInner->Array.joinWith(",\n")}
+          ${store->inner->toTuple->Inner.showInner->Array.joinWith(",\n")}
         }
       }`
     }
 
     let validate = (force, context: context, store: t): Rxjs.t<Rxjs.foreign, Rxjs.void,t> => 
-      Vector.validate(force, context->contextToTuple, store->storeToTuple)
+      Inner.validate(force, context->contextToTuple, store->storeToTuple)
       ->Dynamic.map(storeToStructure)
 
     type actionsInner<'change> = Gen.structure<
       A.actions<'change>,
     >
     let mapActionsInner = (actions: actionsInner<'c>, fn: 'c => 'd): actionsInner<'d> => 
-      actions->toTuple->Vector.mapActionsInner(fn)->fromTuple
+      actions->toTuple->Inner.mapActionsInner(fn)->fromTuple
  
     type actions<'change> = FieldVector.Actions.t<input, 'change, actionsInner<'change>>
     let mapActions = (actions, fn) => actions->FieldVector.Actions.trimap(x => x, fn, mapActionsInner(_, fn))
@@ -151,7 +151,7 @@ module Product1 = {
     type parted = Gen.structure<Form.t<A.t, A.actions<()>>>
 
     let split = (pack: pack): parted => {
-      Vector.splitInner(
+      Inner.splitInner(
         pack.field->Store.inner->toTuple,
         pack.actions.inner->toTuple,
       )
@@ -163,11 +163,11 @@ module Product1 = {
     let makeDyn = (context: context, initial: option<input>, set: Rxjs.Observable.t<input>, val: option<Rxjs.Observable.t<()>> )
       : Dyn.t<Close.t<Form.t<t, actions<()>>>>
       => {
-      Vector.makeDyn(context->contextToTuple, initial->Option.map(toTuple), set->Dynamic.map(toTuple), val)
+      Inner.makeDyn(context->contextToTuple, initial->Option.map(toTuple), set->Dynamic.map(toTuple), val)
       ->Dyn.map(Close.map(_, packFromVector))
     }
 
-    let input = (store: t) => store->storeToTuple->Vector.input->fromTuple
+    let input = (store: t) => store->storeToTuple->Inner.input->fromTuple
   }
 }
 
@@ -229,7 +229,7 @@ module Product2 = {
   module Make: Make = (Gen: Generic, A: Field.T, B: Field.T) => {
     module A = A
     module B = B
-    module Vector = FieldVector.Vector2.Make(A, B)
+    module Inner = FieldVector.Vector2.Make(A, B)
 
     type input = Gen.structure<A.input, B.input>
     type inner = Gen.structure<A.t, B.t>
@@ -249,17 +249,17 @@ module Product2 = {
     let storeToTuple = Store.bimap(_, toTuple, toTuple)
 
     let validateToTuple = Option.map(_, v => out => out->fromTuple->v)
-    let contextToTuple = (context: context): Vector.context => {
+    let contextToTuple = (context: context): Inner.context => {
       let inner = context.inner->toTuple
-      let empty: option<Vector.input> = context.empty->Option.map(toTuple)
+      let empty: option<Inner.input> = context.empty->Option.map(toTuple)
       let validate = context.validate->validateToTuple
       {?empty, ?validate, inner, validateImmediate: ?context.validateImmediate}
     }
 
-    let showInput = (x: input) => x->toTuple->Vector.showInput
+    let showInput = (x: input) => x->toTuple->Inner.showInput
 
-    let set = (x: input): t => x->toTuple->Vector.set->storeToStructure
-    let empty = (context): inner => context->contextToTuple->FieldVector.Context.inner->Vector.emptyInner->fromTuple
+    let set = (x: input): t => x->toTuple->Inner.set->storeToStructure
+    let empty = (context): inner => context->contextToTuple->FieldVector.Context.inner->Inner.emptyInner->fromTuple
     let init = (context: context): t => context->empty->Store.init
 
     let inner = Store.inner
@@ -267,20 +267,20 @@ module Product2 = {
     let error = Store.error
     let enum = Store.toEnum
     
-    let printError = (store: t) => store->storeToTuple->Vector.printError
+    let printError = (store: t) => store->storeToTuple->Inner.printError
 
     let show = (store: t): string => {
       `Product2{
         state: ${store->enum->Store.enumToPretty},
         error: ${store->printError->Option.or("None")},
         children: {
-          ${store->inner->toTuple->Vector.showInner->Array.joinWith(",\n")}
+          ${store->inner->toTuple->Inner.showInner->Array.joinWith(",\n")}
         }
       }`
     }
 
     let validate = (force, context: context, store: t): Rxjs.t<Rxjs.foreign, Rxjs.void,t> => 
-      Vector.validate(force, context->contextToTuple, store->storeToTuple)
+      Inner.validate(force, context->contextToTuple, store->storeToTuple)
       ->Dynamic.map(storeToStructure)
 
     type actionsInner<'change> = Gen.structure<
@@ -288,7 +288,7 @@ module Product2 = {
       B.actions<'change>
     >
     let mapActionsInner = (actions: actionsInner<'c>, fn: 'c => 'd): actionsInner<'d> => 
-      actions->toTuple->Vector.mapActionsInner(fn)->fromTuple
+      actions->toTuple->Inner.mapActionsInner(fn)->fromTuple
 
     type actions<'change> = FieldVector.Actions.t<input, 'change, actionsInner<'change>>
     let mapActions = (actions: actions<'ch> , fn: 'ch => 'b): actions<'b> => actions->FieldVector.Actions.trimap(x => x, fn, mapActionsInner(_, fn))
@@ -301,7 +301,7 @@ module Product2 = {
 
     let split = (pack: pack)
       : parted => {
-      Vector.splitInner(
+      Inner.splitInner(
         pack.field->Store.inner->toTuple,
         pack.actions.inner->toTuple,
       )
@@ -313,11 +313,11 @@ module Product2 = {
     let makeDyn = (context: context, initial: option<input>, set: Rxjs.Observable.t<input>, val: option<Rxjs.Observable.t<()>>)
       : Dyn.t<Close.t<Form.t<t, actions<()>>>>
       => {
-      Vector.makeDyn(context->contextToTuple, initial->Option.map(toTuple), set->Dynamic.map(toTuple), val)
+      Inner.makeDyn(context->contextToTuple, initial->Option.map(toTuple), set->Dynamic.map(toTuple), val)
       ->Dyn.map(Close.map(_, packFromVector))
     }
  
-    let input = (store: t) => store->storeToTuple->Vector.input->fromTuple
+    let input = (store: t) => store->storeToTuple->Inner.input->fromTuple
   }
 }
 
@@ -377,7 +377,7 @@ module Product3 = {
       >
 
   module Make : Make = (Gen: Generic, A: Field.T, B: Field.T, C: Field.T) => {
-    module Vector = FieldVector.Vector3.Make(A, B, C)
+    module Inner = FieldVector.Vector3.Make(A, B, C)
     type input = Gen.structure<A.input, B.input, C.input>
     type inner = Gen.structure<A.t, B.t, C.t>
     type output = Gen.structure<A.output, B.output, C.output>
@@ -395,21 +395,21 @@ module Product3 = {
     let storeToStructure = Store.bimap(_, fromTuple, fromTuple)
     let storeToTuple = Store.bimap(_, toTuple, toTuple)
     let validateToTuple  = Option.map(_, (v, out) => out->fromTuple->v)
-    let contextToTuple = (context: context): Vector.context => {
+    let contextToTuple = (context: context): Inner.context => {
       let inner = context.inner->toTuple
       let empty = context.empty->Option.map(toTuple)
       let validate = context.validate->validateToTuple
       {?empty, ?validate, inner, validateImmediate: ?context.validateImmediate}
     }
 
-    let showInput = (x: input) => x->toTuple->Vector.showInput
+    let showInput = (x: input) => x->toTuple->Inner.showInput
 
-    let set = (x: input): t => x->toTuple->Vector.set->storeToStructure
-    let empty = (context): inner => context->contextToTuple->FieldVector.Context.inner->Vector.emptyInner->fromTuple
+    let set = (x: input): t => x->toTuple->Inner.set->storeToStructure
+    let empty = (context): inner => context->contextToTuple->FieldVector.Context.inner->Inner.emptyInner->fromTuple
     let init = (context: context): t => context->empty->Store.init
 
     let validate = (force, context: context, store: t): Rxjs.t<Rxjs.foreign, Rxjs.void,t> => 
-      Vector.validate(force, context->contextToTuple, store->storeToTuple)
+      Inner.validate(force, context->contextToTuple, store->storeToTuple)
       ->Dynamic.map(storeToStructure)
 
     type actionsInner<'change> = Gen.structure<
@@ -419,7 +419,7 @@ module Product3 = {
     >
     
     let mapActionsInner = (actions: actionsInner<'c>, fn: 'c => 'd): actionsInner<'d> => 
-      actions->toTuple->Vector.mapActionsInner(fn)->fromTuple
+      actions->toTuple->Inner.mapActionsInner(fn)->fromTuple
 
     type actions<'change> = FieldVector.Actions.t<input, 'change, actionsInner<'change>>
     let mapActions = (actions: actions<'ch>, fn: 'ch => 'b) => actions->FieldVector.Actions.trimap(x => x, fn, mapActionsInner(_, fn))
@@ -431,7 +431,7 @@ module Product3 = {
         Form.t<C.t, C.actions<()>>
       >
     let split = (pack: pack) : parted => {
-      Vector.splitInner(
+      Inner.splitInner(
         pack.field->Store.inner->toTuple,
         pack.actions.inner->toTuple,
       )
@@ -443,26 +443,26 @@ module Product3 = {
     let makeDyn = (context: context, initial: option<input>, set: Rxjs.Observable.t<input>, val: option<Rxjs.Observable.t<()>> )
       : Dyn.t<Close.t<Form.t<t, actions<()>>>>
       => {
-     Vector.makeDyn(context->contextToTuple, initial->Option.map(toTuple), set->Dynamic.map(toTuple), val)
+     Inner.makeDyn(context->contextToTuple, initial->Option.map(toTuple), set->Dynamic.map(toTuple), val)
       ->Dyn.map(Close.map(_, packFromVector))
     }
  
     let inner = Store.inner
 
-    let input = (store: t) => store->storeToTuple->Vector.input->fromTuple
+    let input = (store: t) => store->storeToTuple->Inner.input->fromTuple
 
     let output = Store.output
     let error = Store.error
     let enum = Store.toEnum
     
-    let printError = (store: t) => store->storeToTuple->Vector.printError
+    let printError = (store: t) => store->storeToTuple->Inner.printError
 
     let show = (store: t): string => {
       `Product3{
         state: ${store->enum->Store.enumToPretty},
         error: ${store->printError->Option.or("None")},
         children: {
-          ${store->inner->toTuple->Vector.showInner->Array.joinWith(",\n")}
+          ${store->inner->toTuple->Inner.showInner->Array.joinWith(",\n")}
         }}`
     }
   }
@@ -550,7 +550,7 @@ module Product4 = {
 
 
   module Make: Make = (Gen: Generic, A: Field.T, B: Field.T, C: Field.T, D: Field.T) => {
-    module Vector = FieldVector.Vector4.Make(A, B, C, D)
+    module Inner = FieldVector.Vector4.Make(A, B, C, D)
     type input = Gen.structure<A.input, B.input, C.input, D.input>
     type inner = Gen.structure<A.t, B.t, C.t, D.t>
     type output = Gen.structure<A.output, B.output, C.output, D.output>
@@ -568,21 +568,21 @@ module Product4 = {
     let storeToStructure = Store.bimap(_, fromTuple, fromTuple)
     let storeToTuple = Store.bimap(_, toTuple, toTuple)
     let validateToTuple = Option.map(_, v => out => out->fromTuple->v)
-    let contextToTuple = (context: context): Vector.context => {
+    let contextToTuple = (context: context): Inner.context => {
       let inner = context.inner->toTuple
       let empty = context.empty->Option.map(toTuple)
       let validate = context.validate->validateToTuple
       {?empty, ?validate, inner, validateImmediate: ?context.validateImmediate}
     }
 
-    let showInput = (x: input) => x->toTuple->Vector.showInput
+    let showInput = (x: input) => x->toTuple->Inner.showInput
 
-    let set = (x: input) => x->toTuple->Vector.set->storeToStructure
-    let empty = (context): inner => context->contextToTuple->FieldVector.Context.inner->Vector.emptyInner->fromTuple
+    let set = (x: input) => x->toTuple->Inner.set->storeToStructure
+    let empty = (context): inner => context->contextToTuple->FieldVector.Context.inner->Inner.emptyInner->fromTuple
     let init = (context: context): t => context->empty->Store.init
 
     let validate = (force, context: context, store: t): Rxjs.t<Rxjs.foreign, Rxjs.void,t> => 
-      Vector.validate(force, context->contextToTuple, store->storeToTuple)
+      Inner.validate(force, context->contextToTuple, store->storeToTuple)
       ->Dynamic.map(storeToStructure)
 
     type actionsInner<'change> = Gen.structure<
@@ -593,7 +593,7 @@ module Product4 = {
     >
     
     let mapActionsInner = (actions: actionsInner<'c>, fn: 'c => 'd): actionsInner<'d> => 
-      actions->toTuple->Vector.mapActionsInner(fn)->fromTuple
+      actions->toTuple->Inner.mapActionsInner(fn)->fromTuple
 
     type actions<'change> = FieldVector.Actions.t<input, 'change, actionsInner<'change>>
     let mapActions = (actions: actions<'ch>, fn: 'ch => 'b) => actions->FieldVector.Actions.trimap(x => x, fn, mapActionsInner(_, fn))
@@ -607,7 +607,7 @@ module Product4 = {
     >
 
     let split = (pack: pack): parted => {
-      Vector.splitInner(
+      Inner.splitInner(
         pack.field->Store.inner->toTuple,
         pack.actions.inner->toTuple,
       )
@@ -619,7 +619,7 @@ module Product4 = {
     let makeDyn = (context: context, initial: option<input>, set: Rxjs.Observable.t<input>, val: option<Rxjs.Observable.t<()>> )
       : Dyn.t<Close.t<Form.t<t, actions<()>>>>
       => {
-      let x = Vector.makeDyn(context->contextToTuple, initial->Option.map(toTuple), set->Dynamic.map(toTuple), val)
+      let x = Inner.makeDyn(context->contextToTuple, initial->Option.map(toTuple), set->Dynamic.map(toTuple), val)
       ->Dyn.map(Close.map(_, packFromVector))
 
       x
@@ -627,20 +627,20 @@ module Product4 = {
  
     let inner = Store.inner
 
-    let input = (store: t) => store->storeToTuple->Vector.input->fromTuple
+    let input = (store: t) => store->storeToTuple->Inner.input->fromTuple
 
     let output = Store.output
     let error = Store.error
     let enum = Store.toEnum
 
-    let printError = (store: t) => store->storeToTuple->Vector.printError
+    let printError = (store: t) => store->storeToTuple->Inner.printError
 
     let show = (store: t): string => {
       `Product4{
         state: ${store->enum->Store.enumToPretty},
         error: ${store->printError->Option.or("None")},
         children: {
-          ${store->inner->toTuple->Vector.showInner->Array.joinWith(",\n")}
+          ${store->inner->toTuple->Inner.showInner->Array.joinWith(",\n")}
         }
       }`
     }
@@ -731,7 +731,7 @@ module Product5 = {
       >
 
   module Make: Make = (Gen: Generic, A: Field.T, B: Field.T, C: Field.T, D: Field.T, E: Field.T) => {
-    module Vector = FieldVector.Vector5.Make(A, B, C, D, E)
+    module Inner = FieldVector.Vector5.Make(A, B, C, D, E)
     type input = Gen.structure<A.input, B.input, C.input, D.input, E.input>
     type inner = Gen.structure<A.t, B.t, C.t, D.t, E.t>
     type output = Gen.structure<A.output, B.output, C.output, D.output, E.output>
@@ -749,21 +749,21 @@ module Product5 = {
     let storeToStructure = Store.bimap(_, fromTuple, fromTuple)
     let storeToTuple = Store.bimap(_, toTuple, toTuple)
     let validateToTuple = Option.map(_, v => out => out->fromTuple->v)
-    let contextToTuple = (context: context): Vector.context => {
+    let contextToTuple = (context: context): Inner.context => {
       let inner = context.inner->toTuple
       let empty = context.empty->Option.map(toTuple)
       let validate = context.validate->validateToTuple
       {?empty, ?validate, inner, validateImmediate: ?context.validateImmediate}
     }
 
-    let showInput = (x: input) => x->toTuple->Vector.showInput
-    let set = (x: input): t => x->toTuple->Vector.set->storeToStructure
+    let showInput = (x: input) => x->toTuple->Inner.showInput
+    let set = (x: input): t => x->toTuple->Inner.set->storeToStructure
     
-    let empty = (context): inner => context->contextToTuple->FieldVector.Context.inner->Vector.emptyInner->fromTuple
+    let empty = (context): inner => context->contextToTuple->FieldVector.Context.inner->Inner.emptyInner->fromTuple
     let init = (context: context): t => context->empty->Store.init
 
     let validate = (force, context: context, store: t): Rxjs.t<Rxjs.foreign, Rxjs.void,t> => 
-      Vector.validate(force, context->contextToTuple, store->storeToTuple)
+      Inner.validate(force, context->contextToTuple, store->storeToTuple)
       ->Dynamic.map(storeToStructure)
 
     type actionsInner<'change> = Gen.structure<
@@ -775,7 +775,7 @@ module Product5 = {
     >
 
     let mapActionsInner = (actions: actionsInner<'c>, fn: 'c => 'd): actionsInner<'d> => 
-      actions->toTuple->Vector.mapActionsInner(fn)->fromTuple
+      actions->toTuple->Inner.mapActionsInner(fn)->fromTuple
 
     type actions<'change> = FieldVector.Actions.t<input, 'change, actionsInner<'change>>
     let mapActions = (actions: actions<'ch>, fn: 'ch => 'b) => actions->FieldVector.Actions.trimap(x => x, fn, mapActionsInner(_, fn))
@@ -791,7 +791,7 @@ module Product5 = {
 
     let split = (pack: pack)
       : parted => {
-      Vector.splitInner(
+      Inner.splitInner(
         pack.field->Store.inner->toTuple,
         pack.actions.inner->toTuple,
       )
@@ -803,26 +803,26 @@ module Product5 = {
     let makeDyn = (context: context, initial: option<input>, set: Rxjs.Observable.t<input>, val: option<Rxjs.Observable.t<()>> )
       : Dyn.t<Close.t<Form.t<t, actions<()>>>>
       => {
-      Vector.makeDyn(context->contextToTuple, initial->Option.map(toTuple), set->Dynamic.map(toTuple), val)
+      Inner.makeDyn(context->contextToTuple, initial->Option.map(toTuple), set->Dynamic.map(toTuple), val)
       ->Dyn.map(Close.map(_, packFromVector))
     }
  
     let inner = Store.inner
 
-    let input = (store: t) => store->storeToTuple->Vector.input->fromTuple
+    let input = (store: t) => store->storeToTuple->Inner.input->fromTuple
 
     let output = Store.output
     let error = Store.error
     let enum = Store.toEnum
     
-    let printError = (store: t) => store->storeToTuple->Vector.printError
+    let printError = (store: t) => store->storeToTuple->Inner.printError
 
     let show = (store: t): string => {
       `Product5{
         state: ${store->enum->Store.enumToPretty},
         error: ${store->printError->Option.or("None")},
         children: {
-          ${store->inner->toTuple->Vector.showInner->Array.joinWith(",\n")}
+          ${store->inner->toTuple->Inner.showInner->Array.joinWith(",\n")}
         }
       }`
     }
@@ -917,7 +917,7 @@ module Product6 = {
 
 
   module Make: Make = (Gen: Generic, A: Field.T, B: Field.T, C: Field.T, D: Field.T, E: Field.T, F: Field.T) => {
-    module Vector = FieldVector.Vector6.Make(A, B, C, D, E, F)
+    module Inner = FieldVector.Vector6.Make(A, B, C, D, E, F)
     type input = Gen.structure<A.input, B.input, C.input, D.input, E.input, F.input>
     type inner = Gen.structure<A.t, B.t, C.t, D.t, E.t, F.t>
     type output = Gen.structure<A.output, B.output, C.output, D.output, E.output, F.output>
@@ -935,21 +935,21 @@ module Product6 = {
     let storeToStructure = Store.bimap(_, fromTuple, fromTuple)
     let storeToTuple = Store.bimap(_, toTuple, toTuple)
     let validateToTuple = Option.map(_, v => out => out->fromTuple->v)
-    let contextToTuple = (context: context): Vector.context => {
+    let contextToTuple = (context: context): Inner.context => {
       let inner = context.inner->toTuple
       let empty = context.empty->Option.map(toTuple)
       let validate = context.validate->validateToTuple
       {?empty, ?validate, inner, validateImmediate: ?context.validateImmediate}
     }
 
-    let empty = (context): inner => context->contextToTuple->FieldVector.Context.inner->Vector.emptyInner->fromTuple
+    let empty = (context): inner => context->contextToTuple->FieldVector.Context.inner->Inner.emptyInner->fromTuple
     let init = (context: context): t => context->empty->Store.init
 
-    let set = (x: input): t => x->toTuple->Vector.set->storeToStructure
-    let showInput = (x: input) => x->toTuple->Vector.showInput
+    let set = (x: input): t => x->toTuple->Inner.set->storeToStructure
+    let showInput = (x: input) => x->toTuple->Inner.showInput
 
     let validate = (force, context: context, store: t): Rxjs.t<Rxjs.foreign, Rxjs.void,t> => 
-      Vector.validate(force, context->contextToTuple, store->storeToTuple)
+      Inner.validate(force, context->contextToTuple, store->storeToTuple)
       ->Dynamic.map(storeToStructure)
 
     type actionsInner<'change> = Gen.structure<
@@ -962,7 +962,7 @@ module Product6 = {
     >
 
     let mapActionsInner = (actions: actionsInner<'c>, fn: 'c => 'd): actionsInner<'d> => 
-      actions->toTuple->Vector.mapActionsInner(fn)->fromTuple
+      actions->toTuple->Inner.mapActionsInner(fn)->fromTuple
 
     type actions<'change> = FieldVector.Actions.t<input, 'change, actionsInner<'change>>
     let mapActions = (actions: actions<'ch>, fn: 'ch => 'b) => actions->FieldVector.Actions.trimap(x => x, fn, mapActionsInner(_, fn))
@@ -978,7 +978,7 @@ module Product6 = {
       >
 
     let split = (pack: pack): parted => {
-      Vector.splitInner(
+      Inner.splitInner(
         pack.field->Store.inner->toTuple,
         pack.actions.inner->toTuple,
       )
@@ -990,26 +990,26 @@ module Product6 = {
     let makeDyn = (context: context, initial: option<input>, set: Rxjs.Observable.t<input>, val: option<Rxjs.Observable.t<()>> )
       : Dyn.t<Close.t<Form.t<t, actions<()>>>>
       => {
-      Vector.makeDyn(context->contextToTuple, initial->Option.map(toTuple), set->Dynamic.map(toTuple), val)
+      Inner.makeDyn(context->contextToTuple, initial->Option.map(toTuple), set->Dynamic.map(toTuple), val)
       ->Dyn.map(Close.map(_, packFromVector))
     }
  
     let inner = Store.inner
 
-    let input = (store: t) => store->storeToTuple->Vector.input->fromTuple
+    let input = (store: t) => store->storeToTuple->Inner.input->fromTuple
 
     let output = Store.output
     let error = Store.error
     let enum = Store.toEnum
     
-    let printError = (store: t) => store->storeToTuple->Vector.printError
+    let printError = (store: t) => store->storeToTuple->Inner.printError
 
     let show = (store: t): string => {
       `Product6{
         state: ${store->enum->Store.enumToPretty},
         error: ${store->printError->Option.or("None")},
         children: {
-          ${store->inner->toTuple->Vector.showInner->Array.joinWith(",\n")}
+          ${store->inner->toTuple->Inner.showInner->Array.joinWith(",\n")}
         }
       }`
     }
@@ -1114,7 +1114,7 @@ module Product7 = {
       >
 
   module Make: Make = (Gen: Generic, A: Field.T, B: Field.T, C: Field.T, D: Field.T, E: Field.T, F: Field.T, G: Field.T) => {
-    module Vector = FieldVector.Vector7.Make(A, B, C, D, E, F, G)
+    module Inner = FieldVector.Vector7.Make(A, B, C, D, E, F, G)
     type input = Gen.structure<A.input, B.input, C.input, D.input, E.input, F.input, G.input>
     type inner = Gen.structure<A.t, B.t, C.t, D.t, E.t, F.t, G.t>
     type output = Gen.structure<A.output, B.output, C.output, D.output, E.output, F.output, G.output>
@@ -1132,21 +1132,21 @@ module Product7 = {
     let storeToStructure = Store.bimap(_, fromTuple, fromTuple)
     let storeToTuple = Store.bimap(_, toTuple, toTuple)
     let validateToTuple = Option.map(_, v => out => out->fromTuple->v)
-    let contextToTuple = (context: context): Vector.context => {
+    let contextToTuple = (context: context): Inner.context => {
       let inner = context.inner->toTuple
       let empty = context.empty->Option.map(toTuple)
       let validate = context.validate->validateToTuple
       {?empty, ?validate, inner, validateImmediate: ?context.validateImmediate}
     }
 
-    let empty = (context): inner => context->contextToTuple->FieldVector.Context.inner->Vector.emptyInner->fromTuple
+    let empty = (context): inner => context->contextToTuple->FieldVector.Context.inner->Inner.emptyInner->fromTuple
     let init = (context: context): t => context->empty->Store.init
 
-    let set = (x: input): t => x->toTuple->Vector.set->storeToStructure
-    let showInput = (x: input) => x->toTuple->Vector.showInput
+    let set = (x: input): t => x->toTuple->Inner.set->storeToStructure
+    let showInput = (x: input) => x->toTuple->Inner.showInput
 
     let validate = (force, context: context, store: t): Rxjs.t<Rxjs.foreign, Rxjs.void,t> => 
-      Vector.validate(force, context->contextToTuple, store->storeToTuple)
+      Inner.validate(force, context->contextToTuple, store->storeToTuple)
       ->Dynamic.map(storeToStructure)
 
     type actionsInner<'change> = Gen.structure<
@@ -1160,7 +1160,7 @@ module Product7 = {
     >
 
     let mapActionsInner = (actions: actionsInner<'c>, fn: 'c => 'd): actionsInner<'d> => 
-      actions->toTuple->Vector.mapActionsInner(fn)->fromTuple
+      actions->toTuple->Inner.mapActionsInner(fn)->fromTuple
 
     type actions<'change> = FieldVector.Actions.t<input, 'change, actionsInner<'change>>
     let mapActions = (actions: actions<'ch> , fn: 'ch => 'b) => actions->FieldVector.Actions.trimap(x => x, fn, mapActionsInner(_, fn))
@@ -1177,7 +1177,7 @@ module Product7 = {
     >
 
     let split = (pack: pack) : parted => {
-      Vector.splitInner(
+      Inner.splitInner(
         pack.field->Store.inner->toTuple,
         pack.actions.inner->toTuple,
       )
@@ -1189,26 +1189,26 @@ module Product7 = {
     let makeDyn = (context: context, initial: option<input>, set: Rxjs.Observable.t<input>, val: option<Rxjs.Observable.t<()>> )
       : Dyn.t<Close.t<Form.t<t, actions<()>>>>
       => {
-      Vector.makeDyn(context->contextToTuple, initial->Option.map(toTuple), set->Dynamic.map(toTuple), val)
+      Inner.makeDyn(context->contextToTuple, initial->Option.map(toTuple), set->Dynamic.map(toTuple), val)
       ->Dyn.map(Close.map(_, packFromVector))
     }
 
     let inner = Store.inner
 
-    let input = (store: t) => store->storeToTuple->Vector.input->fromTuple
+    let input = (store: t) => store->storeToTuple->Inner.input->fromTuple
 
     let output = Store.output
     let error = Store.error
     let enum = Store.toEnum
     
-    let printError = (store: t) => store->storeToTuple->Vector.printError
+    let printError = (store: t) => store->storeToTuple->Inner.printError
 
     let show = (store: t): string => {
       `Product7{
         state: ${store->enum->Store.enumToPretty},
         error: ${store->printError->Option.or("None")},
         children: {
-          ${store->inner->toTuple->Vector.showInner->Array.joinWith(",\n")}
+          ${store->inner->toTuple->Inner.showInner->Array.joinWith(",\n")}
         }
       }`
     }

@@ -26,8 +26,8 @@ module Field: Field.T = {
 
   type actions<'change> = { set: input => 'change }
   let mapActions = (actions, fn) => {set: x => x->actions.set->fn }
-  
-  let makeDyn = (_context: context, _initial: option<input>, setOuter: Rxjs.t<'cs, 'ss, input>, val: option<Rxjs.Observable.t<()>> )
+
+  let makeDyn = (_context: context, initial: option<input>, setOuter: Rxjs.t<'cs, 'ss, input>, val: option<Rxjs.Observable.t<()>> )
       : Dyn.t<Close.t<Form.t<t, actions<()>>>>
     => {
     let setInner = Rxjs.Subject.makeEmpty()
@@ -38,12 +38,15 @@ module Field: Field.T = {
       set: Rxjs.next(setInner)
     }
 
-    let field = init()
+    let field = initial->Option.map(set)->Option.or(init())
+
     let first: Close.t<Form.t<t, actions<()>>> = {pack: { field, actions }, close}
 
     let val = val->Option.or(Rxjs.Subject.makeEmpty()->Rxjs.toObservable)
 
-    let dyn = 
+    let init = Dynamic.return(first)
+
+    let dyn =
       Rxjs.merge2(
         setOuter->Dynamic.map(_ => field),
         val->Dynamic.map(_ => field)
@@ -57,7 +60,7 @@ module Field: Field.T = {
       ->Rxjs.pipe(Rxjs.shareReplay(1))
       ->Rxjs.pipe(Rxjs.takeUntil(complete))
 
-      { first, dyn }
+      { first, init, dyn }
   }
 
   // Inner is the immediate store values of children

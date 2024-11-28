@@ -14,6 +14,18 @@ type error = [#Whole(string) | #Part]
 type resultValidate = Promise.t<Result.t<unit, string>>
 type validateOut<'out> = 'out => resultValidate
 
+let mergeCloses = ((closeHead, closeTail)) => {
+  () => {
+    closeHead()
+    closeTail()
+  }
+}
+
+let toActionsHead = Dynamic.map(_,  (head: Close.t<Form.t<'s, 'a>>) => head.pack.actions)
+let toActionsTail = Dynamic.map(_,  (tail: Close.t<Form.t<'s, 'a>>) => tail.pack.actions)
+
+let makeClose = ((field, actions, close)): Close.t<Form.t<'f, 'a>> => {pack: {field, actions}, close }
+
 module Context = {
   type t<'e, 'v, 'i> = {
     empty?: 'e,
@@ -106,7 +118,7 @@ module type Tail = {
   type partition
   let splitInner: (inner, actionsInner<()>) => partition
 
-  let makeDynInner: (contextInner, option<input>, Rxjs.Observable.t<input>) => 
+  let makeDynInner: (contextInner, option<input>, Rxjs.Observable.t<input>) =>
     Dyn.t<Close.t<Form.t<inner, actionsInner<()>>>>
 
   let toInputInner: inner => input
@@ -115,7 +127,7 @@ module type Tail = {
 }
 
 // Vector0 is only a degenerate base case so its not useful to create one as a fully fledged Field.
-// We use makeDynInner to terminate a chain of VectorRec makeDynInner to create a vector of the desired length 
+// We use makeDynInner to terminate a chain of VectorRec makeDynInner to create a vector of the desired length
 // But the behavior of makeDyn "undefined" and can be trivially simple to satisfy the contract of Field.
 // Other functions are implemented to return dynamic values that emit in line with the VectorRec so 
 // We can use combineLatest there and not get hung up waiting for this field to return
@@ -180,29 +192,29 @@ module Vector0 = {
   => {
     let pack: Form.t<'f, 'a> = { field: (), actions: () }
     let close = () => ()
-    let first: Close.t<'fa> = {pack, close} 
-    let dyn = 
-          set
-          ->Dynamic.map( (_): Close.t<Form.t<'f, 'a>> => first)
-          ->Dynamic.map(Dynamic.return)
+    let first: Close.t<'fa> = {pack, close}
+    let init = Dynamic.return(first)
 
-    {first, dyn}
+    let dyn = set->Dynamic.const(first)->Dynamic.map(Dynamic.return)
+
+    {first, init, dyn}
   }
 
-  // I dont think you're going to find much use in creating a Vector0 directly but I may be wrong. 
+  // I dont think you're going to find much use in creating a Vector0 directly but I may be wrong.
   let makeDyn = (_context: context, _initial: option<input>, _set: Rxjs.Observable.t<input>, _val: option<Rxjs.Observable.t<()>>)
       : Dyn.t<Close.t<Form.t<t, actions<()>>>>
     => {
     let actions: actions<()> = {
       set: ignore,
-      clear: ignore, 
+      clear: ignore,
       opt: ignore,
       validate: ignore,
       inner: (),
     }
-
+    let first: Close.t<Form.t<t, actions<()>>> = {close: ignore, pack: {field: Store.init(), actions}}
+    let init = Dynamic.return(first)
     let dyn = Rxjs.Subject.makeEmpty()->Rxjs.toObservable
-    { first: {close: ignore, pack: {field: Store.init(), actions}}, dyn}
+    { first, init, dyn }
   }
 }
 
@@ -261,10 +273,10 @@ module VectorRec = {
     }
 
     let allResult = Tuple.Tuple2.uncurry(Result.all2)
+
     let toResultInner = (inner: inner): result<output, Store.enum> => {
-      open Tuple.Tuple2
       (outputresult(Head.output, Head.enum, _), Tail.toResultInner)
-      ->napply(inner)
+      ->Tuple.Tuple2.napply(inner)
       ->allResult
    }
 
@@ -327,43 +339,6 @@ module VectorRec = {
       Console.log2("FieldVectorRec field", x.pack.field)
     }))
 
-  let makeDynInner = (context: contextInner, initial: option<input>, set: Rxjs.Observable.t<input>)
-    : Dyn.t<Close.t<Form.t<inner, actionsInner<()>>>>
-    => {
-    let setHead = set->Dynamic.map(Tuple.Nested.head)
-    let setTail = set->Dynamic.map(Tuple.Nested.rest)
-    let (contextHead, contextTail) = context 
-
-    let (initialHead, initialTail) =  initial->Option.distribute2
-
-    let {first: firstHead, dyn: firstDyn} = Head.makeDyn(contextHead, initialHead, setHead, None)
-    let {first: firstTail, dyn: tailDyn} = Tail.makeDynInner(contextTail, initialTail, setTail)
-
-    let first: Close.t<Form.t<'f, 'a>> = {
-      pack: {
-        field: (firstHead.pack.field, firstTail.pack.field),
-        actions: (firstHead.pack.actions, firstTail.pack.actions)
-        },
-      close: () => {firstHead.close(); firstTail.close()}
-    }
-
-
-    let dyn = 
-    Dynamic.combineLatest2((firstDyn, tailDyn))
-    ->Dynamic.map( ((head, tail)) => {
-      Dynamic.combineLatest2((head, tail))
-      ->Dynamic.map( ((head, tail)): Close.t<Form.t<'f, 'a>> => {
-        pack: {
-          field: (head.pack.field, tail.pack.field),
-          actions: (head.pack.actions, tail.pack.actions)
-        },
-        close: () => {head.close(); tail.close()}
-      })
-    })
-
-    {first, dyn}
-  }
-    
   let toInputInner = (inner: inner) => (Head.input, Tail.toInputInner)->Tuple.Tuple2.napply(inner)
   let input = (store: t) =>
     (Head.input, Tail.toInputInner)->Tuple.Tuple2.napply(store->Store.inner)
@@ -403,26 +378,89 @@ module VectorRec = {
       }}`
   }
 
+
+  let makeDynInner = (context: contextInner, initial: option<input>, set: Rxjs.Observable.t<input>)
+    : Dyn.t<Close.t<Form.t<inner, actionsInner<()>>>>
+    => {
+    let (contextHead, contextTail) = context
+    let setHead = set->Dynamic.map(Tuple.fst2)
+    let setTail = set->Dynamic.map(Tuple.snd2)
+
+    // let (initialHead, initialTail) =  initial->Option.distribute2
+    let initialHead = initial->Option.map(Tuple.fst2)
+    let initialTail = initial->Option.map(Tuple.snd2)
+
+    let head = Head.makeDyn(contextHead, initialHead, setHead, None)
+    let tail = Tail.makeDynInner(contextTail, initialTail, setTail)
+
+    let innerFirst: inner = (head.first.pack.field, tail.first.pack.field)
+
+    let actionsFirstHead = head.first.pack->Form.actions
+    let actionsFirstTail = tail.first.pack->Form.actions
+    let actionsFirst: actionsInner<()> = (actionsFirstHead, actionsFirstTail)
+    let closeFirst = mergeCloses((tail.first.close, head.first.close))
+
+    let packFirst: Form.t<'f, 'a> = { field: innerFirst, actions: actionsFirst }
+    let first: Close.t<Form.t<'f, 'a>> = { pack: packFirst, close: closeFirst }
+
+    let init = {
+      // Why is this startsWith?
+      // We want combineLatest to emit immediately so actions "always" has a value
+      let actionsHead = head.init->toActionsHead->Dynamic.startWith(actionsFirstHead)
+      let actionsTail = tail.init->toActionsTail->Dynamic.startWith(actionsFirstTail)
+      let actions = Rxjs.combineLatest2(actionsHead, actionsTail)
+
+      let closeHead = head.init->Dynamic.map(x => x.close)
+      let closeTail = tail.init->Dynamic.map(x => x.close)
+      let close =
+        Rxjs.combineLatest2(closeHead, closeTail)
+        ->Dynamic.map(mergeCloses)
+        ->Dynamic.startWith(closeFirst)
+
+      let fieldHead = head.init->Dynamic.map(x => x.pack.field)
+      let fieldTail = tail.init->Dynamic.map(x => x.pack.field)
+
+      Rxjs.combineLatest2(fieldHead, fieldTail)
+      ->Dynamic.withLatestFrom2(actions, close)
+      ->Dynamic.map(makeClose)
+    }
+
+
+    let dyn =
+      Dynamic.combineLatest2((head.dyn, tail.dyn))
+      ->Dynamic.map( ((head, tail)) => {
+        Dynamic.combineLatest2((head, tail))
+        ->Dynamic.map( ((head, tail)): Close.t<Form.t<'f, 'a>> => {
+          pack: {
+            field: (head.pack.field, tail.pack.field),
+            actions: (head.pack.actions, tail.pack.actions)
+          },
+          close: mergeCloses((head.close, tail.close))
+        })
+      })
+
+    {first, init, dyn}
+  }
+
+
   let makeDyn = (context: context, initial: option<input>, setOuter: Rxjs.Observable.t<input>, valOuter: option<Rxjs.Observable.t<()>>)
     : Dyn.t<Close.t<Form.t<t, actions<()>>>>
     => {
-    let field = 
-      initial
-      ->Option.map(set)
-      ->Option.or(init(context))
-    
     let complete = Rxjs.Subject.makeEmpty()
+    let close = Rxjs.next(complete)
+
     let clear = Rxjs.Subject.makeEmpty()
     let opt = Rxjs.Subject.makeEmpty()
     let valInner = Rxjs.Subject.makeEmpty()
-    let val = valOuter->Option.map(Rxjs.merge2(_, valInner))->Option.or(valInner->Rxjs.toObservable)
+    let val =
+      valOuter
+      ->Option.map(Rxjs.merge2(_, valInner))
+      ->Option.or(valInner->Rxjs.toObservable)
 
     let setInner: Rxjs.t<'csi, 'ssi, input> = Rxjs.Subject.makeEmpty()
     let set = Rxjs.merge2(setOuter, setInner)
 
-    let fnValidate = validateOut(~validate=context.validate, ~immediate=context.validateImmediate->Option.or(true))
-
-    let {first: firstInner, dyn: dynInner} = makeDynInner(context.inner, initial, set)
+    let inner = makeDynInner(context.inner, initial, set)
 
     let actionsFirst: actions<()> = {
       set: Rxjs.next(setInner),
@@ -430,57 +468,68 @@ module VectorRec = {
       // reset: Rxjs.next(reset),
       opt: Rxjs.next(opt),
       validate: Rxjs.next(valInner),
-      inner: firstInner.pack.actions, 
-    } 
+      inner: inner.first.pack.actions,
+    }
 
-    let close = Rxjs.next(complete)
+    // FIXME: Is Dirty the right first state?
+    let first: Close.t<Form.t<'f, 'a>> = {pack: { field: inner.first.pack.field->Store.dirty, actions: actionsFirst }, close}
 
-    let first: Close.t<Form.t<'f, 'a>> = {pack: { field, actions: actionsFirst }, close}
     let state = Rxjs.Subject.makeBehavior(first)
 
-    let dynInnerValidated = dynInner
-      ->Dynamic.map(Dynamic.switchMap(_, (inner: Close.t<Form.t<'fa, 'ai>>) => 
+    let fnValidate = validateOut(~validate=context.validate, ~immediate=context.validateImmediate->Option.or(true))
+
+    // actions passed in to reuse the Vector level actions set, clear, opt, validate
+    let applyInner = (actions, inner: Close.t<Form.t<'fa, 'ai>>) =>
         makeStore(~validate=fnValidate, inner.pack.field)
         ->Dynamic.map( (field): Close.t<Form.t<'f, actions<()>>> => {
-          pack: {
-            field,
-            actions: {
-              ...actionsFirst,
-              inner: inner.pack.actions,
-            }
-          },
-          close
+          { pack: {
+              field,
+              actions: {
+                ...actions,
+                inner: inner.pack.actions,
+              }
+            },
+            close
+          }
         })
-      ))
-    
-    let validated = 
-      val
-      ->Dynamic.withLatestFrom(state)
-      ->Dynamic.map(((_, state:  Close.t<Form.t<t, 'a>>)) => {
-        makeStore(~validate=fnValidate, state.pack.field->inner)
-        ->Dynamic.map( (field): Close.t<Form.t<'f, actions<()>>> => {
-          pack: {
-            field,
-            actions: state.pack.actions
-          },
-          close
+
+    let memoStateInit = Dynamic.tap(_, (x: Close.t<Form.t<t, 'a>>) => Rxjs.next(state, x))
+
+    let init = {
+      inner.init
+      ->Dynamic.switchMap(applyInner(actionsFirst))
+      ->memoStateInit
+    }
+
+    let memoStateDyn = Dynamic.map(_, memoStateInit)
+
+    // FIXME: block dyn changes on init completing? - AxM
+    // FIXME: interaction betwween validations and inners?
+    let dyn = {
+      let inner =
+        inner.dyn
+        ->Dynamic.map(Dynamic.switchMap(_, applyInner(actionsFirst)))
+
+      let validated =
+        val
+        ->Dynamic.withLatestFrom(state)
+        ->Dynamic.map(((_, state:  Close.t<Form.t<t, 'a>>)) => {
+          makeStore(~validate=fnValidate, state.pack.field->Store.inner)
+          ->Dynamic.map( (field): Close.t<Form.t<'f, actions<()>>> => {
+            pack: Form.setField(state.pack, field),
+            close
+          })
         })
-      })
 
-    let memoState = Dynamic.map(
-      _,
-      Dynamic.tap(_, (x: Close.t<Form.t<t, 'a>>) => {
-        Rxjs.next(state, x)
-      }),
-    )
-
-    let dyn = 
-      Rxjs.merge2(dynInnerValidated, validated)
-      ->memoState
+      Rxjs.merge2(inner, validated)
+      ->memoStateDyn
+      // FIXME: When are shareReplays really needed? - AxM
+      // Is it that Dynamic.return uses 'of' which is immediate? - AxM
       ->Rxjs.pipe(Rxjs.shareReplay(1))
       ->Rxjs.pipe(Rxjs.takeUntil(complete))
+    }
 
-    {first, dyn}
+    {first, init, dyn}
   }
   }
 }

@@ -51,17 +51,19 @@ module Make = (I: Interface) => {
   let set = Store.dirty
 
   let validate = (force: bool, context: context, store: t): Rxjs.t<Rxjs.foreign, Rxjs.void, t> => {
+    // FIXME: needs to honor force flag?
     ignore(force)
     switch store {
     | Init(input)
-    | Dirty(input) =>
+    | Dirty(input) => {
       input
       ->I.parse
       ->Result.resolve(
         ~ok=value => {
           switch context.validate {
           | None => Store.valid(input, value)->Dynamic.return
-          | Some(validate) =>
+        | Some(validate) => {
+            Console.log("above validate")
             value
             ->validate
             ->Promise.map(res => {
@@ -70,12 +72,21 @@ module Make = (I: Interface) => {
               | Error(err) => Store.invalid(input, err)
               }
             })
+            ->Promise.tap(x => { Console.log2("validate p", x) })
+            // ->Dynamic.tap(Console.log2("validate string length"))
             ->Rxjs.fromPromise
+            // ->Rxjs.fromPromiseSched(Rxjs.asyncScheduler)
+            ->Dynamic.log("blah")
+            // ->Promise.tap(Console.log2("validated p"))
+            // Console.log2("validated pp"))
             ->Dynamic.startWith(Store.busy(input))
+            // ->Dynamic.tap(Console.log2("blah sw") )
+          }
           }
         },
         ~err=err => Store.invalid(input, err)->Dynamic.return,
       )
+    }
     | _ => Dynamic.return(store)
     }
   }
@@ -106,7 +117,7 @@ module Make = (I: Interface) => {
     let complete = Rxjs.Subject.makeEmpty()
     let clear = Rxjs.Subject.makeEmpty()
     let reset = Rxjs.Subject.makeEmpty()
-    let setInner = Rxjs.Subject.makeEmpty()
+    let setInner = Rxjs.Subject.makeEmpty()->Dynamic.tap(Console.log2("setInner"))
     let valInner = Rxjs.Subject.makeEmpty()
 
     let setCombined = Rxjs.merge2(setOuter, setInner)
@@ -115,7 +126,7 @@ module Make = (I: Interface) => {
       clear: Rxjs.next(clear),
       reset: Rxjs.next(reset),
       validate: Rxjs.next(valInner),
-      set: x => {Rxjs.next(setInner, x)},
+      set: x => Rxjs.next(setInner, x),
     }
 
     // For testing, you need to close EVERYTHING including the set to get the observable to close.
@@ -146,13 +157,24 @@ module Make = (I: Interface) => {
       ->Dynamic.withLatestFrom(state)
       ->Dynamic.map(((_, state)) => state.pack.field->validate(true, context, _))
 
-    let setValidated = setCombined->Dynamic.map(input => {
+    let validateOpt =
       if context.validateImmediate->Option.or(true) {
-        Store.dirty(input)->validate(false, context, _)
+        (x) => validate(false, context, x)->Dynamic.log("validateOpt")
       } else {
-        Store.dirty(input)->Dynamic.return
+        (x) => x->Dynamic.return->Dynamic.log("validateOpt return")
       }
-    })
+
+    let toClose = Dynamic.map(_, (field): Close.t<Form.t<t, 'b>> => {pack: {field, actions}, close})
+
+    let init = field->validateOpt->toClose
+
+    let setValidated = setCombined
+        ->Dynamic.tap(Console.log2("setCombined"))
+        ->Dynamic.map(input => {
+          Console.log2("pre validateOpt", input)
+          input->Store.dirty->validateOpt
+        })
+        // ->Dynamic.map(Dynamic.tap(_, Console.log2("setValidated")))
 
     let memoState = Dynamic.map(
       _,
@@ -166,13 +188,14 @@ module Make = (I: Interface) => {
       ->Dynamic.withLatestFrom(state)
       ->Dynamic.map(((x, state)) =>
         x
-        ->Dynamic.map((field): Close.t<Form.t<t, 'b>> => {pack: {field, actions}, close})
+        ->toClose
         ->Dynamic.startWith(state)
+        ->Dynamic.tap(Console.log2("dyn"))
       )
       ->memoState
       ->Rxjs.pipe(Rxjs.takeUntil(complete))
 
-    {first, dyn}
+    {first, init, dyn}
   }
 
   let printError = Store.error
