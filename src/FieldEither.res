@@ -12,6 +12,23 @@ type error = [#Whole(string) | #Part]
 
 module Actions = FieldVector.Actions
 
+let combineLatestScan = (head: Rxjs.Observable.t<'left>, tail: Rxjs.Observable.t<'right>, init) =>
+      Rxjs.merge2(
+        head->Dynamic.map(Either.left),
+        tail->Dynamic.map(Either.right)
+      )
+      ->Rxjs.pipe(Rxjs.scan(
+          ( (hs: 'left , ts: 'right)
+          , d: Either.t<'left, 'right >
+          , _index
+          ) => {
+          switch d {
+          | Left(h) => (h, ts)
+          | Right(t) => (hs, t)
+          }
+      }, init))
+
+
 @ocamldoc("the Tail module type is an extension of Field with some extras for
 managing the recursive construction of FieldEither3,4,5...
 Some elements of Field are baked in to include a non recursive
@@ -110,47 +127,33 @@ module Either0 = {
   let splitInner = (_, _) => {
     ()
   }
- 
+
   let showInner = (_inner: inner): string => "(either0 inner)"
 
   let show = (_store: t): string => "Either0"
 
   type observables =
     Rxjs.t<Rxjs.foreign, Rxjs.void, Form.t<t, actions<()>>>
-  
+
+  let null: Close.t<Form.t<'f, 'a>> = {pack: {field: (), actions: ()}, close: () => ()}
+
   let makeDynInner =  (_context: contextInner, _initial: option<input>, set: Rxjs.Observable.t<input>)
     : Dyn.t<Close.t<Form.t<inner, actionsInner<()>>>>
     => {
       // Since either0 is degenerate, it will never be meanigfully set
       // and it should never emit values on validation.
 
-      let first: Close.t<Form.t<'f, 'a>> = {pack: {field: (), actions: ()}, close: () => ()}
-
-      let init = Dynamic.return(first)
-
-      let dyn = set
-        ->Dynamic.map(_ => Dynamic.return(first))
+      let first: Close.t<Form.t<'f, 'a>> = null
+      let init = Dynamic.return(null)
+      let dyn = set->Dynamic.map(_ => Dynamic.return(null))
 
       {first, init, dyn}
     }
 
-  let makeDyn = (_context: context, initial: option<input>, setOuter: Rxjs.Observable.t<input>, valOuter: option<Rxjs.Observable.t<()>> )
-    : Dyn.t<Close.t<Form.t<t, actions<()>>>>
-    => {
-    let field = initial->Option.map(set)->Option.or(init())
-    let actions: actions<()> = () 
-    let first: Close.t<Form.t<'f, 'a>> = {pack: { field, actions }, close: () => ()}
-
-    let init = Dynamic.return(first)
-    let dyn =
-      valOuter
-      ->Option.map(Rxjs.merge2(setOuter, _))
-      ->Option.or(setOuter)
-      ->Dynamic.map(_ => Dynamic.return(first))
-      ->Rxjs.toObservable
-
-    {first, init, dyn}
-  }
+  // Meaningless to be called, so far.
+  let makeDyn
+    : (context, option<input>, Rxjs.Observable.t<input>, option<Rxjs.Observable.t<()>> ) => Dyn.t<Close.t<Form.t<t, actions<()>>>>
+    = %raw("() => { debugger }")
 }
 
 module Rec = {

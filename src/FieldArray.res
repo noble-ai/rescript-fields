@@ -35,8 +35,37 @@ let traverseTuple3 = (arr: array<'a>, fn: 'a => ('b, 'c, 'd)): (array<'b>, array
 
 external identity: 'a => 'a = "%identity"
 
-let sequenceTuple3 = (arr: array<('a, 'b, 'c)>): (array<'a>, array<'b>, array<'c>) =>
-  traverseTuple3(arr, identity)
+let mergeCloses = (closes) => {
+  () => {
+    closes->Array.forEach(x => x())
+  }
+}
+
+let mergeInner =  (array: array<Close.t<Form.t<'fa, 'aa>>>): Close.t<Form.t<'f, 'a>> => {
+  let field = array->Array.map(x => x.pack.field)
+  let actions = array->Array.map(x => x.pack.actions)
+  let close = mergeCloses(array->Array.map(x => x.close))
+  { pack: { field, actions }, close }
+}
+
+type merge<'a> = { value: 'a, index: int }
+
+// Observables anre not guaranteed to emit.
+// and if we apply a startWith on each element
+// We will cause an emission before any signal was recieved.
+// So instead we use a default value array
+// and multiplex all the changes by index
+// and then applyLatest combines them, taking the init as value
+// for any indices that have not yet emitted
+let combineLatestScan = {
+  let applyLatest = (d: Array.t<'a>, (hs, index): ('a, int), _index: int): Array.t<'a> => Array.set(d, index, hs)
+  (a: array<Rxjs.Observable.t<'a>>, init: array<'a>): Rxjs.Observable.t<array<'a>> => {
+    a
+    ->Array.mapi( (obs, i) => Dynamic.map(obs, x => (x, i) ))
+    ->Rxjs.mergeArray
+    ->Rxjs.pipe(Rxjs.scan(applyLatest, init))
+  }
+}
 
 module type IArray =
 {
@@ -59,7 +88,7 @@ type actions<'finput, 'factions, 'out> = {
   reset: () => 'out,
   index: (int) => option<'factions>,
 }
-  
+
 
   module type T = {
     include Field.T
@@ -74,7 +103,7 @@ type actions<'finput, 'factions, 'out> = {
     with type input = array<F.input>
     and type inputElement = F.input
     and type inner = array<F.t>
-    and type output = array<F.output> 
+    and type output = array<F.output>
     and type error = error
     and type t = Store.t<array<F.t>, array<F.output>, error>
     and type context = Context.structure<F.output, F.context, F.input>
@@ -125,7 +154,7 @@ module Make: Make = (F: Field.T, I: IArray with type t = F.t) => {
       #Invalid,
     )
 
-  let validateImpl = (context: context, force, inner) => {
+  let validateImpl = (context: context, force, inner): Result.t<Rxjs.Observable.t<'out>, 'err> => {
     Result.first(makeOutput(inner), makeOutput(inner->I.filter))
     ->Result.mapError(_ => #Invalid)
     ->Result.map(out => {
@@ -148,7 +177,7 @@ module Make: Make = (F: Field.T, I: IArray with type t = F.t) => {
   }
 
   // Just like FieldProduct makeStore, but for an array of same elements
-  let makeStore = (~validate, inner: inner): Rxjs.t<Rxjs.foreign, Rxjs.void,t> => {
+  let makeStore = (~validate, inner: inner): Rxjs.Observable.t<t> => {
     [
       prefer(#Busy, Store.busy, inner),
       preferFiltered(#Invalid, Store.invalid(_, #Part), inner, inner->I.filter),
@@ -156,7 +185,7 @@ module Make: Make = (F: Field.T, I: IArray with type t = F.t) => {
       validate(inner),
     ]
     ->Array.reduce(Result.first, Error(#Invalid))
-    ->Result.resolve(~ok=x => x, ~err=FieldVector.resolveErr(inner))
+    ->Result.resolve(~ok=x => x, ~err=x => FieldVector.resolveErr(inner, x)->Dynamic.return)
   }
 
   let validate = (force, context: context, store: t): Rxjs.t<Rxjs.foreign, Rxjs.void,t> => {
@@ -226,7 +255,7 @@ module Make: Make = (F: Field.T, I: IArray with type t = F.t) => {
     })
   }
 
- 
+
   external outputToString: output => string = "%identity"
   let show = (store: t) => {
     `FieldArray{
@@ -239,6 +268,16 @@ module Make: Make = (F: Field.T, I: IArray with type t = F.t) => {
     }`
   }
 
+  let traverseSet = (context: context, set, x) => {
+    x
+    ->Array.mapi( (value, index) => (value, index))
+    ->traverseTuple3( ((value, index)) => {
+      let setElement = set->Dynamic.keepMap(Array.get(_, index))->Dynamic.startWith(value)
+      let {first, init, dyn} = F.makeDyn(context.element, Some(value), setElement, None)
+      (first, init, dyn)
+    })
+  }
+
   let makeDynInner = (context: context, initial: option<input>, set: Rxjs.Observable.t<input>)
     : (
       Array.t<Close.t<Form.t<F.t, F.actions<unit>>>>,
@@ -248,23 +287,12 @@ module Make: Make = (F: Field.T, I: IArray with type t = F.t) => {
    => {
       Option.first(initial, Option.flap0(context.empty))
       ->Option.or([])
-      // THis is the same as #Set below
-      ->Array.mapi( (value, index) => {
-        let setElement = set->Dynamic.keepMap(Array.get(_, index))->Dynamic.startWith(value)
-        let {first, init, dyn} = F.makeDyn(context.element, Some(value), setElement, None)
-        (first, init, dyn)
-      })
-      ->sequenceTuple3
-  }
+      ->traverseSet(context, set, _)
+    }
 
   let makeDyn = (context: context, initial: option<input>, setOuter: Rxjs.Observable.t<input>, _validate: option<Rxjs.Observable.t<()>>)
     : Dyn.t<Close.t<Form.t<t, actions<()>>>>
   => {
-    let (firstInner, initInner, dynInner) = makeDynInner(context, initial, setOuter)
-    let packsInner = firstInner->Array.map(Close.pack)
-    let actionsInner = packsInner->Array.map(Form.actions)
-    let fieldsInner = packsInner->Array.map(Form.field)
-
     let opt: Rxjs.t<'c, Rxjs.source<option<input>>, option<input>> = Rxjs.Subject.makeEmpty()
     let setInner: Rxjs.t<'c, Rxjs.source<input>, input> = Rxjs.Subject.makeEmpty()
     let clearInner = Rxjs.Subject.makeEmpty()
@@ -278,9 +306,7 @@ module Make: Make = (F: Field.T, I: IArray with type t = F.t) => {
 
     let clear = Rxjs.merge2(clearInner, clearOpt)
 
-    let fieldFirst = fieldsInner->Store.init
-
-    let actionsFirst: actions<()> = {
+    let makeActions = (actionsInner):  actions<()> => {
       set: Rxjs.next(setInner),
       clear: Rxjs.next(clearInner),
       opt: Rxjs.next(opt),
@@ -291,6 +317,7 @@ module Make: Make = (F: Field.T, I: IArray with type t = F.t) => {
     }
 
     let closeArray = () => {
+      // Only static observables here
       Rxjs.complete(clearInner)
       Rxjs.complete(reset)
       Rxjs.complete(add)
@@ -300,63 +327,70 @@ module Make: Make = (F: Field.T, I: IArray with type t = F.t) => {
       Rxjs.next(complete, ())
     }
 
-    let close = () => {
-      firstInner->Array.forEach( c => c.close())
+    let makeClose = (close: () => ()) => () => {
+      close()
       closeArray()
     }
 
-    let first: Close.t<Form.t<'f, 'a>> = {pack: {field: fieldFirst, actions: actionsFirst}, close}
+    let (firstInner, initInner, dynInner) = makeDynInner(context, initial, setOuter)
+
+    let applyField = ({pack,close}: Close.t<Form.t<'aaf, 'baf>>) =>
+          (field): Close.t<Form.t<t, actions<()>>> =>
+            { pack:
+              { field
+              , actions: makeActions(pack.actions)
+              }
+            , close: makeClose(close)
+            }
+
+    // This is like applyInner but does not include makeStore which produces an observable.
+    // We want one definite value, and now.
+    let first: Close.t<Form.t<'ff, 'af>> = {
+      let inners = mergeInner(firstInner)
+      inners.pack.field
+      ->Store.init
+      ->applyField(inners, _)
+    }
 
     let validate = validateImpl(context, false)
 
-    let init = {
-      initInner
-      ->Rxjs.combineLatestArray
-      ->Dynamic.switchMap( (inners): Rxjs.Observable.t<Close.t<Form.t<t, actions<()>>>> => {
-        let close = () => {
-          inners->Array.forEach(x => x.close())
-          closeArray()
-        }
-        let actions = inners->Array.map(x => x.pack.actions)
-
-        inners
-        ->Array.map(x => x.pack.field)
+    let applyInner = (inners): Rxjs.Observable.t<Close.t<Form.t<t, actions<()>>>> => {
+        // Console.log2("apply Inner", inners)
+        let inners = mergeInner(inners)
+        inners.pack.field
         ->makeStore(~validate)
-        ->Dynamic.map( (field): Close.t<Form.t<t, actions<()>>> =>
-          { pack:
-            { field
-            , actions:
-              { ...actionsFirst
-              , index: Array.get(actions)
-              }
-            }
-          , close
-          }
-        )
-      })
-    }
+        ->Dynamic.map( applyField(inners))
+      }
 
     let stateElements =
       Rxjs.Subject.make(firstInner)
       ->Rxjs.pipe(Rxjs.shareReplay(1))
+      // ->Dynamic.log("stateElements")
+
+    let init = {
+      combineLatestScan(initInner, firstInner)
+      ->Dynamic.tap(Rxjs.next(stateElements))
+      ->Dynamic.switchMap(applyInner)
+      // ->Dynamic.log("init array 2")
+    }
 
     let set =
       Rxjs.merge3(setOuter, setInner, setOpt)
-      ->Rxjs.pipe(Rxjs.shareReplay(1))
+      // ->Rxjs.pipe(Rxjs.shareReplay(1))
 
     // multiplex all the various Array level change signals
     // So we can scan on them, producing new arrays of F.t dyns.
-    let changes = Rxjs.merge5(
-      add->Dynamic.map(x => #Add(x)),
-      remove->Dynamic.map(i => #Remove(i)),
-      set->Dynamic.map(x => #Set(x)),
-      clear->Dynamic.map(_ => #Clear),
-      reset->Dynamic.map(_ => #Reset),
-    )
-
     let elements =
-      changes
+      Rxjs.merge5(
+        add->Dynamic.map(x => #Add(x)),
+        remove->Dynamic.map(i => #Remove(i)),
+        set->Dynamic.map(x => #Set(x)),
+        clear->Dynamic.map(_ => #Clear),
+        reset->Dynamic.map(_ => #Reset),
+      )
+      // ->Dynamic.log("changes")
       ->Dynamic.withLatestFrom(stateElements->Dynamic.startWith(firstInner))
+      // ->Dynamic.log("changes wlf")
       // scan accumulates state, but only so it can be passed to the combineLatestArray step
       ->Rxjs.pipe(Rxjs.scan(
         ( (firsts: Array.t<Close.t<Form.t<F.t, F.actions<unit>>>>, inits, dyns)
@@ -380,7 +414,6 @@ module Make: Make = (F: Field.T, I: IArray with type t = F.t) => {
         let index = firsts->Array.length
         let setElement = set->Dynamic.keepMap(Array.get(_, index))
         let {first, init, dyn} = F.makeDyn(context.element, value, setElement, None)
-        let dyn = dyn->Dynamic.startWith(Dynamic.return(first))
         ( stateElements->Array.append(first)
         , inits->Array.append(init)
         , dyns->Array.append(dyn)
@@ -396,26 +429,20 @@ module Make: Make = (F: Field.T, I: IArray with type t = F.t) => {
       }
       | #Set(input) => {
         stateElements->Array.forEach(c => c.close())
-        let (firsts, inits, dyns) =
-          input
-          ->Array.mapi( (value, index) => {
-            let setElement = set->Dynamic.keepMap(Array.get(_, index))->Dynamic.startWith(value)
-            let {first, init, dyn} = F.makeDyn(context.element, Some(value), setElement, None)
-            (first, init, dyn)
-          })
-          ->sequenceTuple3
+        let (firsts, inits, dyns) = input->traverseSet(context, set, _)
         ( firsts , inits , dyns)
       }}
     }, (firstInner, initInner, dynInner)))
     // Take the latest array of inner dyns,
-    ->Dynamic.withLatestFrom(stateElements->Dynamic.startWith(firstInner))
-    ->Dynamic.switchMap( (((_firsts, _inits, dyns), stateElements): (
+    // ->Dynamic.log("changes scan")
+    // ->Dynamic.withLatestFrom(stateElements->Dynamic.startWith(firstInner))
+    // ->Dynamic.log("changes scan wlf")
+    ->Dynamic.switchMap( (((state, inits, dyns)):
         ( Array.t<Close.t<Form.t<F.t, F.actions<unit>>>>
         , Array.t<Dyn.init<Close.t<Form.t<F.t, F.actions<()>>>>>
         , Array.t<Dyn.dyn<Close.t<Form.t<F.t, F.actions<()>>>>>
         )
-        , Array.t<Close.t<Form.t<F.t, F.actions<unit>>>>
-      )): Dyn.dyn<Array.t<Close.t<Form.t<F.t, F.actions<()>>>>> => {
+      ): Dyn.dyn<Array.t<Close.t<Form.t<F.t, F.actions<()>>>>> => {
 
       // When the array is empty, there are no events to animate combineLatestArray
       // So a default for []
@@ -423,40 +450,23 @@ module Make: Make = (F: Field.T, I: IArray with type t = F.t) => {
       | [] => Dynamic.return(Dynamic.return([]))
       | dyns => {
         dyns
-        ->Rxjs.combineLatestArray
-        ->Dynamic.map(Rxjs.combineLatestArray)
-        // Needs to tickle the combine latest with an initial value so that removing an index will emit new values
-        ->Dynamic.map(Dynamic.startWith(_, stateElements))
+        ->combineLatestScan(inits)
+        ->Dynamic.map(combineLatestScan(_, state))
       }}
     })
+    // ->Dynamic.log("elements")
 
     // Combine the
     let dyn =
       elements
       ->Dynamic.switchMap(elements => {
+        // Console.log2("dyn elements", elements)
         elements
-        ->Dynamic.map( elements => {
-          Rxjs.next(stateElements, elements)
-          elements
-          ->Array.map(e => e->Close.pack->Form.field)
-          ->makeStore(~validate)
-          ->Dynamic.map((field): Close.t<Form.t<'f, 'a>> => {
-            let actions: actions<unit> = {
-              ...actionsFirst,
-              index: index => Array.get(elements, index)->Option.map(e => e->Close.pack->Form.actions),
-            }
-
-            let close = () => {
-              elements->Array.forEach(c => c.close())
-              closeArray()
-            }
-
-            {pack: {field, actions}, close}
-          })
-        })
+        ->Dynamic.tap(Rxjs.next(stateElements))
+        ->Dynamic.map(applyInner)
+        // ->Dynamic.log("dyn elements inner")
+        // ->Dynamic.map(Dynamic.log(_, "dyn elements values"))
       })
-      ->Dynamic.startWith(Dynamic.return(first))
-      ->Rxjs.pipe(Rxjs.shareReplay(1))
       ->Rxjs.pipe(Rxjs.takeUntil(complete))
 
     {first, init, dyn}

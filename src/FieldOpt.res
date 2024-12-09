@@ -163,7 +163,6 @@ module Make: Make = (F: Field.T) => {
     let initialInner = initial->Option.join
     let {first: firstInner, init: initInner, dyn: dynInner} = F.makeDyn(context, initialInner, set, Some(val))
 
-
     let actions: actions<()> = {
       clear: Rxjs.next(clearInner),
       opt: Rxjs.next(opt),
@@ -190,7 +189,7 @@ module Make: Make = (F: Field.T) => {
       ->Dynamic.switchSequence
 
     // FIXME: needs a startsWith for withLatestFrom in case validate comes before change
-    let validated = val 
+    let validated = val
       ->Dynamic.withLatestFrom(change)
       ->Rxjs.toObservable
       ->Dynamic.map( ((_, {pack: {field, actions}, close})) =>
@@ -198,7 +197,7 @@ module Make: Make = (F: Field.T) => {
         ->Dynamic.map((field): Close.t<Form.t<'f, 'a>> => {pack: {field, actions}, close})
       )
 
-    let dyn = 
+    let dyn =
       Rxjs.merge2(changes, validated)
       ->Rxjs.pipe(Rxjs.shareReplay(1))
       ->Rxjs.pipe(Rxjs.takeUntil(complete))

@@ -14,7 +14,12 @@ module Make = (F: Field.T) => {
       let {first, init, dyn} = F.makeDyn(context, init, set->Rxjs.toObservable, validate->Rxjs.toObservable->Some)
 
       let dyn =
-        [init->Dynamic.finalize(Console.log2("init")), dyn->Dynamic.switchSequence]
+        [ init
+          ->Dynamic.log("init")
+        , dyn
+          ->Dynamic.switchSequence
+          // ->Dynamic.log("dyn")
+        ]
         ->Rxjs.fromArray
         ->Dynamic.switchSequence
 
@@ -29,16 +34,16 @@ module Make = (F: Field.T) => {
       ->Dynamic.toPromise
       ->Promise.void
     })
-    
+
     React.useEffect0(() => {
       // Promise.sleep(30)
       // ->Promise.tap((_) => {
-        init->Option.forEach(Rxjs.next(set))
+        // init->Option.forEach(Rxjs.next(set))
       // })
       // ->Promise.void
-      if validateInit {
-        Rxjs.next(validate, ())
-      }
+      // if validateInit {
+      //   Rxjs.next(validate, ())
+      // }
       None
     })
 

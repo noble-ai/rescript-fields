@@ -143,7 +143,7 @@ module Product1 = {
     >
     let mapActionsInner = (actions: actionsInner<'c>, fn: 'c => 'd): actionsInner<'d> => 
       actions->toTuple->Inner.mapActionsInner(fn)->fromTuple
- 
+
     type actions<'change> = FieldVector.Actions.t<input, 'change, actionsInner<'change>>
     let mapActions = (actions, fn) => actions->FieldVector.Actions.trimap(x => x, fn, mapActionsInner(_, fn))
   
@@ -619,10 +619,12 @@ module Product4 = {
     let makeDyn = (context: context, initial: option<input>, set: Rxjs.Observable.t<input>, val: option<Rxjs.Observable.t<()>> )
       : Dyn.t<Close.t<Form.t<t, actions<()>>>>
       => {
-      let x = Inner.makeDyn(context->contextToTuple, initial->Option.map(toTuple), set->Dynamic.map(toTuple), val)
+      let {first, init, dyn} = Inner.makeDyn(context->contextToTuple, initial->Option.map(toTuple), set->Dynamic.map(toTuple), val)
       ->Dyn.map(Close.map(_, packFromVector))
 
-      x
+      let init = init
+      // ->Dynamic.log("prod4")
+      {first, init, dyn }
     }
  
     let inner = Store.inner

@@ -26,6 +26,22 @@ let toActionsTail = Dynamic.map(_,  (tail: Close.t<Form.t<'s, 'a>>) => tail.pack
 
 let makeClose = ((field, actions, close)): Close.t<Form.t<'f, 'a>> => {pack: {field, actions}, close }
 
+let combineLatestScan = (head: Rxjs.Observable.t<'left>, tail: Rxjs.Observable.t<'right>, init) =>
+      Rxjs.merge2(
+        head->Dynamic.map(Either.left),
+        tail->Dynamic.map(Either.right)
+      )
+      ->Rxjs.pipe(Rxjs.scan(
+          ( (hs: 'left , ts: 'right)
+          , d: Either.t<'left, 'right >
+          , _index
+          ) => {
+          switch d {
+          | Left(h) => (h, ts)
+          | Right(t) => (hs, t)
+          }
+      }, init))
+
 module Context = {
   type t<'e, 'v, 'i> = {
     empty?: 'e,
@@ -88,7 +104,7 @@ let resolveErr = (inner, e) => {
   | #Init => Store.init(inner)
   | #Dirty => Store.dirty(inner)
   | #Valid => Exn.raise("allResult must not fail when #Valid")
-  }->Dynamic.return
+  }
 }
 
 // This is a selection of Field.T with some "Inner" additions to allow recursion
@@ -129,7 +145,7 @@ module type Tail = {
 // Vector0 is only a degenerate base case so its not useful to create one as a fully fledged Field.
 // We use makeDynInner to terminate a chain of VectorRec makeDynInner to create a vector of the desired length
 // But the behavior of makeDyn "undefined" and can be trivially simple to satisfy the contract of Field.
-// Other functions are implemented to return dynamic values that emit in line with the VectorRec so 
+// Other functions are implemented to return dynamic values that emit in line with the VectorRec so
 // We can use combineLatest there and not get hung up waiting for this field to return
 module Vector0 = {
   type input = ()
@@ -172,7 +188,7 @@ module Vector0 = {
   let error = _ => None //Store.error
   let printErrorInner = (_inner: inner): array<option<string>> => []
   let printError = (_store: t): option<string> => None
-  
+
   let show = (_store: t): string => `Vector0`
 
   type actionsInner<'change> = ()
@@ -201,21 +217,9 @@ module Vector0 = {
   }
 
   // I dont think you're going to find much use in creating a Vector0 directly but I may be wrong.
-  let makeDyn = (_context: context, _initial: option<input>, _set: Rxjs.Observable.t<input>, _val: option<Rxjs.Observable.t<()>>)
-      : Dyn.t<Close.t<Form.t<t, actions<()>>>>
-    => {
-    let actions: actions<()> = {
-      set: ignore,
-      clear: ignore,
-      opt: ignore,
-      validate: ignore,
-      inner: (),
-    }
-    let first: Close.t<Form.t<t, actions<()>>> = {close: ignore, pack: {field: Store.init(), actions}}
-    let init = Dynamic.return(first)
-    let dyn = Rxjs.Subject.makeEmpty()->Rxjs.toObservable
-    { first, init, dyn }
-  }
+  let makeDyn
+    : (context, option<input>, Rxjs.Observable.t<input>, option<Rxjs.Observable.t<()>> ) => Dyn.t<Close.t<Form.t<t, actions<()>>>>
+    = %raw("() => { debugger }")
 }
 
 module VectorRec = {
@@ -236,11 +240,11 @@ module VectorRec = {
       `${head}, ${tail}`
     }
 
-    let set = (x: input): t => 
+    let set = (x: input): t =>
       Tuple.bimap(Head.set, x => x->Tail.set->Tail.inner, x)
       ->Store.dirty
 
-    let emptyInner = (context: contextInner): inner => 
+    let emptyInner = (context: contextInner): inner =>
       Tuple.bimap(Head.init, Tail.emptyInner, context)
     let empty = (c: context) => c.inner->emptyInner
 
@@ -280,7 +284,7 @@ module VectorRec = {
       ->allResult
    }
 
-    let makeStore = (~validate, inner: inner): Rxjs.t<Rxjs.foreign, Rxjs.void,t> => {
+    let makeStore = (~validate, inner: inner): Rxjs.Observable.t<t> => {
       // TODO: These predicated values are computed up front
       // so these promises are made, and then thrown away
       // Should predicate take a thunk for lazy evaluation? - AxM
@@ -293,7 +297,7 @@ module VectorRec = {
         inner->toResultInner->Result.map(validate(inner)),
       ]
       ->Array.reduce(Result.first, Error(#Invalid))
-      ->Result.resolve(~ok=x => x, ~err=resolveErr(inner))
+      ->Result.resolve(~ok=x => x, ~err=x => resolveErr(inner, x)->Dynamic.return)
     }
 
     let validateInner = (context: contextInner, inner: inner): Rxjs.t<Rxjs.foreign, Rxjs.void,inner> => {
@@ -323,10 +327,10 @@ module VectorRec = {
 
     type actions<'change> = Actions.t<input, 'change, actionsInner<'change>>
     let mapActions = (actions, fn) => actions->Actions.trimap(x => x, fn, mapActionsInner(_, fn))
-    
+
     type partition = (Form.t<Head.t, Head.actions<()>>, Tail.partition)
     let splitInner = (inner: inner, actions: actionsInner<()>): partition => {
-      let (field, it) = inner 
+      let (field, it) = inner
       let (ah, at) = actions
       ( {field: field, actions: ah}, Tail.splitInner(it, at))
     }
@@ -378,65 +382,44 @@ module VectorRec = {
       }}`
   }
 
+  let mergeHt =  ((h: Close.t<Form.t<'fh, 'ah>>, t: Close.t<Form.t<'ft, 'at>>)): Close.t<Form.t<'f, 'a>> => {
+      let field = (h.pack.field, t.pack.field)
+      let actions = (h.pack.actions, t.pack.actions)
+      let close = mergeCloses((h.close, t.close))
+      { pack: { field, actions }, close }
+    }
 
   let makeDynInner = (context: contextInner, initial: option<input>, set: Rxjs.Observable.t<input>)
     : Dyn.t<Close.t<Form.t<inner, actionsInner<()>>>>
     => {
-    let (contextHead, contextTail) = context
-    let setHead = set->Dynamic.map(Tuple.fst2)
-    let setTail = set->Dynamic.map(Tuple.snd2)
-
-    // let (initialHead, initialTail) =  initial->Option.distribute2
-    let initialHead = initial->Option.map(Tuple.fst2)
-    let initialTail = initial->Option.map(Tuple.snd2)
-
-    let head = Head.makeDyn(contextHead, initialHead, setHead, None)
-    let tail = Tail.makeDynInner(contextTail, initialTail, setTail)
-
-    let innerFirst: inner = (head.first.pack.field, tail.first.pack.field)
-
-    let actionsFirstHead = head.first.pack->Form.actions
-    let actionsFirstTail = tail.first.pack->Form.actions
-    let actionsFirst: actionsInner<()> = (actionsFirstHead, actionsFirstTail)
-    let closeFirst = mergeCloses((tail.first.close, head.first.close))
-
-    let packFirst: Form.t<'f, 'a> = { field: innerFirst, actions: actionsFirst }
-    let first: Close.t<Form.t<'f, 'a>> = { pack: packFirst, close: closeFirst }
-
-    let init = {
-      // Why is this startsWith?
-      // We want combineLatest to emit immediately so actions "always" has a value
-      let actionsHead = head.init->toActionsHead->Dynamic.startWith(actionsFirstHead)
-      let actionsTail = tail.init->toActionsTail->Dynamic.startWith(actionsFirstTail)
-      let actions = Rxjs.combineLatest2(actionsHead, actionsTail)
-
-      let closeHead = head.init->Dynamic.map(x => x.close)
-      let closeTail = tail.init->Dynamic.map(x => x.close)
-      let close =
-        Rxjs.combineLatest2(closeHead, closeTail)
-        ->Dynamic.map(mergeCloses)
-        ->Dynamic.startWith(closeFirst)
-
-      let fieldHead = head.init->Dynamic.map(x => x.pack.field)
-      let fieldTail = tail.init->Dynamic.map(x => x.pack.field)
-
-      Rxjs.combineLatest2(fieldHead, fieldTail)
-      ->Dynamic.withLatestFrom2(actions, close)
-      ->Dynamic.map(makeClose)
+    // FIXME: pass validate to head and tail - AxM
+    let head = {
+      let initial = initial->Option.map(Tuple.fst2)
+      let set = set->Dynamic.map(Tuple.fst2)
+      let context = context->Tuple.fst2
+      Head.makeDyn(context, initial, set, None)
     }
 
+    let tail = {
+      let initial = initial->Option.map(Tuple.snd2)
+      let set = set->Dynamic.map(Tuple.snd2)
+      let context = context->Tuple.snd2
+      Tail.makeDynInner(context, initial, set)
+    }
+
+    let first = mergeHt((head.first, tail.first))
+
+    let init = combineLatestScan(head.init, tail.init, (head.first, tail.first))
+      ->Dynamic.map(mergeHt)
+      // ->Dynamic.log("vector init merge")
 
     let dyn =
-      Dynamic.combineLatest2((head.dyn, tail.dyn))
-      ->Dynamic.map( ((head, tail)) => {
-        Dynamic.combineLatest2((head, tail))
-        ->Dynamic.map( ((head, tail)): Close.t<Form.t<'f, 'a>> => {
-          pack: {
-            field: (head.pack.field, tail.pack.field),
-            actions: (head.pack.actions, tail.pack.actions)
-          },
-          close: mergeCloses((head.close, tail.close))
-        })
+      combineLatestScan(head.dyn, tail.dyn, (head.init, tail.init))
+      ->Dynamic.map( ((h, t)) => {
+        Console.log3("VectorRec dyn merge", h, t)
+        combineLatestScan(h, t, (head.first, tail.first))
+        ->Dynamic.map(mergeHt)
+        ->Dynamic.log("vector dyn mergem inner")
       })
 
     {first, init, dyn}

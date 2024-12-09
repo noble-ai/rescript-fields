@@ -194,7 +194,7 @@ describe("FieldParse.String", () => {
 				})
 				itPromise("finally emits valid", () => {
 					test()->Promise.tap( res => {
-            res->Array.map(x => x.pack.field->Field.show)->Console.log
+            // res->Array.forEach(x => x.pack.field->Field.show->Console.log)
 						res->Array.leaf->Option.getUnsafe->Close.pack->Form.field->Field.enum->expect->toEqual(#Valid)
 					})
 				})
