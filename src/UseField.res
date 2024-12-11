@@ -14,13 +14,11 @@ module Make = (F: Field.T) => {
       let {first, init, dyn} = F.makeDyn(context, init, set->Rxjs.toObservable, validate->Rxjs.toObservable->Some)
 
       let dyn =
-        [ init
-          ->Dynamic.log("init")
-        , dyn
-          ->Dynamic.switchSequence
-          // ->Dynamic.log("dyn")
+        [ init->Dynamic.return
+          // ->Dynamic.log("init")
+        , dyn->Dynamic.log("dyn switched")
         ]
-        ->Rxjs.fromArray
+        ->Rxjs.concatArray
         ->Dynamic.switchSequence
 
       (first, dyn, set, validate)
@@ -30,7 +28,8 @@ module Make = (F: Field.T) => {
     let (close, setclose) = React.useState((_): Close.t<Form.t<F.t, F.actions<()>>> => first)
 
     let _ = React.useMemo0( () => {
-      dyn->Dynamic.tap(x => setclose(_ => x))
+      dyn
+      ->Dynamic.tap(x => setclose(_ => x))
       ->Dynamic.toPromise
       ->Promise.void
     })
