@@ -73,7 +73,6 @@ module Make = (I: Interface) => {
               })
               ->Rxjs.fromPromise
               ->Dynamic.startWith(Store.busy(input))
-              // ->Dynamic.log("FieldParse validate")
             }
           }
         },
@@ -165,14 +164,12 @@ module Make = (I: Interface) => {
       field
       ->validateOpt
       ->toClose
-      // ->Dynamic.log("init fieldParse")
 
     let setValidated =
         Rxjs.merge2(setOuter, setInner)
         ->Dynamic.map(input => {
           input->Store.dirty->validateOpt
         })
-        // ->Dynamic.log("sv")
 
     let memoState = Dynamic.map(
       _,
