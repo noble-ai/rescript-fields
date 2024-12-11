@@ -48,8 +48,6 @@ let mergeInner =  (array: array<Close.t<Form.t<'fa, 'aa>>>): Close.t<Form.t<'f, 
   { pack: { field, actions }, close }
 }
 
-type merge<'a> = { value: 'a, index: int }
-
 // Observables anre not guaranteed to emit.
 // and if we apply a startWith on each element
 // We will cause an emission before any signal was recieved.
@@ -355,7 +353,6 @@ module Make: Make = (F: Field.T, I: IArray with type t = F.t) => {
     let validate = validateImpl(context, false)
 
     let applyInner = (inners): Rxjs.Observable.t<Close.t<Form.t<t, actions<()>>>> => {
-        // Console.log2("apply Inner", inners)
         let inners = mergeInner(inners)
         inners.pack.field
         ->makeStore(~validate)
@@ -365,13 +362,11 @@ module Make: Make = (F: Field.T, I: IArray with type t = F.t) => {
     let stateElements =
       Rxjs.Subject.make(firstInner)
       ->Rxjs.pipe(Rxjs.shareReplay(1))
-      // ->Dynamic.log("stateElements")
 
     let init = {
       combineLatestScan(initInner, firstInner)
       ->Dynamic.tap(Rxjs.next(stateElements))
       ->Dynamic.switchMap(applyInner)
-      // ->Dynamic.log("init array 2")
     }
 
     let set =
@@ -388,9 +383,7 @@ module Make: Make = (F: Field.T, I: IArray with type t = F.t) => {
         clear->Dynamic.map(_ => #Clear),
         reset->Dynamic.map(_ => #Reset),
       )
-      // ->Dynamic.log("changes")
       ->Dynamic.withLatestFrom(stateElements->Dynamic.startWith(firstInner))
-      // ->Dynamic.log("changes wlf")
       // scan accumulates state, but only so it can be passed to the combineLatestArray step
       ->Rxjs.pipe(Rxjs.scan(
         ( (firsts: Array.t<Close.t<Form.t<F.t, F.actions<unit>>>>, inits, dyns)
@@ -414,6 +407,7 @@ module Make: Make = (F: Field.T, I: IArray with type t = F.t) => {
         let index = firsts->Array.length
         let setElement = set->Dynamic.keepMap(Array.get(_, index))
         let {first, init, dyn} = F.makeDyn(context.element, value, setElement, None)
+        let dyn = dyn->Dynamic.startWith(init)
         ( stateElements->Array.append(first)
         , inits->Array.append(init)
         , dyns->Array.append(dyn)
@@ -433,10 +427,6 @@ module Make: Make = (F: Field.T, I: IArray with type t = F.t) => {
         ( firsts , inits , dyns)
       }}
     }, (firstInner, initInner, dynInner)))
-    // Take the latest array of inner dyns,
-    // ->Dynamic.log("changes scan")
-    // ->Dynamic.withLatestFrom(stateElements->Dynamic.startWith(firstInner))
-    // ->Dynamic.log("changes scan wlf")
     ->Dynamic.switchMap( (((state, inits, dyns)):
         ( Array.t<Close.t<Form.t<F.t, F.actions<unit>>>>
         , Array.t<Dyn.init<Close.t<Form.t<F.t, F.actions<()>>>>>
@@ -454,18 +444,14 @@ module Make: Make = (F: Field.T, I: IArray with type t = F.t) => {
         ->Dynamic.map(combineLatestScan(_, state))
       }}
     })
-    // ->Dynamic.log("elements")
 
     // Combine the
     let dyn =
       elements
       ->Dynamic.switchMap(elements => {
-        // Console.log2("dyn elements", elements)
         elements
         ->Dynamic.tap(Rxjs.next(stateElements))
         ->Dynamic.map(applyInner)
-        // ->Dynamic.log("dyn elements inner")
-        // ->Dynamic.map(Dynamic.log(_, "dyn elements values"))
       })
       ->Rxjs.pipe(Rxjs.takeUntil(complete))
 

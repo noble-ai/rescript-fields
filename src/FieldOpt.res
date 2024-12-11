@@ -104,7 +104,7 @@ module Make: Make = (F: Field.T) => {
   let applyClear = (clear, actions, close) => {
       clear
       ->Rxjs.pipe(Rxjs.map((_, _i) => Store.init(None)))
-      ->Rxjs.pipe(Rxjs.map( (field, _): Close.t<Form.t<t, actions<()>>> => {pack:{ field, actions }, close}))
+      ->Rxjs.pipe(Rxjs.map((field, _): Close.t<Form.t<t, actions<()>>> => {pack:{ field, actions }, close}))
   }
 
   let applyInner = (inner: Rxjs.Observable.t<Close.t<Form.t<F.t, F.actions<()>>>>, actions, close) => {
