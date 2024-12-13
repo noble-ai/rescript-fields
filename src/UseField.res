@@ -15,8 +15,7 @@ module Make = (F: Field.T) => {
 
       let dyn =
         [ init->Dynamic.return
-          // ->Dynamic.log("init")
-        , dyn->Dynamic.log("dyn switched")
+        , dyn
         ]
         ->Rxjs.concatArray
         ->Dynamic.switchSequence
@@ -32,18 +31,6 @@ module Make = (F: Field.T) => {
       ->Dynamic.tap(x => setclose(_ => x))
       ->Dynamic.toPromise
       ->Promise.void
-    })
-
-    React.useEffect0(() => {
-      // Promise.sleep(30)
-      // ->Promise.tap((_) => {
-        // init->Option.forEach(Rxjs.next(set))
-      // })
-      // ->Promise.void
-      // if validateInit {
-      //   Rxjs.next(validate, ())
-      // }
-      None
     })
 
     close->Close.pack
