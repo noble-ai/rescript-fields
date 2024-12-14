@@ -292,19 +292,24 @@ module Make: Make = (F: Field.T, I: IArray with type t = F.t) => {
   let makeDyn = (context: context, initial: option<input>, setOuter: Rxjs.Observable.t<input>, _validate: option<Rxjs.Observable.t<()>>)
     : Dyn.t<Close.t<Form.t<t, actions<()>>>>
   => {
-    let opt: Rxjs.t<'c, Rxjs.source<option<input>>, option<input>> = Rxjs.Subject.makeEmpty()
-    let setInner: Rxjs.t<'c, Rxjs.source<input>, input> = Rxjs.Subject.makeEmpty()
-    let clearInner = Rxjs.Subject.makeEmpty()
-    let reset = Rxjs.Subject.makeEmpty()
-    let add: Rxjs.t<'ca, Rxjs.source<option<F.input>>, option<F.input>> = Rxjs.Subject.makeEmpty()
-    let remove: Rxjs.t<'cr, Rxjs.source<int>, int> = Rxjs.Subject.makeEmpty()
+    // Every observable has a complete, to terminate the stream
     let complete = Rxjs.Subject.makeEmpty()
 
+    // The observable inputs for an array
+    let reset = Rxjs.Subject.makeEmpty()
+    let setInner: Rxjs.t<'c, Rxjs.source<input>, input> = Rxjs.Subject.makeEmpty()
+    let clearInner = Rxjs.Subject.makeEmpty()
+
+    // Opt allows the value to be either set or clearned
+    let opt: Rxjs.t<'c, Rxjs.source<option<input>>, option<input>> = Rxjs.Subject.makeEmpty()
     let setOpt = opt->Rxjs.pipe(Rxjs.keepMap(x => x))
     let clearOpt = opt->Rxjs.pipe(Rxjs.keepMap(Option.invert(_, ())))
 
-    let clear = Rxjs.merge2(clearInner, clearOpt)
+    let add: Rxjs.t<'ca, Rxjs.source<option<F.input>>, option<F.input>> = Rxjs.Subject.makeEmpty()
+    let remove: Rxjs.t<'cr, Rxjs.source<int>, int> = Rxjs.Subject.makeEmpty()
 
+    // Close over all the array level observables except actionsInner
+    // to produce an actions object constructor for this array
     let makeActions = (actionsInner):  actions<()> => {
       set: Rxjs.next(setInner),
       clear: Rxjs.next(clearInner),
@@ -315,6 +320,7 @@ module Make: Make = (F: Field.T, I: IArray with type t = F.t) => {
       reset: Rxjs.next(reset),
     }
 
+    // CLose this array completely. Maybe overkill
     let closeArray = () => {
       // Only static observables here
       Rxjs.complete(clearInner)
@@ -325,6 +331,7 @@ module Make: Make = (F: Field.T, I: IArray with type t = F.t) => {
       Rxjs.complete(setInner)
       Rxjs.next(complete, ())
     }
+
 
     let makeClose = (close: () => ()) => () => {
       close()
@@ -351,12 +358,10 @@ module Make: Make = (F: Field.T, I: IArray with type t = F.t) => {
       ->applyField(inners, _)
     }
 
-    let validate = validateImpl(context, false)
-
     let applyInner = (inners): Rxjs.Observable.t<Close.t<Form.t<t, actions<()>>>> => {
         let inners = mergeInner(inners)
         inners.pack.field
-        ->makeStore(~validate)
+        ->makeStore(~validate=validateImpl(context, false))
         ->Dynamic.map(applyField(inners))
       }
 
@@ -374,28 +379,31 @@ module Make: Make = (F: Field.T, I: IArray with type t = F.t) => {
 
     let set =
       Rxjs.merge3(setOuter, setInner, setOpt)
+    let clear = Rxjs.merge2(clearInner, clearOpt)
 
     // multiplex all the various Array level change signals
     // So we can scan on them, producing new arrays of F.t dyns.
     let elements =
-      Rxjs.merge6(
+      Rxjs.merge5(
         add->Dynamic.map(x => #Add(x)),
         remove->Dynamic.map(i => #Remove(i)),
         set->Dynamic.map(x => #Set(x)),
         clear->Dynamic.const(#Clear),
         reset->Dynamic.const(#Reset),
-        // HACK. without this the dyns dont get tickled and you cant input on original values
-        Dynamic.return(#Void)
-        // void->Dynamic.const(#Void)->Dynamic.startWith(())
       )
       ->Dynamic.withLatestFrom2(
-          // FIXME: Why do these have a startsWith if they are Behaviors.
+          // FIXME: Why do these have a startsWith if they are Behaviors?
           stateValues->Dynamic.startWith(firstInner)
           , stateObs->Dynamic.startWith(initInner)
           )
-      // scan accumulates state, but only so it can be passed to the combineLatestArray step
       ->Rxjs.pipe(Rxjs.scan(
-        ( ( firsts: Array.t<Close.t<Form.t<F.t, F.actions<unit>>>>, inits, dyns)
+        // The persistent values and obs are ignored in this scan,
+        // As they can have changed outside of the scan
+        // So we take stateValues and stateObs instead
+        // then those can be passed to the combineLatestArray step
+        // The observables may be the same but the values definitely can have changed
+        // So ignore both to be consistent
+        ( ( _values: Array.t<Close.t<Form.t<F.t, F.actions<unit>>>>, _obs, dyns)
         , ( change: 'change
           , stateValues: Array.t<Close.t<Form.t<F.t, F.actions<unit>>>>
           , stateObs: Array.t<Rxjs.Observable.t<Close.t<Form.t<F.t, F.actions<unit>>>>>
@@ -407,7 +415,6 @@ module Make: Make = (F: Field.T, I: IArray with type t = F.t) => {
         )
      => {
       switch change {
-      | #Void => (firsts, inits, dyns)
       | #Clear => {
         stateValues->Array.forEach(c => c.close())
         ( [], [], [] )
@@ -442,10 +449,14 @@ module Make: Make = (F: Field.T, I: IArray with type t = F.t) => {
       }
       | #Set(input) => {
         stateValues->Array.forEach(c => c.close())
-        let (firsts, inits, dyns) = input->traverseSet(context, set, _)
-        ( firsts, inits, dyns)
+        let (values, obs, dyns) = input->traverseSet(context, set, _)
+        ( values, obs, dyns)
       }}
     }, (firstInner, initInner, dynInner)))
+    // The scan does not emit without a change,
+    // but we want to prime the switch below to observe child changes
+    // so startWith the same values as the scan initial
+    ->Dynamic.startWith((firstInner, initInner, dynInner))
     ->Dynamic.tap( ((_, obs, _)) => Rxjs.next(stateObs, obs))
     ->Dynamic.switchMap( (((value, obs, dyns)):
         ( Array.t<Close.t<Form.t<F.t, F.actions<unit>>>>
@@ -454,9 +465,10 @@ module Make: Make = (F: Field.T, I: IArray with type t = F.t) => {
         )
       ): Dyn.dyn<Array.t<Close.t<Form.t<F.t, F.actions<()>>>>> => {
 
+      switch dyns {
       // When the array is empty, there are no events to animate combineLatestArray
       // So a default for []
-      switch dyns {
+      // FIXME: there is no more combineLatestArray, is this still needed?
       | [] => Dynamic.return(Dynamic.return([]))
       | dyns => {
         dyns
@@ -466,7 +478,6 @@ module Make: Make = (F: Field.T, I: IArray with type t = F.t) => {
       }}
     })
 
-    // Combine the
     let dyn =
       elements
       ->Dynamic.switchMap(elements => {
