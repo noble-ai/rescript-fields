@@ -50,10 +50,8 @@ module Addresses = {
 			}
 
 			<div>
-				{ forms->Array.mapi((f, i) => {
-					// let key: string = f.field->State.FieldOpt.input->Option.map(State.show)->Option.or("null")
-					// let key = `${i->Int.toString}`
-					<div className="row">
+				{ forms->Array.mapi(((key, f), i) => {
+					<div className="row" key={key->Belt.Int.toString}>
 						<div className="column">
 							<Login.InputString label="username" form=f/>
 						</div>

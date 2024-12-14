@@ -62,7 +62,7 @@ describe("FieldArray", () => {
         describe("non-empty", () => {
           describe("all valid", () => {
             let valid = [3, 4, 5]
-            let input = valid->Array.map(x => Store.Dirty(Some(Store.Dirty(x->Int.toString))))
+            let input = valid->Array.mapi( (x, i) => (i, Store.Dirty(Some(Store.Dirty(x->Int.toString)))))
             describe("without external validation", () =>  {
               testPromise("returns Ok", () => {
                 Subject.validate(false, context, Dirty(input))
@@ -117,7 +117,7 @@ describe("FieldArray", () => {
             let indexBad = 1
             let bad = None
             let good = [Some(3), Some(5)]
-            let input = good->Array.insert(bad, indexBad)->Array.map(x => x->Option.map(Int.toString)->FieldElement.set)->Store.Dirty
+            let input = good->Array.insert(bad, indexBad)->Array.mapi((x, i) => (i, x->Option.map(Int.toString)->FieldElement.set))->Store.Dirty
 
             let result = Subject.validate(false, context, input)
             testPromise("returns partial Error", () => {

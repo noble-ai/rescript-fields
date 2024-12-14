@@ -1,3 +1,12 @@
+type key = int
+
+let key: ref<int> = {contents: 0}
+let getKey = () => {
+  let k = key.contents
+  key.contents = key.contents + 1
+  k
+}
+
 module Context = {
   type structure<'output, 'element, 'empty> = {
     @ocamldoc("External validation for array recieves output from all valid children
@@ -33,7 +42,10 @@ let traverseTuple3 = (arr: array<'a>, fn: 'a => ('b, 'c, 'd)): (array<'b>, array
   (a, b, c)
 }
 
-external identity: 'a => 'a = "%identity"
+let traverseTupleSnd = ((a, b): ('a, 'b), fn: 'b => Rxjs.Observable.t<'c>): Rxjs.Observable.t<('a, 'c)> => {
+  fn(b)
+  ->Dynamic.map(b => (a, b))
+}
 
 let mergeCloses = (closes) => {
   () => {
@@ -44,7 +56,7 @@ let mergeCloses = (closes) => {
 let mergeInner =  (array: array<Close.t<Form.t<'fa, 'aa>>>): Close.t<Form.t<'f, 'a>> => {
   let field = array->Array.map(x => x.pack.field)
   let actions = array->Array.map(x => x.pack.actions)
-  let close = mergeCloses(array->Array.map(x => x.close))
+  let close = mergeCloses(array->Array.map(Close.close))
   { pack: { field, actions }, close }
 }
 
@@ -69,7 +81,7 @@ let combineLatestScan = {
 module type IArray =
 {
   type t
-  let filter: array<t> => array<t>
+  let filter: array<(key, t)> => array<(key, t)>
 }
 
 let filterIdentity = (a: array<'a>) => a
@@ -101,13 +113,14 @@ type actions<'finput, 'factions, 'out> = {
   module type Make = (F: Field.T, I: IArray with type t = F.t ) => T
     with type input = array<F.input>
     and type inputElement = F.input
-    and type inner = array<F.t>
+    // Array maintains keys for elements here
+    and type inner = array<(key, F.t)>
     and type output = array<F.output>
     and type error = error
-    and type t = Store.t<array<F.t>, array<F.output>, error>
+    and type t = Store.t<array<(key, F.t)>, array<F.output>, error>
     and type context = Context.structure<F.output, F.context, F.input>
     and type actions<'change> = actions<F.input, F.actions<'change>, 'change>
-    and type parted = array<Form.t<F.t, F.actions<()>>>
+    and type parted = array<(key, Form.t<F.t, F.actions<()>>)>
 
 module Make: Make = (F: Field.T, I: IArray with type t = F.t) => {
   module Element = F
@@ -121,26 +134,32 @@ module Make: Make = (F: Field.T, I: IArray with type t = F.t) => {
 
   type output = array<Element.output>
   type error = error
-  type inner = array<Element.t>
+  type inner = array<(key, Element.t)>
   type t = Store.t<inner, output, error>
 
-  let empty: context => inner = (context) => Option.flap0(context.empty)->Option.or([])->Array.map(F.set)
+  let setKeyed = Array.mapi(_, (x, i) => (i, F.set(x)))
+  // FIXME: use a key hash or something. these will overlap on previous pretty easily
+  let empty: context => inner = (context) => Option.flap0(context.empty)->Option.or([])->setKeyed
   let init: context => t = context => context->empty->Store.init
 
-  let set = (input: input): t => input->Array.map(F.set)->Dirty
+  let set = (input: input): t => input->setKeyed->Dirty
 
   let makeOutput = (inner: inner): Result.t<array<F.output>, 'err> =>
-    inner->Array.reduce((res, element) => {
+    inner->Array.reduce((res, (key, element)) => {
       switch element->F.output {
       | Some(output) => res->Result.bind(res => Ok(Array.concat(res, [output])))
       | None => Error(element->F.enum)
       }
     }, Ok([]))
 
+  let toKey = Tuple.fst2
+  let toElement = Tuple.snd2
+  let toEnums = Array.map(_, x => x->toElement->Element.enum)
+
   let prefer = (enum, make, inner): Result.t<'a, 'e> =>
     // First Prioritize Busy first if any children are busy
     Result.predicate(
-      inner->Array.map(Element.enum)->Array.some(x => x == enum),
+      inner->toEnums->Array.some(x => x == enum),
       make(inner)->Dynamic.return,
       #Invalid,
     )
@@ -148,7 +167,7 @@ module Make: Make = (F: Field.T, I: IArray with type t = F.t) => {
   let preferFiltered = (enum, make, inner, filtered): Result.t<'a, 'e> =>
     // First Prioritize Busy first if any children are busy
     Result.predicate(
-      filtered->Array.map(Element.enum)->Array.some(x => x == enum),
+      filtered->toEnums->Array.some(x => x == enum),
       make(inner)->Dynamic.return,
       #Invalid,
     )
@@ -196,7 +215,7 @@ module Make: Make = (F: Field.T, I: IArray with type t = F.t) => {
       makeStore(~validate, inner)
     } else {
       inner
-      ->Array.map(Element.validate(force, context.element))
+      ->Array.map(traverseTupleSnd(_, Element.validate(force, context.element)))
       ->Dynamic.combineLatest
       ->Dynamic.bind(makeStore(~validate))
     }
@@ -213,14 +232,14 @@ module Make: Make = (F: Field.T, I: IArray with type t = F.t) => {
     reset: () => actions.reset()->fn
   }
 
-  type parted = array<Form.t<F.t, F.actions<()>>>
+  type parted = array<(key, Form.t<F.t, F.actions<()>>)>
   let split = (pack: Form.t<t, actions<()>>): parted => {
     pack.field
     ->Store.inner
-    ->Array.mapi( (field, i): Form.t<F.t, F.actions<()>> => {
+    ->Array.mapi( ((key, field), i): (key, Form.t<F.t, F.actions<()>>) => (key, {
       field,
-      actions: pack.actions.index(i)->Option.getExn(~desc="fieldArray split"), 
-    })
+      actions: pack.actions.index(i)->Option.getExn(~desc="fieldArray split"),
+    }))
   }
 
   let enum = Store.toEnum
@@ -228,7 +247,7 @@ module Make: Make = (F: Field.T, I: IArray with type t = F.t) => {
   let inner = Store.inner
 
   let input = (store: t) => {
-    store->Store.inner->Array.map(Element.input)
+    store->Store.inner->Array.map(x => x->toElement->Element.input)
   }
 
   let error = Store.error
@@ -237,7 +256,7 @@ module Make: Make = (F: Field.T, I: IArray with type t = F.t) => {
 
   let printErrorInner = (inner: inner) => {
     inner
-    ->Array.map(F.printError)
+    ->Array.map(x => x->toElement->F.printError)
     ->Array.map(Option.or(_, "None"))
     ->Array.mapi((a, i) => `${i->Int.toString}: ${a}`)
     ->Array.joinWith(", \n")
@@ -262,31 +281,63 @@ module Make: Make = (F: Field.T, I: IArray with type t = F.t) => {
       input: ${store->input->showInput},
       output: ${store->Store.output->Option.map(outputToString)->Option.or("None")},
       children: [
-        ${store->Store.inner->Array.map(Element.show)->Array.joinWith(",\n")}
+        ${store->Store.inner->Array.map(x => x->toElement->Element.show)->Array.joinWith(",\n")}
       ]
     }`
   }
 
-  let traverseSet = (context: context, set, x) => {
+  let traverseSetk = (context: context, set, x) => {
     x
     ->Array.mapi( (value, index) => (value, index))
     ->traverseTuple3( ((value, index)) => {
+      let key = getKey()
       let setElement = set->Dynamic.keepMap(Array.get(_, index))->Dynamic.startWith(value)
       let {first, init, dyn} = F.makeDyn(context.element, Some(value), setElement, None)
-      (first, init, dyn)
+      ((key, first), (key, init), (key, dyn))
     })
   }
 
+  let packKeyValue = (key: key, p: Close.t<Form.t<F.t, F.actions<unit>>>):  Close.t<Form.t<(key, F.t), F.actions<unit>>> => {
+    close: p.close
+    , pack: {
+      actions: p.pack.actions
+      , field: (key, p.pack.field)
+    }
+  }
+
+
+  let packKeyObss: (key, Dyn.init<Close.t<Form.t<F.t, F.actions<unit>>>>) => Dyn.init<Close.t<Form.t<(key, F.t), F.actions<unit>>>> = (key, v) => Dynamic.map(v, packKeyValue(key))
+  let packKeyDyns: (key, Dyn.dyn<Close.t<Form.t<F.t, F.actions<()>>>>) => Dyn.dyn<Close.t<Form.t<(key, F.t), F.actions<()>>>> = (key, dyns) => Dynamic.map(dyns, Dynamic.map(_, packKeyValue(key)))
+
+  let packKey:
+    ( ( Array.t<(key, Close.t<Form.t<F.t, F.actions<unit>>>)>
+      , Array.t<(key, Dyn.init<Close.t<Form.t<F.t, F.actions<unit>>>>)>
+      , Array.t<(key, Dyn.dyn<Close.t<Form.t<F.t, F.actions<()>>>>)>
+      )
+    )
+   => (
+      Array.t<Close.t<Form.t<(key, F.t), F.actions<unit>>>>,
+      Array.t<Dyn.init<Close.t<Form.t<(key, F.t), F.actions<unit>>>>>,
+      Array.t<Dyn.dyn<Close.t<Form.t<(key, F.t), F.actions<()>>>>>
+    ) =
+      Tuple.napply3(
+        ( Array.map(_, Tuple.uncurry2(packKeyValue))
+        , Array.map(_, Tuple.uncurry2(packKeyObss))
+        , Array.map(_, Tuple.uncurry2(packKeyDyns))
+        )
+      )
+
   let makeDynInner = (context: context, initial: option<input>, set: Rxjs.Observable.t<input>)
     : (
-      Array.t<Close.t<Form.t<F.t, F.actions<unit>>>>,
-      Array.t<Dyn.init<Close.t<Form.t<F.t, F.actions<unit>>>>>,
-      Array.t<Dyn.dyn<Close.t<Form.t<F.t, F.actions<()>>>>>,
+      Array.t<Close.t<Form.t<(key, F.t), F.actions<unit>>>>,
+      Array.t<Dyn.init<Close.t<Form.t<(key, F.t), F.actions<unit>>>>>,
+      Array.t<Dyn.dyn<Close.t<Form.t<(key, F.t), F.actions<()>>>>>,
     )
    => {
       Option.first(initial, Option.flap0(context.empty))
       ->Option.or([])
-      ->traverseSet(context, set, _)
+      ->traverseSetk(context, set, _)
+      ->packKey
     }
 
   let makeDyn = (context: context, initial: option<input>, setOuter: Rxjs.Observable.t<input>, _validate: option<Rxjs.Observable.t<()>>)
@@ -338,25 +389,14 @@ module Make: Make = (F: Field.T, I: IArray with type t = F.t) => {
       closeArray()
     }
 
-    let applyField = ({pack,close}: Close.t<Form.t<'aaf, 'baf>>) =>
-          (field): Close.t<Form.t<t, actions<()>>> =>
+    let applyField = ({pack, close}: Close.t<Form.t<array<(key, 'aaf)>, 'baf>>) =>
+          (field: t): Close.t<Form.t<t, actions<()>>> =>
             { pack:
-              { field
+              { field: field
               , actions: makeActions(pack.actions)
               }
             , close: makeClose(close)
             }
-
-    let (firstInner, initInner, dynInner) = makeDynInner(context, initial, setOuter)
-
-    // This is like applyInner but does not include makeStore which produces an observable.
-    // We want one definite value, and now.
-    let first: Close.t<Form.t<'ff, 'af>> = {
-      let inners = mergeInner(firstInner)
-      inners.pack.field
-      ->Store.init
-      ->applyField(inners, _)
-    }
 
     let applyInner = (inners): Rxjs.Observable.t<Close.t<Form.t<t, actions<()>>>> => {
         let inners = mergeInner(inners)
@@ -365,11 +405,19 @@ module Make: Make = (F: Field.T, I: IArray with type t = F.t) => {
         ->Dynamic.map(applyField(inners))
       }
 
-    let stateValues =
-      Rxjs.Subject.make(firstInner)
+    let (firstInner, initInner, dynInner) = makeDynInner(context, initial, setOuter)
 
-    let stateObs =
-      Rxjs.Subject.make(initInner)
+    // This is like applyInner but does not include makeStore which produces an observable.
+    // We want one definite value, and now.
+    let first: Close.t<Form.t<t, 'af>> = {
+      let inners = mergeInner(firstInner)
+      inners.pack.field
+      ->Store.init
+      ->applyField(inners, _)
+    }
+
+    let stateValues = Rxjs.Subject.make(firstInner)
+    let stateObs = Rxjs.Subject.make(initInner)
 
     let init = {
       combineLatestScan(initInner, firstInner)
@@ -377,13 +425,12 @@ module Make: Make = (F: Field.T, I: IArray with type t = F.t) => {
       ->Dynamic.switchMap(applyInner)
     }
 
-    let set =
-      Rxjs.merge3(setOuter, setInner, setOpt)
+    let set = Rxjs.merge3(setOuter, setInner, setOpt)
     let clear = Rxjs.merge2(clearInner, clearOpt)
 
     // multiplex all the various Array level change signals
     // So we can scan on them, producing new arrays of F.t dyns.
-    let elements =
+    let dynInner =
       Rxjs.merge5(
         add->Dynamic.map(x => #Add(x)),
         remove->Dynamic.map(i => #Remove(i)),
@@ -403,15 +450,15 @@ module Make: Make = (F: Field.T, I: IArray with type t = F.t) => {
         // then those can be passed to the combineLatestArray step
         // The observables may be the same but the values definitely can have changed
         // So ignore both to be consistent
-        ( ( _values: Array.t<Close.t<Form.t<F.t, F.actions<unit>>>>, _obs, dyns)
+        ( ( _values: Array.t<Close.t<Form.t<(key, F.t), F.actions<unit>>>>, _obs, dyns)
         , ( change: 'change
-          , stateValues: Array.t<Close.t<Form.t<F.t, F.actions<unit>>>>
-          , stateObs: Array.t<Rxjs.Observable.t<Close.t<Form.t<F.t, F.actions<unit>>>>>
+          , stateValues: Array.t<Close.t<Form.t<(key, F.t), F.actions<unit>>>>
+          , stateObs: Array.t<Rxjs.Observable.t<Close.t<Form.t<(key, F.t), F.actions<unit>>>>>
           )
         , _sequence)
-      : ( Array.t<Close.t<Form.t<F.t, F.actions<unit>>>>
-        , Array.t<Dyn.init<Close.t<Form.t<F.t, F.actions<unit>>>>>
-        , Array.t<Dyn.dyn<Close.t<Form.t<F.t, F.actions<()>>>>>
+      : ( Array.t<Close.t<Form.t<(key, F.t), F.actions<unit>>>>
+        , Array.t<Dyn.init<Close.t<Form.t<(key, F.t), F.actions<unit>>>>>
+        , Array.t<Dyn.dyn<Close.t<Form.t<(key, F.t), F.actions<()>>>>>
         )
      => {
       switch change {
@@ -427,16 +474,15 @@ module Make: Make = (F: Field.T, I: IArray with type t = F.t) => {
         let index = stateValues->Array.length
         let setElement = set->Dynamic.keepMap(Array.get(_, index))
         let {first, init, dyn} = F.makeDyn(context.element, value, setElement, None)
-
-        let obs = stateObs->Array.append(init)
-
+        let key = getKey()
+        let first = packKeyValue(key, first)
+        let init = packKeyObss(key, init)
+        let dyn = packKeyDyns(key, dyn)
+        ( stateValues->Array.append(first)
+        , stateObs->Array.append(init)
         // Adding an element to an array, the init process has already gone off for the initial array
         // But we need to process the init on the child, so prepend to dyn.
-        let dyn = dyn->Dynamic.startWith(init)
-
-        ( stateValues->Array.append(first)
-        , obs
-        , dyns->Array.append(dyn)
+        , dyns->Array.append(dyn->Dynamic.startWith(init))
         )
       }
       | #Remove(index) => {
@@ -449,7 +495,8 @@ module Make: Make = (F: Field.T, I: IArray with type t = F.t) => {
       }
       | #Set(input) => {
         stateValues->Array.forEach(c => c.close())
-        let (values, obs, dyns) = input->traverseSet(context, set, _)
+        let (values, obs, dyns) = input->traverseSetk(context, set, _)->packKey
+
         ( values, obs, dyns)
       }}
     }, (firstInner, initInner, dynInner)))
@@ -459,17 +506,17 @@ module Make: Make = (F: Field.T, I: IArray with type t = F.t) => {
     ->Dynamic.startWith((firstInner, initInner, dynInner))
     ->Dynamic.tap( ((_, obs, _)) => Rxjs.next(stateObs, obs))
     ->Dynamic.switchMap( (((value, obs, dyns)):
-        ( Array.t<Close.t<Form.t<F.t, F.actions<unit>>>>
-        , Array.t<Dyn.init<Close.t<Form.t<F.t, F.actions<()>>>>>
-        , Array.t<Dyn.dyn<Close.t<Form.t<F.t, F.actions<()>>>>>
+        ( Array.t<Close.t<Form.t<(key, F.t), F.actions<unit>>>>
+        , Array.t<Dyn.init<Close.t<Form.t<(key, F.t), F.actions<()>>>>>
+        , Array.t<Dyn.dyn<Close.t<Form.t<(key, F.t), F.actions<()>>>>>
         )
-      ): Dyn.dyn<Array.t<Close.t<Form.t<F.t, F.actions<()>>>>> => {
+      ): Dyn.dyn<Array.t<Close.t<Form.t<(key, F.t), F.actions<()>>>>> => {
 
       switch dyns {
       // When the array is empty, there are no events to animate combineLatestArray
       // So a default for []
       // FIXME: there is no more combineLatestArray, is this still needed?
-      | [] => Dynamic.return(Dynamic.return([]))
+      // | [] => Dynamic.return(Dynamic.return([]))
       | dyns => {
         dyns
         ->combineLatestScan(obs)
@@ -479,12 +526,9 @@ module Make: Make = (F: Field.T, I: IArray with type t = F.t) => {
     })
 
     let dyn =
-      elements
-      ->Dynamic.switchMap(elements => {
-        elements
-        ->Dynamic.tap(Rxjs.next(stateValues))
-        ->Dynamic.map(applyInner)
-      })
+      dynInner
+      ->Dynamic.map( Dynamic.tap(_, Rxjs.next(stateValues)))
+      ->Dynamic.switchMap( Dynamic.map(_, applyInner))
       ->Rxjs.pipe(Rxjs.takeUntil(complete))
 
     {first, init, dyn}
