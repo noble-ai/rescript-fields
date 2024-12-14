@@ -2,7 +2,7 @@
 module Make = (F: Field.T) => {
   type ret = Form.t<F.t, F.actions<()>>
   let use = (. ~context: F.context, ~init: option<F.input>, ~validateInit): ret => {
-    let (first, dyn, set, validate) = React.useMemo0( () => {
+    let (first, dyn, _set, _validate) = React.useMemo0( () => {
       let set =
         init
         ->Option.map(Rxjs.Subject.make)
