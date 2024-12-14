@@ -200,7 +200,6 @@ module String = {
 
   let length = (~min: option<int>=?, ~max: option<int>=?, ()): Field.validate =>
     (str: string) => {
-      let x = ()
       switch str {
       | a if min->Option.map(min => a->String.length < min)->Option.or(false) =>
         "Too Short"->Result.Error
