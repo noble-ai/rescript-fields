@@ -285,8 +285,8 @@ module Make: Make = (F: Field.T, I: IArray with type t = F.t) => {
     }`
   }
 
-  let traverseSetk = (context: context, set, x) => {
-    x
+  let traverseSetk = (context: context, set, elements) => {
+    elements
     ->Array.mapi( (value, index) => (value, index))
     ->traverseTuple3( ((value, index)) => {
       let key = getKey()
