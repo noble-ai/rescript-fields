@@ -1,6 +1,5 @@
 type key = int
-
-let key: ref<int> = {contents: 0}
+let key: ref<key> = {contents: 0}
 let getKey = () => {
   let k = key.contents
   key.contents = key.contents + 1
