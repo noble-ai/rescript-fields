@@ -144,7 +144,7 @@ module Make: Make = (F: Field.T, I: IArray with type t = F.t) => {
   let set = (input: input): t => input->setKeyed->Dirty
 
   let makeOutput = (inner: inner): Result.t<array<F.output>, 'err> =>
-    inner->Array.reduce((res, (key, element)) => {
+    inner->Array.reduce((res, (_key, element)) => {
       switch element->F.output {
       | Some(output) => res->Result.bind(res => Ok(Array.concat(res, [output])))
       | None => Error(element->F.enum)
