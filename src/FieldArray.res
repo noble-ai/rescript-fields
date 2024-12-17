@@ -112,7 +112,7 @@ type actions<'finput, 'factions, 'out> = {
   module type Make = (F: Field.T, I: IArray with type t = F.t ) => T
     with type input = array<F.input>
     and type inputElement = F.input
-    // Array maintains keys for elements here
+    // Array maintains keys for elements here, to help React know when to unmount
     and type inner = array<(key, F.t)>
     and type output = array<F.output>
     and type error = error
