@@ -96,7 +96,7 @@ module OptState = {
 				>
 					<option value="">{"Select a state"->React.string}</option>
 					{ State.all
-						->Array.map(state => <option value={state->State.show}>{state->State.show->React.string}</option>)
+						->Array.map(state => <option key={state->State.show} value={state->State.show}>{state->State.show->React.string}</option>)
 						->React.array
 					}
 				</select>
