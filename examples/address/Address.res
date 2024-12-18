@@ -60,7 +60,6 @@ module Zip = {
 				Ok()
 			}
 			->Promise.return
-			// ->Promise.tap(Console.log2("validate zip"))
 			->Promise.delay(~ms=1000)
 		}
 	}
@@ -68,7 +67,6 @@ module Zip = {
 	module Input = {
 		@react.component
 		let make = (~form: Form.t<Field.t, Field.actions<()>>) => {
-			Console.log2("zip", form.field->Field.show)
 			<div>
 				<label>{"Zip"->React.string}</label>
 				<InputOptString value={form.field->Field.input} clear={form.actions.clear} set={form.actions.inner.set} />

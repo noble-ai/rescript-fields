@@ -178,7 +178,6 @@ describe("FieldEither", () => {
 
             itPromise("sets inner value", () => {
               test()->Promise.tap(res => {
-                // Console.log2("res", res->Array.map(x => x->Close.pack->Form.field->Subject.show))
                 res
                 ->Array.leaf
                 ->Option.getUnsafe

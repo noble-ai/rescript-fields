@@ -53,7 +53,6 @@ module Product1 = {
       switch ch {
       | Either.Left(ch) => #A(ch)
       | Either.Right(_) => {
-          Console.log2("fromEither", ch)
           failwith("impossible")
         }
       }

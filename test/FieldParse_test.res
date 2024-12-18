@@ -194,7 +194,6 @@ describe("FieldParse.String", () => {
 				})
 				itPromise("finally emits valid", () => {
 					test()->Promise.tap( res => {
-            // res->Array.forEach(x => x.pack.field->Field.show->Console.log)
 						res->Array.leaf->Option.getUnsafe->Close.pack->Form.field->Field.enum->expect->toEqual(#Valid)
 					})
 				})
@@ -269,7 +268,6 @@ describe("FieldParse.String", () => {
 				})
 			})
 			itPromise("keeps input when valid", () => { 
-				// test()->Promise.tap( res => res->Array.map(x => x->Close.pack->Form.field->Field.input)->Console.log2("set valid"))->Promise.void
 				test()->Promise.tap( res => res->Array.leaf->Option.getUnsafe->Close.pack->Form.field->Field.input->expect->toEqual(value))
 			})
 		})

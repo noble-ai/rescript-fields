@@ -416,10 +416,8 @@ module VectorRec = {
     let dyn =
       combineLatestScan(head.dyn, tail.dyn, (head.init, tail.init))
       ->Dynamic.map( ((h, t)) => {
-        Console.log3("VectorRec dyn merge", h, t)
         combineLatestScan(h, t, (head.first, tail.first))
         ->Dynamic.map(mergeHt)
-        ->Dynamic.log("vector dyn mergem inner")
       })
 
     {first, init, dyn}

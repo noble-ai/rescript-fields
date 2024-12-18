@@ -163,7 +163,6 @@ describe("FieldProduct", () => {
 					}
 
 				let validateString = (_x: FieldParse.String.Field.output) => {
-						// Console.log2("validateString", x)
 						let d = delay.contents
 						delay.contents = delay.contents - 10
 						Promise.sleep(d)->Promise.map(_ => Ok())
@@ -192,11 +191,6 @@ describe("FieldProduct", () => {
 						set->Rxjs.next({left: "nono", right: "haha"})
 						// Needs to be long enough for
 						Promise.sleep(1000)->Promise.tap(_ => current.contents.close())->Promise.void
-
-						// hist->Promise.tap(hist => {
-						// 	hist->Array.map(x => x->Tuple.fst2->Form.field->Subject.show)
-						// 	->Console.log2("hist", _)
-						// })->Promise.void
 
 						let field = res->Promise.map(res => res->Close.pack->Form.field)
 						itPromise("applies last", () => {
@@ -374,7 +368,6 @@ describe("FieldProduct", () => {
 					}
 
 				let validateString = (_x: FieldParse.String.Field.output) => {
-						// Console.log2("validateString", x)
 						let d = delay.contents
 						delay.contents = delay.contents - 10
 						Promise.sleep(d)->Promise.map(_ => Ok())
@@ -401,10 +394,6 @@ describe("FieldProduct", () => {
 						set->Rxjs.next({left: "haha", right: "nono"})
 						set->Rxjs.next({left: "nono", right: "haha"})
 						Promise.sleep(100)->Promise.tap(_ => current.contents.close())->Promise.void
-
-						// hist->Promise.tap(hist => {
-						// 	hist->Array.map(x => x->Tuple.fst2->Form.field->Subject.show)->Console.log2("hist", _)
-						// })->Promise.void
 
 						let field = res->Promise.map(res => res->Close.pack->Form.field)
 						itPromise("applies last", () => {

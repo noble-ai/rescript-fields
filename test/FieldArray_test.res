@@ -42,7 +42,6 @@ describe("FieldArray", () => {
 
         itPromise("set", () => {
           test()->Promise.tap(res => {
-            // Console.log2("res", res)
             expect(res->Close.pack->Form.field->Subject.output)->toEqual(Some([3,4,5]))
           })
         })
