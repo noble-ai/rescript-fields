@@ -107,11 +107,14 @@ module Make = (I: Interface) => {
     valOuter: option<Rxjs.Observable.t<unit>>,
   ): Dyn.t<Close.t<Form.t<t, actions<unit>>>> => {
     let complete = Rxjs.Subject.makeEmpty()
+    // For testing, you need to close EVERYTHING including the set to get the observable to close.
+    // FIXME: can this be more aggressive? - AxM
+    let close = Rxjs.next(complete)
+
     let clear = Rxjs.Subject.makeEmpty()
     let reset = Rxjs.Subject.makeEmpty()
     let setInner = Rxjs.Subject.makeEmpty()
     let valInner = Rxjs.Subject.makeEmpty()
-
 
     let actions: actions<unit> = {
       clear: Rxjs.next(clear),
@@ -120,11 +123,7 @@ module Make = (I: Interface) => {
       set: x => Rxjs.next(setInner, x),
     }
 
-    // For testing, you need to close EVERYTHING including the set to get the observable to close.
-    // FIXME: can this be more aggressive? - AxM
-    let close = Rxjs.next(complete)
-
-    let field = 
+    let field =
       initial
       ->Option.map(set)
       ->Option.or(init(context))
@@ -158,7 +157,9 @@ module Make = (I: Interface) => {
       ->Dynamic.withLatestFrom(state)
       ->Dynamic.map(((_, state)) => state.pack.field->validate(true, context, _))
 
-    let toClose = Dynamic.map(_, (field): Close.t<Form.t<t, 'b>> => {pack: {field, actions}, close})
+    let toClose = Dynamic.map(_, (field): Close.t<Form.t<t, 'b>> => {
+      {pack: {field, actions}, close}
+    })
 
     let init =
       field
@@ -166,23 +167,23 @@ module Make = (I: Interface) => {
       ->toClose
 
     let setValidated =
-        Rxjs.merge2(setOuter, setInner)
+        Rxjs.merge2(
+          setOuter
+          , setInner
+        )
         ->Dynamic.map(input => {
           input->Store.dirty->validateOpt
         })
 
-    let memoState = Dynamic.map(
-      _,
-      Dynamic.tap(_, (x: Close.t<Form.t<t, 'a>>) => {
-        Rxjs.next(state, x)
-      }),
-    )
-
     let dyn =
-      Rxjs.merge4(cleared, resetted, val, setValidated)
-      // ->Dynamic.withLatestFrom(state)
+      Rxjs.merge4(
+        cleared
+        , resetted
+        , val
+        , setValidated
+      )
       ->Dynamic.map(toClose)
-      ->memoState
+      ->Dynamic.map(_, Dynamic.tap(_, Rxjs.next(state)))
       ->Rxjs.pipe(Rxjs.takeUntil(complete))
 
     {first, init, dyn}

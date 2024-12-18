@@ -7,7 +7,6 @@ module Make = (F: Field.T) => {
         init
         ->Option.map(Rxjs.Subject.make)
         ->Option.or(Rxjs.Subject.makeEmpty())
-        ->Rxjs.pipe(Rxjs.shareReplay(1))
 
       let validate = Rxjs.Subject.makeEmpty()
 

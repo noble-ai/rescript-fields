@@ -96,7 +96,7 @@ module Make: FieldIdentity = (T: T) => {
     let field = initial->Option.map(set)->Option.or(init(context))
     let first: Close.t<Form.t<'f, 'a>> = {pack: {field, actions}, close}
 
-    let state = Rxjs.Subject.make(first)
+    let state = Rxjs.Subject.makeBehavior(first)
     let memoState = Dynamic.tap(_, (x: Close.t<Form.t<t, 'a>>) => {
       Rxjs.next(state, x)
     })
