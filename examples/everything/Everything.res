@@ -1,5 +1,5 @@
 module Addresses = {
-	module FieldElement = FieldParse.String.Field
+	module FieldElement = Address.Field
 	module Field = FieldArray.Make(
 		FieldElement,
 		{
@@ -19,7 +19,7 @@ module Addresses = {
 	let contextDefault: Field.context = {
 		validate: validate,
 		empty: _ => [],
-		element: {validateImmediate: true, validate: FieldParse.String.length(~min=2, ())}
+		element: Address.contextDefault
 	}
 
 	module Input = {
@@ -53,7 +53,7 @@ module Addresses = {
 				{ forms->Array.mapi(((key, f), i) => {
 					<div className="row" key={key->Belt.Int.toString}>
 						<div className="column">
-							<Login.InputString label="username" form=f/>
+							<Address.Input form=f/>
 						</div>
 						<button className="button-clear" onClick={handleRemove(~index=i)}>{"✕"->React.string}</button>
 					</div>
@@ -75,24 +75,22 @@ module Addresses = {
 module Field = Addresses.Field
 module Form = UseField.Make(Field)
 
-// let init: Field.input = [
-// 	Street({
-// 		street: Some("123 Hhaa"),
-// 		city: Some("Fort Collines"),
-// 		state: Some(#Alabama),
-// 		zip: Some("44400"),
-// 	}),
-// 	Military({
-// 		segment: Some(#Community),
-// 		numSegment: Some("300"),
-// 		box: Some("123"),
-// 		branch: Some(#Apo),
-// 		theater: Some(#Europe),
-// 		zip: Some("99900")
-// 	})
-// ]
-
-let init: Field.input = ["hello", "world"]
+let init: Field.input = [
+	Street({
+		street: Some("123 Hhaa"),
+		city: Some("Fort Collines"),
+		state: Some(#Alabama),
+		zip: Some("44400"),
+	}),
+	Military({
+		segment: Some(#Community),
+		numSegment: Some("300"),
+		box: Some("123"),
+		branch: Some(#Apo),
+		theater: Some(#Europe),
+		zip: Some("99900")
+	})
+]
 
 @react.component
 let make = (~onSubmit) => {
