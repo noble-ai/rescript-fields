@@ -479,7 +479,7 @@ module Make: Make = (F: Field.T, I: IArray with type t = F.t) => {
         stateValues->Array.forEach(c => c.close())
         let (v, o, d) = makeDynInner(context, initial, set)
         // FIXME: Should be left with init?
-        (v, o, d->Array.map(Either.right), None)
+        (v, o, d->Array.map(Either.right), Some(v))
       }
       | #Add(value) =>  {
         let index = stateValues->Array.length
