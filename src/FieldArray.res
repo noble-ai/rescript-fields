@@ -479,7 +479,8 @@ module Make: Make = (F: Field.T, I: IArray with type t = F.t) => {
         stateValues->Array.forEach(c => c.close())
         let (v, o, d) = makeDynInner(context, initial, set)
         // FIXME: Should be left with init?
-        (v, o, d->Array.map(Either.right), Some(v))
+        let d = d->Array.mapi((d, i) => Either.left((Array.getUnsafe(o, i), d)))
+        (v, o, d, Some(v))
       }
       | #Add(value) =>  {
         let index = stateValues->Array.length
