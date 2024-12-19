@@ -16,72 +16,92 @@ describe("FieldIdentity", () => {
     describe("context empty", () => {
       let context: Subject.context = {}
       describe("#setOuter", () => {
-        let set = Rxjs.Subject.makeEmpty()
-        let validate = Rxjs.Subject.makeEmpty()
-        let {first, dyn} = Subject.makeDyn(context, None, set->Rxjs.toObservable, validate->Rxjs.toObservable->Some)
-        let current: ref<'a> = {contents: first}
+        let test = () => {
+          let set = Rxjs.Subject.makeEmpty()
+          let validate = Rxjs.Subject.makeEmpty()
+          let {first, dyn} = Subject.makeDyn(context, None, set->Rxjs.toObservable, validate->Rxjs.toObservable->Some)
+          let current: ref<'a> = {contents: first}
 
-        let res = dyn->Dynamic.switchSequence->Current.apply(current)->Dynamic.toPromise
+          let res = dyn->Dynamic.switchSequence->Current.apply(current)->Dynamic.toPromise
 
-        set->Rxjs.next(3.0)
-        current.contents.close()
+          [ (.) => set->Rxjs.next(3.0)
+          , (.) => current.contents.close()
+          ]
+          ->Test.chain(~delay=500)
+          ->Promise.bind(_ => res)
+        }
+
         testPromise("returns the change value", () => {
-          res->Promise.tap(result => result->Close.pack->Form.field->expect->toEqual(Store.Valid(value, value)))
+          test()->Promise.tap(result => result->Close.pack->Form.field->expect->toEqual(Store.Valid(value, value)))
         })
       })
 
       describe("#validateOuter", () => {
-        let set = Rxjs.Subject.makeEmpty()
-        let validate = Rxjs.Subject.makeEmpty()
-        let {first, dyn} = Subject.makeDyn(context, None, set->Rxjs.toObservable, validate->Rxjs.toObservable->Some)
-        let current: ref<'a> = {contents: first}
+        let test = () => {
 
-        let res = dyn->Dynamic.switchSequence->Current.apply(current)->Dynamic.toHistory
+          let set = Rxjs.Subject.makeEmpty()
+          let validate = Rxjs.Subject.makeEmpty()
+          let {first, dyn} = Subject.makeDyn(context, None, set->Rxjs.toObservable, validate->Rxjs.toObservable->Some)
+          let current: ref<'a> = {contents: first}
 
-        set->Rxjs.next(3.0)
-        validate->Rxjs.next()
+          let res = dyn->Dynamic.switchSequence->Current.apply(current)->Dynamic.toHistory
 
-        Promise.sleep(500)
-        ->Promise.tap(_ => current.contents.close())
-        ->Promise.void
+          [ (.) => set->Rxjs.next(3.0)
+          , (.) => validate->Rxjs.next()
+          , (.) => current.contents.close()
+          ]
+          ->Test.chain(~delay=500)
+          ->Promise.bind(_ => res)
+        }
 
         testPromise("emits a new value for validate", () => {
-          res->Promise.tap(result => result->expect->toHaveLengthArray(2))
+          test()->Promise.tap(result => result->expect->toHaveLengthArray(2))
         })
 
         testPromise("returns the change value", () => {
-          res->Promise.tap(result => result->Array.leaf->Option.getUnsafe->Close.pack->Form.field->expect->toEqual(Store.Valid(value, value)))
+          test()->Promise.tap(result => result->Array.leaf->Option.getUnsafe->Close.pack->Form.field->expect->toEqual(Store.Valid(value, value)))
         })
       })
- 
+
       describe("#set", () => {
-        let set = Rxjs.Subject.makeEmpty()
-        let validate = Rxjs.Subject.makeEmpty()
-        let {first, dyn} = Subject.makeDyn(context, None, set->Rxjs.toObservable, validate->Rxjs.toObservable->Some)
-        let current: ref<'a> = {contents: first}
+        let test = () => {
+          let set = Rxjs.Subject.makeEmpty()
+          let validate = Rxjs.Subject.makeEmpty()
+          let {first, dyn} = Subject.makeDyn(context, None, set->Rxjs.toObservable, validate->Rxjs.toObservable->Some)
+          let current: ref<'a> = {contents: first}
 
-        let res = dyn->Dynamic.switchSequence->Current.apply(current)->Dynamic.toPromise
+          let res = dyn->Dynamic.switchSequence->Current.apply(current)->Dynamic.toPromise
 
-        first.pack.actions.set(3.0)
-        first.close()
+          [ (.)  => current.contents.pack.actions.set(3.0)
+          , (.)  => current.contents.close()
+          ]
+          ->Test.chain(~delay=500)
+          ->Promise.bind(_ => res)
+        }
         testPromise("returns the change value", () => {
-          res->Promise.tap(result => result->Close.pack->Form.field->expect->toEqual(Store.Valid(value, value)))
+          test()->Promise.tap(result => result->Close.pack->Form.field->expect->toEqual(Store.Valid(value, value)))
         })
       })
 
       describe("#clear", () => {
-        let set = Rxjs.Subject.makeEmpty()
-        let validate = Rxjs.Subject.makeEmpty()
-        let {first, dyn} = Subject.makeDyn(context, None, set->Rxjs.toObservable, validate->Rxjs.toObservable->Some)
-        let current: ref<'a> = {contents: first}
+        let test = () => {
+          let set = Rxjs.Subject.makeEmpty()
+          let validate = Rxjs.Subject.makeEmpty()
+          let {first, dyn} = Subject.makeDyn(context, None, set->Rxjs.toObservable, validate->Rxjs.toObservable->Some)
+          let current: ref<'a> = {contents: first}
 
-        let res = dyn->Dynamic.switchSequence->Current.apply(current)->Dynamic.toPromise
+          let res = dyn->Dynamic.switchSequence->Current.apply(current)->Dynamic.toPromise
 
-        first.pack.actions.set(3.0)
-        first.pack.actions.clear()
-        first.close()
+          [ (.)  => current.contents.pack.actions.set(3.0)
+          , (.)  => current.contents.pack.actions.clear()
+          , (.)  => current.contents.close()
+          ]
+          ->Test.chain(~delay=500)
+          ->Promise.bind(_ => res)
+        }
+
         testPromise("returns the empty value", () => {
-          res->Promise.tap(result => result->Close.pack->Form.field->expect->toEqual(Store.Valid(0., 0.)))
+          test()->Promise.tap(result => result->Close.pack->Form.field->expect->toEqual(Store.Valid(0., 0.)))
         })
       })
 
@@ -89,19 +109,25 @@ describe("FieldIdentity", () => {
         [("None", None, 0.0), ("Some(4.0)", Some(4.0), 4.0)]
         ->Array.forEach( ((name, value, out)) => {
           describe(name, () => {
-            let set = Rxjs.Subject.makeEmpty()
-            let validate = Rxjs.Subject.makeEmpty()
-            let {first, dyn} = Subject.makeDyn(context, None, set->Rxjs.toObservable, validate->Rxjs.toObservable->Some)
-            let current: ref<'a> = {contents: first}
+            let test = () => {
 
-            let res = dyn->Dynamic.switchSequence->Current.apply(current)->Dynamic.toPromise
+              let set = Rxjs.Subject.makeEmpty()
+              let validate = Rxjs.Subject.makeEmpty()
+              let {first, dyn} = Subject.makeDyn(context, None, set->Rxjs.toObservable, validate->Rxjs.toObservable->Some)
+              let current: ref<'a> = {contents: first}
 
-            current.contents.pack.actions.set(3.0)
-            current.contents.pack.actions.opt(value)
-            current.contents.close()
+              let res = dyn->Dynamic.switchSequence->Current.apply(current)->Dynamic.toPromise
+
+              [ (.)  => current.contents.pack.actions.set(3.0)
+              , (.)  => current.contents.pack.actions.opt(value)
+              , (.)  => current.contents.close()
+              ]
+              ->Test.chain(~delay=500)
+              ->Promise.bind(_ => res)
+            }
 
             testPromise("returns the expected value", () => {
-              res->Promise.tap(result => result->Close.pack->Form.field->expect->toEqual(Store.Valid(out, out)))
+              test()->Promise.tap(result => result->Close.pack->Form.field->expect->toEqual(Store.Valid(out, out)))
             })
           })
         })

@@ -416,6 +416,7 @@ module Make: Make = (F: Field.T, I: IArray with type t = F.t) => {
     let stateValues =
       Rxjs.Subject.makeBehavior(firstInner)
       ->Rxjs.pipe(Rxjs.distinct())
+      // ->Dynamic.mapLog("stateValues", valuesToInputs)
 
     let stateObs =
       Rxjs.Subject.makeBehavior(initInner)
@@ -429,7 +430,6 @@ module Make: Make = (F: Field.T, I: IArray with type t = F.t) => {
 
     let set = Rxjs.merge3(setOuter, setInner, setOpt)
     let clear = Rxjs.merge2(clearInner, clearOpt)
-
 
     let dynInner =
     // multiplex all the various Array level change signals
@@ -516,7 +516,8 @@ module Make: Make = (F: Field.T, I: IArray with type t = F.t) => {
         stateValues->Array.forEach(c => c.close())
         let (values, obs, dyns) = input->traverseSetk(context, set, _)->packKey
 
-        ( values, obs, dyns->Array.map(Either.right), None)
+        let dyns = dyns->Array.mapi( (dyn, i) => (obs->Array.getUnsafe(i), dyn)->Either.left)
+        ( values, obs, dyns, Some(values))
       }}
     }, (firstInner, initInner, dynInner->Array.map(Either.right), None)))
     // The scan does not emit without a change,

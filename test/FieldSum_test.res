@@ -58,9 +58,11 @@ describe("FieldSum", () => {
             let current: ref<'a> = {contents: first}
             let res = dyn->Dynamic.switchSequence->Current.apply(current)->Dynamic.toPromise
 
-            values->Array.forEach(Rxjs.next(set))
-            current.contents.close()
-            res
+            values
+            ->Array.map((v) => (.) => Rxjs.next(set, v))
+            ->Array.append( (.) => current.contents.close())
+            ->Test.chain(~delay=500)
+            ->Promise.bind(_ => res)
           }
 
           itPromise("applys last value", () => {

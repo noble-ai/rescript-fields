@@ -26,23 +26,21 @@ describe("FieldArray", () => {
           let {first, dyn} = Subject.makeDyn(context, None, set->Rxjs.toObservable, val->Rxjs.toObservable->Some)
           let current: ref<'a> = {contents: first}
 
-          let actions = first.pack->Form.actions
+          let res = dyn->Dynamic.switchSequence->applyCurrent(current)->Dynamic.toHistory
 
-          let res = dyn->Dynamic.switchSequence->applyCurrent(current)->Dynamic.toPromise
-
-          let x: Subject.inputElement = Some("3")
-          actions.add(None)
-          actions.add(Some(x))
-          actions.reset()
-          set->Rxjs.next([Some("3"), Some("4"), Some("5")])
-
-          Promise.sleep(500)->Promise.tap(_ => current.contents.close())->Promise.void
-          res
+          [ (.) => current.contents.pack.actions.add(None)
+          , (.) => current.contents.pack.actions.add(Some(Some("3")))
+          , (.) => current.contents.pack.actions.reset()
+          , (.) => set->Rxjs.next([Some("3"), Some("4"), Some("5")])
+          , (.) => current.contents.close()
+          ]
+          ->Test.chain(~delay=500)
+          ->Promise.bind(_ => res)
         }
 
         itPromise("set", () => {
           test()->Promise.tap(res => {
-            expect(res->Close.pack->Form.field->Subject.output)->toEqual(Some([3,4,5]))
+            expect(res->Array.leaf->Option.getUnsafe->Close.pack->Form.field->Subject.output)->toEqual(Some([3,4,5]))
           })
         })
       })
@@ -149,7 +147,7 @@ describe("FieldArray", () => {
           let d = delay.contents
           delay.contents = delay.contents - 10
           Promise.sleep(d)->Promise.map(_ => Ok())
-        }  
+        }
 
         // Each validation is a bit quicker than the last so the responses come back out of order
         let validateString = (_x: FieldElement.output) => {
@@ -169,9 +167,11 @@ describe("FieldArray", () => {
 
             let res = dyn->Dynamic.switchSequence->applyCurrent(current)->Dynamic.toPromise
 
-            Rxjs.next(set, ["set"])
-            Promise.sleep(500)->Promise.tap(_ => current.contents.close())->Promise.void
-            res
+            [ (.()) => set->Rxjs.next(["set"])
+            , (.()) => current.contents.close()
+            ]
+            ->Test.chain(~delay=500)
+            ->Promise.bind(_ => res)
           }
 
           itPromise("sets", () => {
@@ -187,10 +187,11 @@ describe("FieldArray", () => {
 
             let res = dyn->Dynamic.switchSequence->applyCurrent(current)->Dynamic.toPromise
 
-            first.pack.actions.set(["set"])
-            Promise.sleep(500)->Promise.tap(_ => current.contents.close())->Promise.void
-
-            res
+            [ (.) => current.contents.pack.actions.set(["set"])
+            , (.) => current.contents.close()
+            ]
+            ->Test.chain(~delay=500)
+            ->Promise.bind(_ => res)
           }
 
           itPromise("sets", () => {
@@ -201,15 +202,16 @@ describe("FieldArray", () => {
         describe("add", () => {
           let test = (values) => {
             let set = Rxjs.Subject.makeEmpty()
-            let {first,dyn} = Subject.makeDyn(context(), None, set->Rxjs.toObservable, None)
+            let {first, init, dyn} = Subject.makeDyn(context(), None, set->Rxjs.toObservable, None)
             let current: ref<'ab> = {contents: first}
 
-            let res = dyn->Dynamic.switchSequence->applyCurrent(current)->Dynamic.toPromise
+            let res = dyn->Dynamic.startWith(init)->Dynamic.switchSequence->applyCurrent(current)->Dynamic.toPromise
 
-            values->Array.forEach(first.pack.actions.add)
-
-            Promise.sleep(500)->Promise.tap(_ => current.contents.close())->Promise.void
-            res
+            values
+            ->Array.map( (v) => (. ) => current.contents.pack.actions.add(v) )
+            ->Array.append((.) => current.contents.close())
+            ->Test.chain(~delay=500)
+            ->Promise.bind(_ => res)
           }
 
           itPromise("adds", () => {
@@ -225,12 +227,13 @@ describe("FieldArray", () => {
 
             let res = dyn->Dynamic.switchSequence->applyCurrent(current)->Dynamic.toPromise
 
-            first.pack.actions.add(None)
-            first.pack.actions.add(Some("add"))
-            first.pack.actions.remove(0)
-
-            Promise.sleep(500)->Promise.tap(_ => current.contents.close())->Promise.void
-            res
+            [ (.) => current.contents.pack.actions.add(None)
+            , (.) => current.contents.pack.actions.add(Some("add"))
+            , (.) => current.contents.pack.actions.remove(0)
+            , (.) => current.contents.close()
+            ]
+            ->Test.chain(~delay=500)
+            ->Promise.bind(_ => res)
           }
 
           itPromise("removes", () => {
@@ -246,11 +249,12 @@ describe("FieldArray", () => {
 
             let res = dyn->Dynamic.switchSequence->applyCurrent(current)->Dynamic.toPromise
 
-            first.pack.actions.set(["set", "set2"])
-            first.pack.actions.opt(opt)
-
-            Promise.sleep(500)->Promise.tap(_ => current.contents.close())->Promise.void
-            res
+            [ (.) => current.contents.pack.actions.set(["set", "set2"])
+            , (.) => current.contents.pack.actions.opt(opt)
+            , (.) => current.contents.close()
+            ]
+            ->Test.chain(~delay=500)
+            ->Promise.bind(_ => res)
           }
 
           describe("some", () => {
@@ -274,15 +278,12 @@ describe("FieldArray", () => {
             // This share prevents the observable from emitting everything twice?
             let res = dyn->Dynamic.switchSequence->applyCurrent(current)->Dynamic.toPromise
 
-            first.pack.actions.set(["set0", "set1", "set2"])
-              
-            Promise.sleep(500)
-            ->Promise.tap(_ => current.contents.pack.actions.index(0)->Option.forEach(index => index.set("index") ))
-            ->Promise.delay(~ms=500)
-            ->Promise.tap(_ => current.contents.close())
-            ->Promise.void
-
-            res
+            [ (.) => current.contents.pack.actions.set(["set0", "set1", "set2"])
+            , (.) => current.contents.pack.actions.index(0)->Option.forEach(index => index.set("index") )
+            , (.) => current.contents.close()
+            ]
+            ->Test.chain(~delay=500)
+            ->Promise.bind(_ => res)
           }
 
           itPromise("indexes", () => {
@@ -298,11 +299,12 @@ describe("FieldArray", () => {
 
             let res = dyn->Dynamic.switchSequence->applyCurrent(current)->Dynamic.toHistory
 
-            first.pack.actions.set(["set", "set2"])
-            first.pack.actions.clear()
-
-            Promise.sleep(500)->Promise.tap(_ => current.contents.close())->Promise.void
-            res
+            [ (.) => current.contents.pack.actions.set(["set", "set2"])
+            , (.) => current.contents.pack.actions.clear()
+            , (.) => current.contents.close()
+            ]
+            ->Test.chain(~delay=500)
+            ->Promise.bind(_ => res)
           }
 
           itPromise("clears", () => {
@@ -318,12 +320,12 @@ describe("FieldArray", () => {
 
             let res = dyn->Dynamic.switchSequence->applyCurrent(current)->Dynamic.toPromise
 
-            first.pack.actions.set(["set", "set2"])
-            first.pack.actions.reset()
-
-            Promise.sleep(500)->Promise.tap(_ => current.contents.close())->Promise.void
-
-            res
+            [ (.) => current.contents.pack.actions.set(["set", "set2"])
+            , (.) => current.contents.pack.actions.reset()
+            , (.) => current.contents.close()
+            ]
+            ->Test.chain(~delay=500)
+            ->Promise.bind(_ => res)
           }
 
           itPromise("resets", () => {

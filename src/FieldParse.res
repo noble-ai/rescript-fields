@@ -68,7 +68,9 @@ module Make = (I: Interface) => {
               ->Promise.map(res => {
                 switch res {
                 | Ok(_) => Store.valid(input, value)
-                | Error(err) => Store.invalid(input, err)
+                | Error(err) => {
+                  Store.invalid(input, err)
+                }
                 }
               })
               ->Rxjs.fromPromise

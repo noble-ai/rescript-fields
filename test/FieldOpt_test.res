@@ -33,15 +33,15 @@ describe("FieldOpt", () => {
           let set = Rxjs.Subject.makeEmpty()
           let val = Rxjs.Subject.makeEmpty()
           let {first, dyn} = Subject.makeDyn(context, None, set->Rxjs.toObservable, val->Rxjs.toObservable->Some) 
-          let current: ref<'a> = {contents: first}
+          let current: ref<Close.t<'a>> = {contents: first}
 
           let hist = dyn->Dynamic.switchSequence->Current.apply(current)->Dynamic.toHistory
 
-          values->Array.forEach(Rxjs.next(set))
-
-          Promise.sleep(500)->Promise.tap(_ => current.contents.close())->Promise.void
-
-          hist
+          values
+          ->Array.map(v => (.) => Rxjs.next(set, v))
+          ->Array.append((.) => current.contents.close())
+          ->Test.chain(~delay=500)
+          ->Promise.bind(_ => hist)
         }
 
         describe("some", () => {
@@ -84,17 +84,17 @@ describe("FieldOpt", () => {
           let set = Rxjs.Subject.makeEmpty()
           let val = Rxjs.Subject.makeEmpty()
           let {first, dyn} = Subject.makeDyn(context, None, set->Rxjs.toObservable, val->Rxjs.toObservable->Some) 
-          let current: ref<'a> = {contents: first}
+          let current: ref<Close.t<'a>> = {contents: first}
 
           let hist = dyn->Dynamic.switchSequence->Current.apply(current)->Dynamic.toHistory
 
-          Rxjs.next(set, Some("3"))
-          Rxjs.next(set, Some("5"))
-          Rxjs.next(set, None)
-
-          Promise.sleep(2000)->Promise.tap(_ => current.contents.close())->Promise.void
-
-          hist
+          [ (.) => Rxjs.next(set, Some("3"))
+          , (.) => Rxjs.next(set, Some("5"))
+          , (.) => Rxjs.next(set, None)
+          , (.) => current.contents.close()
+          ]
+          ->Test.chain(~delay=500)
+          ->Promise.bind(_ => hist)
         }
 
         itPromise("shows busy", () => {
@@ -128,19 +128,18 @@ describe("FieldOpt", () => {
             let set = Rxjs.Subject.makeEmpty()
             let val = Rxjs.Subject.makeEmpty()
             let {first, dyn} = Subject.makeDyn(context, None, set->Rxjs.toObservable, val->Rxjs.toObservable->Some) 
-            let current: ref<'a> = {contents: first}
+            let current: ref<Close.t<'a>> = {contents: first}
 
             let hist = dyn->Dynamic.switchSequence->Current.apply(current)->Dynamic.toHistory
 
-            current.contents.pack.actions.opt(Some("3"))
-            current.contents.pack.actions.opt(None)
-            current.contents.pack.actions.opt(Some("4"))
-
-            Promise.sleep(500)->Promise.tap(_ => current.contents.pack.actions.opt(None))->Promise.void
-
-            Promise.sleep(800)->Promise.tap(_ => current.contents.close())->Promise.void
-
-            hist
+            [ (.) => current.contents.pack.actions.opt(Some("3"))
+            , (.) => current.contents.pack.actions.opt(None)
+            , (.) => current.contents.pack.actions.opt(Some("4"))
+            , (.) => current.contents.pack.actions.opt(None)
+            , (.) => current.contents.close()
+            ]
+            ->Test.chain(~delay=500)
+            ->Promise.bind(_ => hist)
           }
 
           itPromise("captures every input", () => {
@@ -150,7 +149,7 @@ describe("FieldOpt", () => {
           })
 
           itPromise("ends with clear", () => {
-            test()->Promise.tap( res => 
+            test()->Promise.tap( res =>
               res
               ->Array.leaf
               ->Option.getUnsafe

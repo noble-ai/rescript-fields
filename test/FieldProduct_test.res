@@ -44,10 +44,11 @@ describe("FieldProduct", () => {
 
 							let res = dyn->Dynamic.switchSequence->Current.apply(current)->Dynamic.toPromise
 
-							set->Rxjs.next({left: "haha", right: "nono"})
-							current.contents.close()
-
-							res
+							[ (.) => set->Rxjs.next({left: "haha", right: "nono"})
+							, (.) => current.contents.close()
+							]
+							->Test.chain(~delay=500)
+							->Promise.bind(_ => res)
 						}
 
 						itPromise("applies value", () => {
@@ -64,16 +65,13 @@ describe("FieldProduct", () => {
 
 						let res = dyn->Dynamic.switchSequence->Current.apply(current)->Dynamic.toPromise
 
-						set->Rxjs.next({left: "haha", right: "nono"})
-						Promise.sleep(100)
-						->Promise.tap(_ => current.contents.pack.actions.inner.right.set("HEHE"))
-						->Promise.delay(~ms=100)
-						->Promise.tap(_ => current.contents.pack.actions.inner.left.set("NONO"))
-						->Promise.delay(~ms=100)
-						->Promise.tap(_ => current.contents.close())
-						->Promise.void
-
-						res
+						[ (.) => set->Rxjs.next({left: "haha", right: "nono"})
+						, (.) => current.contents.pack.actions.inner.right.set("HEHE")
+						, (.) => current.contents.pack.actions.inner.left.set("NONO")
+						, (.) => current.contents.close()
+						]
+						->Test.chain(~delay=100)
+						->Promise.bind(_ => res)
 					}
 
 					itPromise("Applies inner set left", () => {
@@ -99,24 +97,28 @@ describe("FieldProduct", () => {
 						left: { },
 						right: { }
 					}
-				}	
+				}
 
 				describe("#makeDyn", () => {
 					describe("setOuter", () => {
-						let set = Rxjs.Subject.makeEmpty()
-						let val = Rxjs.Subject.makeEmpty()
+						let test = () => {
+							let set = Rxjs.Subject.makeEmpty()
+							let val = Rxjs.Subject.makeEmpty()
 
-						let {first, dyn} = Subject.makeDyn(context, None, set->Rxjs.toObservable, val->Rxjs.toObservable->Some)
-						let current: ref<'a> = {contents: first}
+							let {first, dyn} = Subject.makeDyn(context, None, set->Rxjs.toObservable, val->Rxjs.toObservable->Some)
+							let current: ref<'a> = {contents: first}
 
-						let res = dyn->Dynamic.switchSequence->Current.apply(current)->Dynamic.toPromise
-
-						set->Rxjs.next({left: "haha", right: "nono"})
-						set->Rxjs.next({left: "nono", right: "haha"})
-						Promise.sleep(100)->Promise.tap(_ => current.contents.close())->Promise.void
+							let res = dyn->Dynamic.switchSequence->Current.apply(current)->Dynamic.toPromise
+							[ (.) => set->Rxjs.next({left: "haha", right: "nono"})
+							, (.) => set->Rxjs.next({left: "nono", right: "haha"})
+							, (.) => current.contents.close()
+							]
+							->Test.chain(~delay=100)
+							->Promise.bind(_ => res)
+						}
 
 						itPromise("applies last", () => {
-							res->Promise.tap(res => res->Close.pack->Form.field->Subject.input->expect->toEqual({left: "nono", right: "haha"}))
+							test()->Promise.tap(res => res->Close.pack->Form.field->Subject.input->expect->toEqual({left: "nono", right: "haha"}))
 						})
 					})
 					describe("setElement", () => {
@@ -129,16 +131,13 @@ describe("FieldProduct", () => {
 
 							let res = dyn->Dynamic.switchSequence->Current.apply(current)->Dynamic.toPromise
 
-							set->Rxjs.next({left: "haha", right: "nono"})
-							Promise.sleep(100)
-							->Promise.tap(_ => current.contents.pack.actions.inner.right.set("HEHE"))
-							->Promise.delay(~ms=100)
-							->Promise.tap(_ => current.contents.pack.actions.inner.left.set("NONO"))
-							->Promise.delay(~ms=100)
-							->Promise.tap(_ => current.contents.close())
-							->Promise.void
-
-							res
+							[ (.) => set->Rxjs.next({left: "haha", right: "nono"})
+							, (.) => current.contents.pack.actions.inner.right.set("HEHE")
+							, (.) => current.contents.pack.actions.inner.left.set("NONO")
+							, (.) => current.contents.close()
+							]
+							->Test.chain(~delay=100)
+							->Promise.bind(_ => res)
 						}
 
 						itPromise("Applies inner set left", () => {
@@ -174,30 +173,33 @@ describe("FieldProduct", () => {
 						left: { validate: validateString },
 						right: { validate: validateString }
 					}
-				}	
+				}
 
 				describe("#makeDyn", () => {
 					describe("setOuter", () => {
-						let set = Rxjs.Subject.makeEmpty()
-						let val = Rxjs.Subject.makeEmpty()
+						let test = () => {
+							let set = Rxjs.Subject.makeEmpty()
+							let val = Rxjs.Subject.makeEmpty()
 
-						let {first, dyn} = Subject.makeDyn(context, None, set->Rxjs.toObservable, val->Rxjs.toObservable->Some)
-						let current: ref<'a> = {contents: first}
+							let {first, dyn} = Subject.makeDyn(context, None, set->Rxjs.toObservable, val->Rxjs.toObservable->Some)
+							let current: ref<'a> = {contents: first}
 
-						let res = dyn->Dynamic.switchSequence->Current.apply(current)->Dynamic.toPromise
+							let res = dyn->Dynamic.switchSequence->Current.apply(current)->Dynamic.toPromise
 
-						// let hist = dyn->Dynamic.toHistory
-						set->Rxjs.next({left: "haha", right: "nono"})
-						set->Rxjs.next({left: "nono", right: "haha"})
-						// Needs to be long enough for
-						Promise.sleep(1000)->Promise.tap(_ => current.contents.close())->Promise.void
+							[ (.) => set->Rxjs.next({left: "haha", right: "nono"})
+							, (.) => set->Rxjs.next({left: "nono", right: "haha"})
+							, (.) => current.contents.close()
+							]
+							->Test.chain(~delay=100)
+							->Promise.bind(_ => res)
+						}
 
-						let field = res->Promise.map(res => res->Close.pack->Form.field)
+						let field = Promise.map(_, res => res->Close.pack->Form.field)
 						itPromise("applies last", () => {
-							field->Promise.tap(field => field->Subject.input->expect->toEqual({left: "nono", right: "haha"}))
+							test()->field->Promise.tap(field => field->Subject.input->expect->toEqual({left: "nono", right: "haha"}))
 						})
 						itPromise("resolves to valid", () => {
-							field->Promise.tap(field => field->Subject.enum->expect->toEqual(#Valid))
+							test()->field->Promise.tap(field => field->Subject.enum->expect->toEqual(#Valid))
 						})
 					})
 					describe("setElement", () => {
@@ -209,17 +211,13 @@ describe("FieldProduct", () => {
 							let current: ref<'a> = {contents: first}
 
 							let res = dyn->Dynamic.switchSequence->Current.apply(current)->Dynamic.toPromise
-
-							set->Rxjs.next({left: "haha", right: "nono"})
-							Promise.sleep(100)
-							->Promise.tap(_ => current.contents.pack.actions.inner.right.set("HEHE"))
-							->Promise.delay(~ms=100)
-							->Promise.tap(_ => current.contents.pack.actions.inner.left.set("NONO"))
-							->Promise.delay(~ms=100)
-							->Promise.tap(_ => current.contents.close())
-							->Promise.void
-
-							res
+							[ (.) => set->Rxjs.next({left: "haha", right: "nono"})
+							, (.) => current.contents.pack.actions.inner.right.set("HEHE")
+							, (.) => current.contents.pack.actions.inner.left.set("NONO")
+							, (.) => current.contents.close()
+							]
+							->Test.chain(~delay=100)
+							->Promise.bind(_ => res)
 						}
 
 						itPromise("Applies inner set left", () => {
@@ -246,19 +244,24 @@ describe("FieldProduct", () => {
 
 				describe("#makeDyn", () => {
 					describe("setOuter", () => {
-						let set = Rxjs.Subject.makeEmpty()
-						let val = Rxjs.Subject.makeEmpty()
+						let test = () => {
+							let set = Rxjs.Subject.makeEmpty()
+							let val = Rxjs.Subject.makeEmpty()
 
-						let {first, dyn} = Subject.makeDyn(context, None, set->Rxjs.toObservable, val->Rxjs.toObservable->Some)
-						let current: ref<'a> = {contents: first}
+							let {first, dyn} = Subject.makeDyn(context, None, set->Rxjs.toObservable, val->Rxjs.toObservable->Some)
+							let current: ref<'a> = {contents: first}
 
-						let res = dyn->Dynamic.switchSequence->Current.apply(current)->Dynamic.toPromise
+							let res = dyn->Dynamic.switchSequence->Current.apply(current)->Dynamic.toPromise
 
-						set->Rxjs.next({left: "haha", right: "nono"})
-						current.contents.close()
+							[ (.) => set->Rxjs.next({left: "haha", right: "nono"})
+							, (.) => current.contents.close()
+							]
+							->Test.chain(~delay=500)
+							->Promise.bind(_ => res)
+						}
 
 						itPromise("applies value", () => {
-							res->Promise.tap(res => res->Close.pack->Form.field->Subject.input->expect->toEqual({left: "haha", right: "nono"}))
+							test()->Promise.tap(res => res->Close.pack->Form.field->Subject.input->expect->toEqual({left: "haha", right: "nono"}))
 						})
 					})
 					describe("setElement", () => {
@@ -271,16 +274,13 @@ describe("FieldProduct", () => {
 
 							let res = dyn->Dynamic.switchSequence->Current.apply(current)->Dynamic.toPromise
 
-							set->Rxjs.next({left: "haha", right: "nono"})
-							Promise.sleep(100)
-							->Promise.tap(_ => current.contents.pack.actions.inner.right.set("HEHE"))
-							->Promise.delay(~ms=100)
-							->Promise.tap(_ => current.contents.pack.actions.inner.left.set("NONO"))
-							->Promise.delay(~ms=100)
-							->Promise.tap(_ => current.contents.close())
-							->Promise.void
-
-							res
+							[ (.) => set->Rxjs.next({left: "haha", right: "nono"})
+							, (.) => current.contents.pack.actions.inner.right.set("HEHE")
+							, (.) => current.contents.pack.actions.inner.left.set("NONO")
+							, (.) =>  current.contents.close()
+							]
+							->Test.chain(~delay=100)
+							->Promise.bind(_ => res)
 						}
 
 						itPromise("Applies inner set left", () => {
@@ -306,24 +306,29 @@ describe("FieldProduct", () => {
 						left: { },
 						right: { }
 					}
-				}	
+				}
 
 				describe("#makeDyn", () => {
 					describe("setOuter", () => {
-						let set = Rxjs.Subject.makeEmpty()
-						let val = Rxjs.Subject.makeEmpty()
+						let test = () => {
+							let set = Rxjs.Subject.makeEmpty()
+							let val = Rxjs.Subject.makeEmpty()
 
-						let {first, dyn} = Subject.makeDyn(context, None, set->Rxjs.toObservable, val->Rxjs.toObservable->Some)
-						let current: ref<'a> = {contents: first}
+							let {first, dyn} = Subject.makeDyn(context, None, set->Rxjs.toObservable, val->Rxjs.toObservable->Some)
+							let current: ref<'a> = {contents: first}
 
-						let res = dyn->Dynamic.switchSequence->Current.apply(current)->Dynamic.toPromise
+							let res = dyn->Dynamic.switchSequence->Current.apply(current)->Dynamic.toPromise
 
-						set->Rxjs.next({left: "haha", right: "nono"})
-						set->Rxjs.next({left: "nono", right: "haha"})
-						Promise.sleep(100)->Promise.tap(_ => current.contents.close())->Promise.void
+							[ (.) => set->Rxjs.next({left: "haha", right: "nono"})
+							, (.) => set->Rxjs.next({left: "nono", right: "haha"})
+							, (.) => current.contents.close()
+							]
+							->Test.chain(~delay=100)
+							->Promise.bind(_ => res)
+						}
 
 						itPromise("applies last", () => {
-							res->Promise.tap(res => res->Close.pack->Form.field->Subject.input->expect->toEqual({left: "nono", right: "haha"}))
+							test()->Promise.tap(res => res->Close.pack->Form.field->Subject.input->expect->toEqual({left: "nono", right: "haha"}))
 						})
 					})
 					describe("setElement", () => {
@@ -336,16 +341,13 @@ describe("FieldProduct", () => {
 
 							let res = dyn->Dynamic.switchSequence->Current.apply(current)->Dynamic.toPromise
 
-							set->Rxjs.next({left: "haha", right: "nono"})
-							Promise.sleep(100)
-							->Promise.tap(_ => current.contents.pack.actions.inner.right.set("HEHE"))
-							->Promise.delay(~ms=100)
-							->Promise.tap(_ => current.contents.pack.actions.inner.left.set("NONO"))
-							->Promise.delay(~ms=100)
-							->Promise.tap(_ => current.contents.close())
-							->Promise.void
-
-							res
+							[ (.) => set->Rxjs.next({left: "haha", right: "nono"})
+							, (.) => current.contents.pack.actions.inner.right.set("HEHE")
+							, (.) => current.contents.pack.actions.inner.left.set("NONO")
+							, (.) => current.contents.close()
+							]
+							->Test.chain(~delay=100)
+							->Promise.bind(_ => res)
 						}
 
 						itPromise("Applies inner set left", () => {
@@ -379,28 +381,32 @@ describe("FieldProduct", () => {
 						left: { validate: validateString },
 						right: { validate: validateString }
 					}
-				}	
+				}
 
 				describe("#makeDyn", () => {
 					describe("setOuter", () => {
-						let set = Rxjs.Subject.makeEmpty()
-						let val = Rxjs.Subject.makeEmpty()
+						let test = () => {
+							let set = Rxjs.Subject.makeEmpty()
+							let val = Rxjs.Subject.makeEmpty()
 
-						let {first, dyn} = Subject.makeDyn(context, None, set->Rxjs.toObservable, val->Rxjs.toObservable->Some)
-						let current: ref<'a> = {contents: first}
+							let {first, dyn} = Subject.makeDyn(context, None, set->Rxjs.toObservable, val->Rxjs.toObservable->Some)
+							let current: ref<'a> = {contents: first}
 
-						let res = dyn->Dynamic.switchSequence->Current.apply(current)->Dynamic.toPromise
+							let res = dyn->Dynamic.switchSequence->Current.apply(current)->Dynamic.toPromise
+							[ (.) => set->Rxjs.next({left: "haha", right: "nono"})
+							,(.) => set->Rxjs.next({left: "nono", right: "haha"})
+							, (.) => current.contents.close()
+							]
+							->Test.chain(~delay=100)
+							->Promise.bind(_ => res)
+						}
 
-						set->Rxjs.next({left: "haha", right: "nono"})
-						set->Rxjs.next({left: "nono", right: "haha"})
-						Promise.sleep(100)->Promise.tap(_ => current.contents.close())->Promise.void
-
-						let field = res->Promise.map(res => res->Close.pack->Form.field)
+						let field = Promise.map(_, res => res->Close.pack->Form.field)
 						itPromise("applies last", () => {
-							field->Promise.tap(field => field->Subject.input->expect->toEqual({left: "nono", right: "haha"}))
+							test()->field->Promise.tap(field => field->Subject.input->expect->toEqual({left: "nono", right: "haha"}))
 						})
 						itPromise("resolves to  valid", () => {
-							field->Promise.tap(field => field->Subject.enum->expect->toEqual(#Valid))
+							test()->field->Promise.tap(field => field->Subject.enum->expect->toEqual(#Valid))
 						})
 					})
 				describe("setElement", () => {
@@ -413,16 +419,13 @@ describe("FieldProduct", () => {
 
 						let res = dyn->Dynamic.switchSequence->Current.apply(current)->Dynamic.toPromise
 
-						set->Rxjs.next({left: "haha", right: "nono"})
-						Promise.sleep(100)
-						->Promise.tap(_ => current.contents.pack.actions.inner.right.set("HEHE"))
-						->Promise.delay(~ms=100)
-						->Promise.tap(_ => current.contents.pack.actions.inner.left.set("NONO"))
-						->Promise.delay(~ms=100)
-						->Promise.tap(_ => current.contents.close())
-						->Promise.void
-
-						res
+						[ (.) => set->Rxjs.next({left: "haha", right: "nono"})
+						, (.) => current.contents.pack.actions.inner.right.set("HEHE")
+						, (.) => current.contents.pack.actions.inner.left.set("NONO")
+						, (.) => current.contents.close()
+						]
+						->Test.chain(~delay=100)
+						->Promise.bind(_ => res)
 					}
 
 					itPromise("Applies inner set left", () => {
