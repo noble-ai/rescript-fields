@@ -67,7 +67,7 @@ module Make: FieldIdentity = (T: T) => {
     clear: () => actions.clear()->fn,
     opt: i => i->actions.opt->fn,
   }
-    
+
   // let logField = Dynamic.tap(_, (x: Close.t<Form.t<t, 'a>>) => {
   //   Console.log2("FieldIdentity field", x.pack.field)
   // })
@@ -75,7 +75,7 @@ module Make: FieldIdentity = (T: T) => {
   let makeDyn = (context: context, initial: option<input>, setOuter: Rxjs.Observable.t<input>, val: option<Rxjs.Observable.t<()>> )
       : Dyn.t<Close.t<Form.t<t, actions<()>>>>
     => {
-    let debug = false 
+    let debug = false
     let debug = context.debug->Option.or(false) || debug
 
     if debug { Console.log("FieldIdentity makeDyn") }
@@ -120,12 +120,12 @@ module Make: FieldIdentity = (T: T) => {
       ->Dynamic.map(Tuple.snd2)
 
     let dyn =
-      Rxjs.merge2(field, validated)
+    Rxjs.merge2(field, validated)
       ->Dynamic.map((field): Close.t<Form.t<'f, 'a>> => {pack: {field, actions}, close})
       ->memoState
       ->Dynamic.map(Dynamic.return)
       ->Rxjs.pipe(Rxjs.takeUntil(complete))
-    
+
     { first, init, dyn }
   }
 

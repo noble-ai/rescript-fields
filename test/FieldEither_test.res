@@ -6,6 +6,7 @@ module Subject = FieldEither.Either2.Make(
   FieldLeft,
   FieldRight,
 )
+module MkDyn = Test.MkDyn(Subject)
 
 describe("FieldEither", () => {
   describe("Either2", () => {
@@ -14,23 +15,11 @@ describe("FieldEither", () => {
         let context: Subject.context = {inner: ({}, ({}, ()))}
 				describe("#makeDyn", () => {
 					describe("setOuter", () => {
-            let test = (value) => {
-              let set = Rxjs.Subject.makeEmpty()
-              let validate = Rxjs.Subject.makeEmpty()
-              let {first, dyn} = Subject.makeDyn(context, None, set->Rxjs.toObservable, validate->Rxjs.toObservable->Some)
-              let current: ref<'a> = {contents: first}
-
-              let res = dyn
-                ->Dynamic.switchSequence
-                ->Current.apply(current)
-                ->Dynamic.toHistory
-
-              [ (.) => Rxjs.next(set, value)
-              , (.) => current.contents.close()
-              ]
-              ->Test.chain(~delay=100)
-              ->Promise.bind(_ => res)
-            }
+            let test = (value) =>
+              MkDyn.test(context,
+                [ #Set(value)
+                ]
+              )()
 
 						itPromise("applys value", () => {
               let value = Either.Left("3")
@@ -41,52 +30,26 @@ describe("FieldEither", () => {
           describe("opt", () => {
             describe("some", () => {
               let value = Either.Right(Either.Left(4))
-              let test = () => {
-                let set = Rxjs.Subject.makeEmpty()
-                let validate = Rxjs.Subject.makeEmpty()
-
-                let {first, dyn} = Subject.makeDyn(context, None, set->Rxjs.toObservable, validate->Rxjs.toObservable->Some)
-              let current: ref<'a> = {contents: first}
-
-                let res = dyn->Dynamic.switchSequence
-                ->Current.apply(current)
-                ->Dynamic.toPromise
-
-                [ (.) => Rxjs.next(set, Either.Left("3"))
-                , (.) => current.contents.pack.actions.opt(Some(value))
-                , (.) => current.contents.close()
+              let test = MkDyn.test(context,
+                [ #Set(Either.Left("3"))
+                , #Action( ({opt}) => opt(Some(value)) )
                 ]
-                ->Test.chain(~delay=100)
-                ->Promise.bind(_ => res)
-              }
+              )
 
               itPromise("sets value", () => {
-                test()->Promise.tap(res => res->Close.pack->Form.field->Subject.input->expect->toEqual(value))
+                test()->Promise.tap(res => res->Array.leaf->Option.getUnsafe->Close.pack->Form.field->Subject.input->expect->toEqual(value))
               })
             })
 
             describe("none", () => {
-              let test = () => {
-                let set = Rxjs.Subject.makeEmpty()
-                let validate = Rxjs.Subject.makeEmpty()
-                let {first, dyn} = Subject.makeDyn(context, None, set->Rxjs.toObservable, validate->Rxjs.toObservable->Some)
-                let current: ref<'a> = {contents: first}
-
-                let res = dyn
-                ->Dynamic.switchSequence
-                ->Current.apply(current)
-                ->Dynamic.toPromise
-
-                [ (.) => Rxjs.next(set, Either.Left("3"))
-                , (.) => current.contents.pack.actions.opt(None)
-                , (.) => current.contents.close()
+              let test = MkDyn.test(context,
+                [ #Set(Either.Left("3"))
+                , #Action( ({opt}) => opt(None) )
                 ]
-                ->Test.chain(~delay=100)
-                ->Promise.bind(_ => res)
-              }
+              )
 
               itPromise("clears value", () => {
-                test()->Promise.tap(res => res->Close.pack->Form.field->Subject.input->expect->not->toEqual(Either.Left("3")))
+                test()->Promise.tap(res => res->Array.leaf->Option.getUnsafe->Close.pack->Form.field->Subject.input->expect->not->toEqual(Either.Left("3")))
               })
             })
           })
@@ -115,71 +78,33 @@ describe("FieldEither", () => {
 				describe("#makeDyn", () => {
 					describe("setOuter", () => {
             let values: Array.t<Subject.input> = [Either.Left("1"), Either.Right(Either.Left((2))), Either.Left("3")]
-            let test = () => {
-              let set = Rxjs.Subject.makeEmpty()
-              let validate = Rxjs.Subject.makeEmpty()
-              let {first, dyn} = Subject.makeDyn(context(), None, set->Rxjs.toObservable, validate->Rxjs.toObservable->Some)
-                let current: ref<'a> = {contents: first}
-
-              let res = dyn
-                ->Dynamic.switchSequence
-                ->Current.apply(current)
-                ->Dynamic.toPromise
-
-              [ (.) => values->Array.forEach(Rxjs.next(set))
-              , (.) => current.contents.close()
-              ]
-              ->Test.chain(~delay=100)
-              ->Promise.bind(_ => res)
-            }
+            let test = MkDyn.test(context(),
+              values->Array.map( (v) => #Set(v) )
+            )
 
 						itPromise("applys last value", () => {
-							test()->Promise.tap(res => res->Close.pack->Form.field->Subject.input->expect->toEqual(values->Array.leaf->Option.getUnsafe))
+							test()->Promise.tap(res => res->Array.leaf->Option.getUnsafe->Close.pack->Form.field->Subject.input->expect->toEqual(values->Array.leaf->Option.getUnsafe))
 						})
 					})
 
           describe("clear", () => {
-            let test = () => {
-              let set = Rxjs.Subject.makeEmpty()
-              let validate = Rxjs.Subject.makeEmpty()
-              let {first, dyn} = Subject.makeDyn(context(), None, set->Rxjs.toObservable, validate->Rxjs.toObservable->Some)
-                let current: ref<'a> = {contents: first}
-              let res = dyn
-              ->Dynamic.switchSequence
-              ->Current.apply(current)
-              ->Dynamic.toPromise
-
-              [ (.) => Rxjs.next(set, Either.Left("3"))
-              , (.) => current.contents.pack.actions.clear()
-              , (.) => current.contents.close()
+            let test = MkDyn.test(context(),
+              [ #Set(Either.Left("3"))
+              , #Action( ({clear}) => clear() )
               ]
-              ->Test.chain(~delay=100)
-              ->Promise.bind(_ => res)
-            }
+            )
 
             itPromise("clears", () => {
-              test()->Promise.tap(res => res->Close.pack->Form.field->Subject.input->expect->not->toEqual(Either.Left("3")))
+              test()->Promise.tap(res => res->Array.leaf->Option.getUnsafe->Close.pack->Form.field->Subject.input->expect->not->toEqual(Either.Left("3")))
             })
           })
 
           describe("validate", () => {
-            let test = () => {
-              let set = Rxjs.Subject.makeEmpty()
-              let validate = Rxjs.Subject.makeEmpty()
-              let {first, dyn} = Subject.makeDyn(context(), None, set->Rxjs.toObservable, validate->Rxjs.toObservable->Some)
-                let current: ref<'a> = {contents: first}
-              let res = dyn
-              ->Dynamic.switchSequence
-              ->Current.apply(current)
-              ->Dynamic.toHistory
-
-              [ (.) => Rxjs.next(set, Either.Left("3"))
-              , (.) => current.contents.pack.actions.validate()
-              , (.) => current.contents.close()
+            let test = MkDyn.test(context(),
+              [ #Set(Either.Left("3"))
+              , #Action( ({validate}) => validate() )
               ]
-              ->Test.chain(~delay=100)
-              ->Promise.bind(_ => res)
-            }
+            )
 
             itPromise("sets inner value", () => {
               test()->Promise.tap(res => {
@@ -197,79 +122,43 @@ describe("FieldEither", () => {
           describe("opt", () => {
            describe("some", () => {
               let value = Either.Right(Either.Left(4))
-              let test = () => {
-                let set = Rxjs.Subject.makeEmpty()
-                let validate = Rxjs.Subject.makeEmpty()
-                let {first, dyn} = Subject.makeDyn(context(), None, set->Rxjs.toObservable, validate->Rxjs.toObservable->Some)
-                let current: ref<'a> = {contents: first}
-                let res = dyn
-                ->Dynamic.switchSequence
-                ->Current.apply(current)
-                ->Dynamic.toPromise
-
-                [ (.) => Rxjs.next(set, Either.Left("3"))
-                , (.) => current.contents.pack.actions.opt(Some(value))
-                , (.) => current.contents.close()
+              let test = MkDyn.test(context(),
+                [ #Set(Either.Left("3"))
+                , #Action( ({opt}) => opt(Some(value)) )
                 ]
-                ->Test.chain(~delay=100)
-                ->Promise.bind(_ => res)
-              }
+              )
 
               itPromise("sets value", () => {
-                test()->Promise.tap(res => res->Close.pack->Form.field->Subject.input->expect->toEqual(value))
+                test()->Promise.tap(res => res->Array.leaf->Option.getUnsafe->Close.pack->Form.field->Subject.input->expect->toEqual(value))
               })
             })
 
             describe("none", () => {
-              let test = () => {
-                let set = Rxjs.Subject.makeEmpty()
-                let validate = Rxjs.Subject.makeEmpty()
-                let {first, dyn} = Subject.makeDyn(context(), None, set->Rxjs.toObservable, validate->Rxjs.toObservable->Some)
-                let current: ref<'a> = {contents: first}
-                let res = dyn
-                ->Dynamic.switchSequence
-                ->Current.apply(current)
-                ->Dynamic.toPromise
-
-                [ (.) => Rxjs.next(set, Either.Left("3"))
-                , (.) => current.contents.pack.actions.opt(None)
-                , (.) => current.contents.close()
+              let test = MkDyn.test(context(),
+                [ #Set(Either.Left("3"))
+                , #Action( ({opt}) => opt(None) )
                 ]
-                ->Test.chain(~delay=100)
-                ->Promise.bind(_ => res)
-              }
+              )
 
               itPromise("clears value", () => {
-                test()->Promise.tap(res => res->Close.pack->Form.field->Subject.input->expect->not->toEqual(Either.left("3")))
+                test()->Promise.tap(res => res->Array.leaf->Option.getUnsafe->Close.pack->Form.field->Subject.input->expect->not->toEqual(Either.left("3")))
               })
             })
           })
 
           describe("inner", () => {
-            let test =  () => {
-              let set = Rxjs.Subject.makeEmpty()
-              let validate = Rxjs.Subject.makeEmpty()
-              let {first, dyn} = Subject.makeDyn(context(), None, set->Rxjs.toObservable, validate->Rxjs.toObservable->Some)
-              let current: ref<'a> = {contents: first}
-              let res = dyn
-              ->Dynamic.switchSequence
-              ->Current.apply(current)
-              ->Dynamic.toPromise
+            let left = ((left, _)) => left
+            let right = ((_, (right, _))) => right
 
-              let left = ((left, _)) => left
-              let right = ((_, (right, _))) => right
-
-              [ (.) => Rxjs.next(set, Either.Left("3"))
-              , (.) => left(current.contents.pack.actions.inner).set("2")
-              , (.) => right(current.contents.pack.actions.inner).set(5)
-              , (.) => current.contents.close()
+            let test = MkDyn.test(context(),
+              [ #Set(Either.Left("3"))
+              , #Action( ({inner}) => left(inner).set("2") )
+              , #Action( ({inner}) => right(inner).set(5) )
               ]
-              ->Test.chain(~delay=100)
-              ->Promise.bind(_ => res)
-            }
+            )
 
             itPromise("sets inner value", () => {
-              test()->Promise.tap(res => res->Close.pack->Form.field->Subject.input->expect->toEqual(Either.Right(Either.Left(5))))
+              test()->Promise.tap(res => res->Array.leaf->Option.getUnsafe->Close.pack->Form.field->Subject.input->expect->toEqual(Either.Right(Either.Left(5))))
             })
           })
         })

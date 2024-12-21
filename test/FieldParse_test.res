@@ -2,6 +2,7 @@ open Vitest
 
 describe("Float", () => {
   module Subject = FieldParse.Float
+  module MkDyn = Test.MkDyn(Subject)
   describe("#validate", () => {
     describe("empty string", () => {
       let input = ""
@@ -41,43 +42,24 @@ describe("Float", () => {
       let context: Subject.context = { }
 
       describe("setOuter", () => {
-        let test = () => {
-          let set = Rxjs.Subject.makeEmpty()
-          let val = Rxjs.Subject.makeEmpty()
-          // close function is static in FieldParse so we can use the first one at the end
-          let {first, dyn} = Subject.makeDyn(context, None, set->Rxjs.toObservable, val->Rxjs.toObservable->Some)
-          let current: ref<'a> = {contents: first}
-          let res = dyn->Dynamic.switchSequence->Current.apply(current)->Dynamic.toPromise
-          [ (.) => set->Rxjs.next("3")
-          , (.) => current.contents.close()
+        let test = MkDyn.test(context,
+          [ #Set("3")
           ]
-          ->Test.chain(~delay=500)
-          ->Promise.bind(_ => res)
-        }
+        )
 
         itPromise("applies the set value", () => {
           test()->Promise.tap(x => {
-            expect(x->Close.pack->Form.field)->toEqual(Store.Valid("3", 3.0))
+            expect(x->Array.leaf->Option.getUnsafe->Close.pack->Form.field)->toEqual(Store.Valid("3", 3.0))
           })
         })
       })
 
       describe("validateOuter", () => {
-        let test = () => {
-          let set = Rxjs.Subject.makeEmpty()
-          let val = Rxjs.Subject.makeEmpty()
-          // close function is static in FieldParse so we can use the first one at the end
-          let {first, dyn} = Subject.makeDyn(context, None, set->Rxjs.toObservable, val->Rxjs.toObservable->Some)
-          let current: ref<'a> = {contents: first}
-          let res = dyn->Dynamic.switchSequence->Current.apply(current)->Dynamic.toHistory
-
-          [ (.) => set->Rxjs.next("3")
-          , (.) => val->Rxjs.next()
-          , (.) => current.contents.close()
+        let test = MkDyn.test(context,
+          [ #Set("3")
+          , #Validate
           ]
-          ->Test.chain(~delay=500)
-          ->Promise.bind(_ => res)
-        }
+        )
 
         itPromise("applies the set value", () => {
           test()->Promise.tap(res => {
@@ -87,67 +69,39 @@ describe("Float", () => {
       })
 
       describe("set", () => {
-        let test = () => {
-          let set = Rxjs.Subject.makeEmpty()
-          let val = Rxjs.Subject.makeEmpty()
-          // close function is static in FieldParse so we can use the first one at the end
-          let {first, dyn} = Subject.makeDyn(context, None, set->Rxjs.toObservable, val->Rxjs.toObservable->Some)
-          let current: ref<'a> = {contents: first}
-          let res = dyn->Dynamic.switchSequence->Current.apply(current)->Dynamic.toPromise
-
-          [ (.) => current.contents.pack.actions.set("3")
-          , (.) => current.contents.close()
+        let test = MkDyn.test(context,
+          [ #Action(({set}) => set("3"))
           ]
-          ->Test.chain(~delay=500)
-          ->Promise.bind(_ => res)
-        }
+        )
 
         itPromise("applies the set value", () => {
           test()->Promise.tap(x => {
-            expect(x.pack.field)->toEqual(Store.Valid("3", 3.0))
+            x->Array.leaf->Option.getUnsafe->Close.pack->Form.field->
+            expect->toEqual(Store.Valid("3", 3.0))
           })
         })
       })
 
       describe("clear", () => {
-        let test = () => {
-          let set = Rxjs.Subject.makeEmpty()
-          let val = Rxjs.Subject.makeEmpty()
-          // close function is static in FieldParse so we can use the first one at the end
-          let {first, dyn} = Subject.makeDyn(context, None, set->Rxjs.toObservable, val->Rxjs.toObservable->Some)
-          let current: ref<'a> = {contents: first}
-          let res = dyn->Dynamic.switchSequence->Current.apply(current)->Dynamic.toPromise
-          [ (.) => current.contents.pack.actions.set("3")
-          , (.) => current.contents.pack.actions.clear()
-          , (.) => current.contents.close()
+        let test = MkDyn.test(context,
+          [ #Action(({set}) => set("3"))
+          , #Action(({clear}) => clear())
           ]
-          ->Test.chain(~delay=500)
-          ->Promise.bind(_ => res)
-        }
+        )
 
         itPromise("Is validated Invalid", () => {
           test()->Promise.tap(x => {
-            expect(x->Close.pack->Form.field->Subject.enum)->toEqual(#Invalid)
+            expect(x->Array.leaf->Option.getUnsafe->Close.pack->Form.field->Subject.enum)->toEqual(#Invalid)
           })
         })
       })
 
       describe("validateInner", () => {
-        let test = () => {
-          let set = Rxjs.Subject.makeEmpty()
-          let val = Rxjs.Subject.makeEmpty()
-          // close function is static in FieldParse so we can use the first one at the end
-          let {first, dyn} = Subject.makeDyn(context, None, set->Rxjs.toObservable, val->Rxjs.toObservable->Some)
-          let current: ref<'a> = {contents: first}
-          let res = dyn->Dynamic.switchSequence->Current.apply(current)->Dynamic.toHistory
-
-          [ (.) => current.contents.pack.actions.set("3")
-          , (.) => current.contents.pack.actions.validate()
-          , (.) => current.contents.close()
+        let test = MkDyn.test(context,
+          [ #Action(({set}) => set("3"))
+          , #Action(({validate}) => validate())
           ]
-          ->Test.chain(~delay=500)
-          ->Promise.bind(_ => res)
-        }
+        )
 
         itPromise("applies the set value", () => {
           test()->Promise.tap(res => {
@@ -163,21 +117,11 @@ describe("Float", () => {
       }
 
       describe("race conditions", () => {
-        let test = () => {
-          let set = Rxjs.Subject.makeEmpty()
-          let val = Rxjs.Subject.makeEmpty()
-          // close function is static in FieldParse so we can use the first one at the end
-          let {first, dyn} = Subject.makeDyn(context, None, set->Rxjs.toObservable, val->Rxjs.toObservable->Some)
-          let current: ref<'a> = {contents: first}
-          let res = dyn->Dynamic.switchSequence->Current.apply(current)->Dynamic.toHistory
-
-          [ (.) => current.contents.pack.actions.set("20")
-          , (.) => current.contents.pack.actions.set("2")
-          , (.) => current.contents.close()
+        let test = MkDyn.test(context,
+          [ #Action( ({set}) => set("20") )
+          , #Action( ({set}) => set("2") )
           ]
-          ->Test.chain(~delay=500)
-          ->Promise.bind(_ => res)
-        }
+        )
 
         itPromise("emits busy for both values in order", () => {
           test()->Promise.tap(res => {
@@ -200,31 +144,15 @@ describe("Float", () => {
 
 describe("FieldParse.String", () => {
   module Field = FieldParse.String.Field
+  module MkDyn = Test.MkDyn(Field)
 	describe("context default", () => {
 		let context: Field.context = {}
 		describe("makeDyn", () => {
 			describe("reset", () => {
-				let test = () => {
-					let set = Rxjs.Subject.makeEmpty()
-					let val = Rxjs.Subject.makeEmpty()
-					let {first, init, dyn} = Field.makeDyn(context, None, set->Rxjs.toObservable, val->Rxjs.toObservable->Some)
-					let current: ref<'a> = {contents: first}
-					let res =
-            Rxjs.concatArray(
-              [ Dynamic.return(init)
-              // , dyn
-              ]
-            )
-            ->Dynamic.switchSequence
-            ->Current.apply(current)
-            ->Dynamic.toHistory
-
-          [ (.) => current.contents.pack.actions.reset()
-          , (.) => current.contents.close()
-          ]
-          ->Test.chain(~delay=500)
-          ->Promise.bind(_ => res)
-				}
+				let test =
+          MkDyn.test(context,
+          [ #Action(({reset}) => reset())
+          ])
 
 				itPromise("finally emits valid", () => {
 					test()->Promise.tap( res => {
@@ -240,20 +168,11 @@ describe("FieldParse.String", () => {
 			validate: (_x) => Ok()->Promise.return
 		}
 		describe("reset", () => {
-			let test = () => {
-				let set = Rxjs.Subject.makeEmpty()
-				let val = Rxjs.Subject.makeEmpty()
-				let {first, dyn} = Field.makeDyn(context, None, set->Rxjs.toObservable, val->Rxjs.toObservable->Some)
-					let current: ref<'a> = {contents: first}
-				let res = dyn->Dynamic.switchSequence->Current.apply(current)->Dynamic.toHistory
-
-        [ (.) => current.contents.pack.actions.validate()
-        , (.) => current.contents.pack.actions.reset()
-        , (.) => current.contents.close()
-        ]
-        ->Test.chain(~delay=500)
-        ->Promise.bind(_ => res)
-			}
+			let test =
+        MkDyn.test(context,
+          [ #Validate
+          , #Action(({reset}) => reset())
+          ])
 
 			itPromise("ends valid", () => {
 				test()->Promise.tap( res => res->Array.leaf->Option.getUnsafe->Close.pack->Form.field->Field.enum->expect->toEqual(#Valid))
@@ -262,21 +181,12 @@ describe("FieldParse.String", () => {
 		})
 		describe("set", () => {
 			let value = "test"
-			let test = () => {
-				let set = Rxjs.Subject.makeEmpty()
-				let val = Rxjs.Subject.makeEmpty()
-
-				let {first, dyn} = Field.makeDyn(context, None, set->Rxjs.toObservable, val->Rxjs.toObservable->Some)
-					let current: ref<'a> = {contents: first}
-				let res = dyn->Dynamic.switchSequence->Current.apply(current)->Dynamic.toHistory
-
-        [ (.) => current.contents.pack.actions.validate()
-        , (.) => current.contents.pack.actions.set(value)
-        , (.) => current.contents.close()
+			let test = MkDyn.test(context
+      , [ #Validate
+        , #Action(({set}) => set(value))
         ]
-        ->Test.chain(~delay=500)
-        ->Promise.bind(_ => res)
-			}
+      )
+
 			itPromise("ends valid", () => {
 				test()->Promise.tap( res => res->Array.leaf->Option.getUnsafe->Close.pack->Form.field->Field.enum->expect->toEqual(#Valid))
 			})
@@ -310,21 +220,12 @@ describe("FieldParse.String", () => {
 		}
 
 		describe("set after set", () => {
-			let test = () => {
-				let set = Rxjs.Subject.makeEmpty()
-				let val = Rxjs.Subject.makeEmpty()
-				let {first, dyn} = Field.makeDyn(context, None, set->Rxjs.toObservable, val->Rxjs.toObservable->Some)
-					let current: ref<'a> = {contents: first}
-				let res = dyn->Dynamic.switchSequence->Current.apply(current)->Dynamic.toHistory
-
-        [ (.) => current.contents.pack.actions.validate()
-        , (.) => current.contents.pack.actions.set(slow)
-        , (.) => current.contents.pack.actions.set(fast)
-        , (.) => current.contents.close()
-        ]
-        ->Test.chain(~delay=500)
-        ->Promise.bind(_ => res)
-			}
+			let test = MkDyn.test( context
+        , [ #Action(({validate}) => validate())
+          , #Action(({set}) => set(slow))
+          , #Action(({set}) => set(fast))
+          ]
+        )
 
 			itPromise("ends valid", () => {
 				test()->Promise.tap( res => res->Array.leaf->Option.getUnsafe->Close.pack->Form.field->Field.enum->expect->toEqual(#Valid))
