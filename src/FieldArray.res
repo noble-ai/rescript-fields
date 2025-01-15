@@ -286,13 +286,13 @@ module Make: Make = (F: Field.T, I: IArray with type t = F.t) => {
     }`
   }
 
-  let traverseSetk = (context: context, set, elements) => {
+  let traverseSetk = (context: context, set, elements, validate) => {
     elements
     ->Array.mapi( (value, index) => (value, index))
     ->traverseTuple3( ((value, index)) => {
       let key = getKey()
       let setElement = set->Dynamic.keepMap(Array.get(_, index))
-      let {first, init, dyn} = F.makeDyn(context.element, Some(value), setElement, None)
+      let {first, init, dyn} = F.makeDyn(context.element, Some(value), setElement, validate)
       ((key, first), (key, init), (key, dyn))
     })
   }
@@ -327,7 +327,7 @@ module Make: Make = (F: Field.T, I: IArray with type t = F.t) => {
         )
       )
 
-  let makeDynInner = (context: context, initial: option<input>, set: Rxjs.Observable.t<input>)
+  let makeDynInner = (context: context, initial: option<input>, set: Rxjs.Observable.t<input>, val: Option.t<Rxjs.Observable.t<()>>)
     : (
       Array.t<Close.t<Form.t<(key, F.t), F.actions<unit>>>>,
       Array.t<Dyn.init<Close.t<Form.t<(key, F.t), F.actions<unit>>>>>,
@@ -336,11 +336,11 @@ module Make: Make = (F: Field.T, I: IArray with type t = F.t) => {
    => {
       Option.first(initial, Option.flap0(context.empty))
       ->Option.or([])
-      ->traverseSetk(context, set, _)
+      ->traverseSetk(context, set, _, val)
       ->packKey
     }
 
-  let makeDyn = (context: context, initial: option<input>, setOuter: Rxjs.Observable.t<input>, _validate: option<Rxjs.Observable.t<()>>)
+  let makeDyn = (context: context, initial: option<input>, setOuter: Rxjs.Observable.t<input>, validate: option<Rxjs.Observable.t<()>>)
     : Dyn.t<Close.t<Form.t<t, actions<()>>>>
   => {
     // Every observable has a complete, to terminate the stream
@@ -400,7 +400,7 @@ module Make: Make = (F: Field.T, I: IArray with type t = F.t) => {
         ->Dynamic.map(applyField(inners))
       }
 
-    let (firstInner, initInner, dynInner) = makeDynInner(context, initial, setOuter)
+    let (firstInner, initInner, dynInner) = makeDynInner(context, initial, setOuter, validate)
 
     // This is like applyInner but does not include makeStore which produces an observable.
     // We want one definite value, and now.
@@ -477,7 +477,7 @@ module Make: Make = (F: Field.T, I: IArray with type t = F.t) => {
       }
       | #Reset => {
         stateValues->Array.forEach(c => c.close())
-        let (v, o, d) = makeDynInner(context, initial, set)
+        let (v, o, d) = makeDynInner(context, initial, set, validate)
         // FIXME: Should be left with init?
         let d = d->Array.mapi((d, i) => Either.left((Array.getUnsafe(o, i), d)))
         (v, o, d, Some(v))
@@ -514,7 +514,7 @@ module Make: Make = (F: Field.T, I: IArray with type t = F.t) => {
       }
       | #Set(input) => {
         stateValues->Array.forEach(c => c.close())
-        let (values, obs, dyns) = input->traverseSetk(context, set, _)->packKey
+        let (values, obs, dyns) = input->traverseSetk(context, set, _, validate)->packKey
 
         let dyns = dyns->Array.mapi( (dyn, i) => (obs->Array.getUnsafe(i), dyn)->Either.left)
         ( values, obs, dyns, Some(values))
