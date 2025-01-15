@@ -431,6 +431,9 @@ module Make: Make = (F: Field.T, I: IArray with type t = F.t) => {
     let set = Rxjs.merge3(setOuter, setInner, setOpt)
     let clear = Rxjs.merge2(clearInner, clearOpt)
 
+    // Starting value of the changes scan and initialValued on the front end of that too.
+    let zero = (firstInner, initInner, dynInner->Array.map(Either.right), None)
+
     let dynInner =
     // multiplex all the various Array level change signals
     // So we can scan on them, producing new arrays of F.t dyns.
@@ -519,11 +522,11 @@ module Make: Make = (F: Field.T, I: IArray with type t = F.t) => {
         let dyns = dyns->Array.mapi( (dyn, i) => (obs->Array.getUnsafe(i), dyn)->Either.left)
         ( values, obs, dyns, Some(values))
       }}
-    }, (firstInner, initInner, dynInner->Array.map(Either.right), None)))
+    }, zero))
     // The scan does not emit without a change,
     // but we want to prime the switch below to observe child changes
     // so startWith the same values as the scan initial
-    ->Dynamic.startWith((firstInner, initInner, dynInner->Array.map(Either.right), None))
+    ->Dynamic.startWith(zero)
     ->Dynamic.switchMap( (((value, obs, dyns, prefix)):
         ( Array.t<Close.t<Form.t<(key, F.t), F.actions<unit>>>>
         , Array.t<Dyn.init<Close.t<Form.t<(key, F.t), F.actions<()>>>>>
