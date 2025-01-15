@@ -346,8 +346,10 @@
     numeral "^2.0.6"
     rescript "^10.1"
 
-"@nobleai/rescript-rxjs@../rescript-rxjs":
-  version "7.5.17"
+"@nobleai/rescript-rxjs@^7.5.20":
+  version "7.5.20"
+  resolved "https://registry.yarnpkg.com/@nobleai/rescript-rxjs/-/rescript-rxjs-7.5.20.tgz#dce8d6c55c76c2478b8efe6023ffa21bead4713f"
+  integrity sha512-eKOVGRcu1f8OkfCYF5desxUpd0UcK5Shbe1FN5uNkYJJRTGxLw0SIgEZkL75PofV7MRXAa0Lsg4cKvelNUQCSw==
 
 "@nobleai/rescript-testing-library@^0.1.0":
   version "0.1.0"
