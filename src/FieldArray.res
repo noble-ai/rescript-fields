@@ -470,7 +470,7 @@ module Make: Make = (F: Field.T, I: IArray with type t = F.t) => {
      => {
       // We are tracking the init of dynamically added elements in the 'dyn' value.
       // When a new array level change comes in, we no longer want to replay the init,
-      // So cast all the eithers to right.
+      // So cast all the eithers to right, losing the inits
       let dyns = dyns->Array.map(Either.either(x => x->Tuple.snd2->Either.right, Either.right))
 
       switch change {
@@ -497,8 +497,8 @@ module Make: Make = (F: Field.T, I: IArray with type t = F.t) => {
         ( values
         , stateObs->Array.append(init)
         // Adding an element to an array, the init process has already gone off for the initial array
-        // But we need to process the init on the child, so prepend to dyn.
-        // FIXME: does this cause init to replay every time tye dyns are joined? YES
+        // If we prepend to dyn it goes off every time the dyns are joined, which is out of order
+        // So store it on the side of dyns, and let the merge process switch from Left to Right after it applies init.
         , dyns->Array.append(Either.left((init, dyn)))
         , None //Some(values)
         )
@@ -566,6 +566,7 @@ module Make: Make = (F: Field.T, I: IArray with type t = F.t) => {
       // So the ui doesnt update
       // Add doesn't have this problem because we prefix the new element dyn with init
       // that *definitely* emits atleast the first value, which is enough to tickle this switchMap
+      // prefix fixes this
       switch dyns {
       // When the array is empty, there are no events to animate the combineLatestScan
       // So a default for []
