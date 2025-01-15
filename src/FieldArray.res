@@ -62,6 +62,8 @@ let mergeInner =  (array: array<Close.t<Form.t<'fa, 'aa>>>): Close.t<Form.t<'f, 
 // Observables are not guaranteed to emit.
 // and if we apply a startWith on each element
 // We will cause an emission before any signal was recieved.
+// And we want to emit when an element does emit
+// without all elements needing to emit.
 // So instead we use a default value array
 // and multiplex all the changes by index
 // and then applyLatest combines them, taking the init as value
@@ -432,7 +434,7 @@ module Make: Make = (F: Field.T, I: IArray with type t = F.t) => {
     let clear = Rxjs.merge2(clearInner, clearOpt)
 
     // Starting value of the changes scan and initialValued on the front end of that too.
-    let zero = (firstInner, initInner, dynInner->Array.map(Either.right), None)
+    let zero = (firstInner, initInner, dynInner->Array.map(Either.right))
 
     let dynInner =
     // multiplex all the various Array level change signals
@@ -465,7 +467,6 @@ module Make: Make = (F: Field.T, I: IArray with type t = F.t) => {
               , Dyn.dyn<Close.t<Form.t<(key, F.t), F.actions<()>>>>
               >
             >
-        , Option.t<Array.t<Close.t<Form.t<(key, F.t), F.actions<unit>>>>>
         )
      => {
       // We are tracking the init of dynamically added elements in the 'dyn' value.
@@ -476,14 +477,14 @@ module Make: Make = (F: Field.T, I: IArray with type t = F.t) => {
       switch change {
       | #Clear => {
         stateValues->Array.forEach(c => c.close())
-        ( [], [], [], None )
+        ( [], [], [])
       }
       | #Reset => {
         stateValues->Array.forEach(c => c.close())
         let (v, o, d) = makeDynInner(context, initial, set, validate)
         // FIXME: Should be left with init?
         let d = d->Array.mapi((d, i) => Either.left((Array.getUnsafe(o, i), d)))
-        (v, o, d, Some(v))
+        (v, o, d)
       }
       | #Add(value) =>  {
         let index = stateValues->Array.length
@@ -500,7 +501,6 @@ module Make: Make = (F: Field.T, I: IArray with type t = F.t) => {
         // If we prepend to dyn it goes off every time the dyns are joined, which is out of order
         // So store it on the side of dyns, and let the merge process switch from Left to Right after it applies init.
         , dyns->Array.append(Either.left((init, dyn)))
-        , None //Some(values)
         )
       }
       | #Remove(index) => {
@@ -512,7 +512,6 @@ module Make: Make = (F: Field.T, I: IArray with type t = F.t) => {
         // but does not cause any child element emissions,
         // so return values to the scan
         , dyns->Array.remove(index)
-        , Some(values)
         )
       }
       | #Set(input) => {
@@ -520,14 +519,14 @@ module Make: Make = (F: Field.T, I: IArray with type t = F.t) => {
         let (values, obs, dyns) = input->traverseSetk(context, set, _, validate)->packKey
 
         let dyns = dyns->Array.mapi( (dyn, i) => (obs->Array.getUnsafe(i), dyn)->Either.left)
-        ( values, obs, dyns, Some(values))
+        ( values, obs, dyns)
       }}
     }, zero))
     // The scan does not emit without a change,
     // but we want to prime the switch below to observe child changes
     // so startWith the same values as the scan initial
     ->Dynamic.startWith(zero)
-    ->Dynamic.switchMap( (((value, obs, dyns, prefix)):
+    ->Dynamic.switchMap( (((value, obs, dyns)):
         ( Array.t<Close.t<Form.t<(key, F.t), F.actions<unit>>>>
         , Array.t<Dyn.init<Close.t<Form.t<(key, F.t), F.actions<()>>>>>
         , Array.t
@@ -555,22 +554,19 @@ module Make: Make = (F: Field.T, I: IArray with type t = F.t) => {
       let stateValuesInner =
         Rxjs.Subject.makeBehavior(value)
         ->Rxjs.pipe(Rxjs.distinct())
+        // ->Dynamic.mapLog("stateValues", valuesToInputs)
 
-      let prefix = switch prefix {
-        | Some(value) => Dynamic.startWith(_, Dynamic.return(value))
-        | None => x => x
-      }
-
-      // FIXME: Delete will update the dyns array, but until another change happens,
-      // the switchMap will not emit the new dyns array.
-      // So the ui doesnt update
-      // Add doesn't have this problem because we prefix the new element dyn with init
-      // that *definitely* emits atleast the first value, which is enough to tickle this switchMap
-      // prefix fixes this
       switch dyns {
       // When the array is empty, there are no events to animate the combineLatestScan
       // So a default for []
-      | [] => Dynamic.return(Dynamic.return([]))
+      // Which is for sure emitting an value of an empty array
+      // So that can be applied to Array Field state
+      | [] => {
+        Rxjs.next(stateObs, [])
+        // This obs produces the value that applying prefix would produce
+        // applying prefix here would only return it twice?
+        Dynamic.return(Dynamic.return([]))
+      }
       | dyns => {
         dyns
         ->combineLatestScan(obs)
@@ -582,11 +578,11 @@ module Make: Make = (F: Field.T, I: IArray with type t = F.t) => {
         // So we need more recent values, can we take it directly with stateValues?
         // At the very beggining though, after #Add or #Remove, stateValues isnt correct either!
         ->Dynamic.withLatestFrom(stateValuesInner)
-        ->Dynamic.map(((x, init)) => {
-          combineLatestScan(x, init)
+        ->Dynamic.map(((obs, init)) => {
+          combineLatestScan(obs, init)
           ->Dynamic.tap(Rxjs.next(stateValuesInner))
         })
-        ->prefix
+        ->Dynamic.startWith(_, Dynamic.return(value))
       }}
     })
 
