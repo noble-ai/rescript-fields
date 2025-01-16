@@ -32,9 +32,8 @@ let mapActions: (actions<'a>, 'a => 'b) => actions<'b> = (actions, fn) => {
 let makeDyn = (context: context, initial: option<input>, setOuter: Rxjs.Observable.t<input>, _validate: option<Rxjs.Observable.t<()>> )
     : Dyn.t<Close.t<Form.t<t, actions<()>>>>
   => {
-  let field =
-    initial
-    ->Option.map(set)
+  let field = 
+    Option.map(initial, set)
     ->Option.or(init(context))
 
   let complete = Rxjs.Subject.makeEmpty()
@@ -48,17 +47,17 @@ let makeDyn = (context: context, initial: option<input>, setOuter: Rxjs.Observab
 
   let first: Close.t<Form.t<'f, 'a>> = {pack: {field, actions}, close}
 
-  let init = Dynamic.return(first)
+  let field = Rxjs.merge2(setOuter, setInner)
+        ->Dynamic.map(set)
 
-  let dyn =
-    Rxjs.merge2(setOuter, setInner)
-    ->Dynamic.map(set)
+  let dyn =  
+    field 
     ->Dynamic.map((field): Close.t<Form.t<'f, 'a>> => {pack: {field, actions}, close})
     ->Dynamic.map(Dynamic.return)
     ->Rxjs.pipe(Rxjs.shareReplay(1))
     ->Rxjs.pipe(Rxjs.takeUntil(complete))
 
-  { first, init, dyn }
+  { first, dyn }
 }
   
 let inner = Store.inner

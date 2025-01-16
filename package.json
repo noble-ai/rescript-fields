@@ -18,7 +18,6 @@
     "test": "yarn vitest",
     "pub": "yarn publish --scope nobleai --access public",
     "examples:login": "yarn vite dev --open examples/login/",
-    "examples:address": "yarn vite dev --open examples/address/",
     "examples:everything": "yarn vite dev --open examples/everything/",
     "docs": "make all"
   },
@@ -40,7 +39,7 @@
     "@nobleai/rescript-documentation": "^0.7.1",
     "@nobleai/rescript-lodash": "^4.17.21",
     "@nobleai/rescript-prelude": "^0.13.9",
-    "@nobleai/rescript-rxjs": "^7.5.20",
+    "@nobleai/rescript-rxjs": "7.5.18",
     "@nobleai/rescript-testing-library": "^0.1.0",
     "@nobleai/rescript-vitest": "^0.30.3",
     "@rescript/react": "^0.11.0",

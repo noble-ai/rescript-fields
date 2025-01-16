@@ -14,24 +14,36 @@ describe("FieldArray", () => {
       }
     )
 
-    module MkDyn = Test.MkDyn(Subject)
-
     describe("context default", () => {
       let context: Subject.context = {
         element: {}
       }
 
       describe("makeDyn", () => {
-        let test = MkDyn.test(context,
-          [ #Action( ({add}) => add(None) )
-          , #Action( ({add}) => add(Some(Some("3"))) )
-          , #Action( ({reset}) => reset() )
-          , #Set([Some("3"), Some("4"), Some("5")])
-          ])
+        let test = () => {
+          let set = Rxjs.Subject.makeEmpty()
+          let val = Rxjs.Subject.makeEmpty()
+          let {first, dyn} = Subject.makeDyn(context, None, set->Rxjs.toObservable, val->Rxjs.toObservable->Some)
+          let current: ref<'a> = {contents: first}
+
+          let actions = first.pack->Form.actions
+
+          let res = dyn->Dynamic.switchSequence->applyCurrent(current)->Dynamic.toPromise
+
+          let x: Subject.inputElement = Some("3")
+          actions.add(None)
+          actions.add(Some(x))
+          actions.reset()
+          set->Rxjs.next([Some("3"), Some("4"), Some("5")])
+
+          Promise.sleep(500)->Promise.tap(_ => current.contents.close())->Promise.void
+          res
+        }
 
         itPromise("set", () => {
           test()->Promise.tap(res => {
-            expect(res->Array.leaf->Option.getUnsafe->Close.pack->Form.field->Subject.output)->toEqual(Some([3,4,5]))
+            // Console.log2("res", res)
+            expect(res->Close.pack->Form.field->Subject.output)->toEqual(Some([3,4,5]))
           })
         })
       })
@@ -50,7 +62,7 @@ describe("FieldArray", () => {
         describe("non-empty", () => {
           describe("all valid", () => {
             let valid = [3, 4, 5]
-            let input = valid->Array.mapi( (x, i) => (i, Store.Dirty(Some(Store.Dirty(x->Int.toString)))))
+            let input = valid->Array.map(x => Store.Dirty(Some(Store.Dirty(x->Int.toString))))
             describe("without external validation", () =>  {
               testPromise("returns Ok", () => {
                 Subject.validate(false, context, Dirty(input))
@@ -105,7 +117,7 @@ describe("FieldArray", () => {
             let indexBad = 1
             let bad = None
             let good = [Some(3), Some(5)]
-            let input = good->Array.insert(bad, indexBad)->Array.mapi((x, i) => (i, x->Option.map(Int.toString)->FieldElement.set))->Store.Dirty
+            let input = good->Array.insert(bad, indexBad)->Array.map(x => x->Option.map(Int.toString)->FieldElement.set)->Store.Dirty
 
             let result = Subject.validate(false, context, input)
             testPromise("returns partial Error", () => {
@@ -129,7 +141,6 @@ describe("FieldArray", () => {
         let filter = FieldArray.filterIdentity
       }
     )
-    module MkDyn = Test.MkDyn(Subject)
 
     describe("context validation", () => {
       let context = (): Subject.context => {
@@ -139,7 +150,7 @@ describe("FieldArray", () => {
           let d = delay.contents
           delay.contents = delay.contents - 10
           Promise.sleep(d)->Promise.map(_ => Ok())
-        }
+        }  
 
         // Each validation is a bit quicker than the last so the responses come back out of order
         let validateString = (_x: FieldElement.output) => {
@@ -152,86 +163,148 @@ describe("FieldArray", () => {
 
       describe("#makeDyn", () => {
         describe("set external", () => {
-          let test = MkDyn.test(context(),
-            [ #Set(["set"])
-            ]
-          )
+          let test = () => {
+            let set = Rxjs.Subject.makeEmpty()
+            let {first, dyn} = Subject.makeDyn(context(), None, set->Rxjs.toObservable, None)
+            let current: ref<'ab> = {contents: first}
+
+            let res = dyn->Dynamic.switchSequence->applyCurrent(current)->Dynamic.toPromise
+
+            Rxjs.next(set, ["set"])
+            Promise.sleep(500)->Promise.tap(_ => current.contents.close())->Promise.void
+            res
+          }
 
           itPromise("sets", () => {
-            test()->Promise.tap(res => res->Array.leaf->Option.getUnsafe->Close.pack->Form.field->Subject.input->expect->toEqual(["set"]))
+            test()->Promise.tap(res => res->Close.pack->Form.field->Subject.input->expect->toEqual(["set"]))
           })
         })
 
         describe("set action", () => {
-          let test = MkDyn.test(context(),
-            [ #Action( ({set}) => set(["set"]) )
-            ]
-          )
+          let test = () => {
+            let set = Rxjs.Subject.makeEmpty()
+            let {first, dyn} = Subject.makeDyn(context(), None, set->Rxjs.toObservable, None)
+            let current: ref<'ab> = {contents: first}
+
+            let res = dyn->Dynamic.switchSequence->applyCurrent(current)->Dynamic.toPromise
+
+            first.pack.actions.set(["set"])
+            Promise.sleep(500)->Promise.tap(_ => current.contents.close())->Promise.void
+
+            res
+          }
 
           itPromise("sets", () => {
-            test()->Promise.tap(res => res->Array.leaf->Option.getUnsafe->Close.pack->Form.field->Subject.input->expect->toEqual(["set"]))
+            test()->Promise.tap(res => res->Close.pack->Form.field->Subject.input->expect->toEqual(["set"]))
           })
         })
 
         describe("add", () => {
-          let test = (values) => MkDyn.test(context(),
-            values->Array.map( (v) => #Action(({add}: Subject.actions<()>) => add(v) ))
-          )()
+          let test = (values) => {
+            let set = Rxjs.Subject.makeEmpty()
+            let {first,dyn} = Subject.makeDyn(context(), None, set->Rxjs.toObservable, None)
+            let current: ref<'ab> = {contents: first}
+
+            let res = dyn->Dynamic.switchSequence->applyCurrent(current)->Dynamic.toPromise
+
+            values->Array.forEach(first.pack.actions.add)
+
+            Promise.sleep(500)->Promise.tap(_ => current.contents.close())->Promise.void
+            res
+          }
 
           itPromise("adds", () => {
-            test([None, Some("add")])->Promise.tap(res => res->Array.leaf->Option.getUnsafe->Close.pack->Form.field->Subject.input->expect->toEqual(["", "add"]))
+            test([None, Some("add")])->Promise.tap(res => res->Close.pack->Form.field->Subject.input->expect->toEqual(["", "add"]))
           })
         })
 
         describe("remove", () => {
-          let test = MkDyn.test(context(),
-              [ #Action( ({add}) => add(None) )
-              , #Action( ({add}) => add(Some("add")))
-              , #Action( ({remove}) => remove(0))
-              ])
+          let test = () => {
+            let set = Rxjs.Subject.makeEmpty()
+            let {first, dyn} = Subject.makeDyn(context(), None, set->Rxjs.toObservable, None)
+            let current: ref<'ab> = {contents: first}
+
+            let res = dyn->Dynamic.switchSequence->applyCurrent(current)->Dynamic.toPromise
+
+            first.pack.actions.add(None)
+            first.pack.actions.add(Some("add"))
+            first.pack.actions.remove(0)
+
+            Promise.sleep(500)->Promise.tap(_ => current.contents.close())->Promise.void
+            res
+          }
 
           itPromise("removes", () => {
-            test()->Promise.tap(res => res->Array.leaf->Option.getUnsafe->Close.pack->Form.field->Subject.input->expect->toEqual(["add"]))
+            test()->Promise.tap(res => res->Close.pack->Form.field->Subject.input->expect->toEqual(["add"]))
           })
         })
 
         describe("opt", () => {
-          let test = (o) =>
-            MkDyn.test(context(),
-              [ #Action( ({set}) => set(["set", "set2"]) )
-              , #Action( ({opt}) => opt(o) )
-              ])()
+          let test = (opt) => {
+            let set = Rxjs.Subject.makeEmpty()
+            let {first, dyn} = Subject.makeDyn(context(), None, set->Rxjs.toObservable, None)
+            let current: ref<'ab> = {contents: first}
+
+            let res = dyn->Dynamic.switchSequence->applyCurrent(current)->Dynamic.toPromise
+
+            first.pack.actions.set(["set", "set2"])
+            first.pack.actions.opt(opt)
+
+            Promise.sleep(500)->Promise.tap(_ => current.contents.close())->Promise.void
+            res
+          }
 
           describe("some", () => {
             itPromise("sets", () => {
-              test(Some(["opt", "opt2"]))->Promise.tap(res => res->Array.leaf->Option.getUnsafe->Close.pack->Form.field->Subject.input->expect->toEqual(["opt", "opt2"]))
+              test(Some(["opt", "opt2"]))->Promise.tap(res => res->Close.pack->Form.field->Subject.input->expect->toEqual(["opt", "opt2"]))
             })
           })
           describe("none", () => {
             itPromise("clears", () => {
-              test(None)->Promise.tap(res => res->Array.leaf->Option.getUnsafe->Close.pack->Form.field->Subject.input->expect->toEqual([]))
+              test(None)->Promise.tap(res => res->Close.pack->Form.field->Subject.input->expect->toEqual([]))
             })
           })
         })
 
         describe("index", () => {
-          let test = MkDyn.test(context(),
-            [ #Action( ({set}) => set(["set0", "set1", "set2"]) )
-            , #Action( ({index}) => index(0)->Option.forEach(index => index.set("index") ))
-            ]
-          )
+          let test = () => {
+            let set = Rxjs.Subject.makeEmpty()
+            let {first, dyn} = Subject.makeDyn(context(), None, set->Rxjs.toObservable, None)
+            let current: ref<'ab> = {contents: first}
+
+            // This share prevents the observable from emitting everything twice?
+            let res = dyn->Dynamic.switchSequence->applyCurrent(current)->Dynamic.toPromise
+
+            first.pack.actions.set(["set0", "set1", "set2"])
+              
+            Promise.sleep(500)
+            ->Promise.tap(_ => current.contents.pack.actions.index(0)->Option.forEach(index => index.set("index") ))
+            ->Promise.delay(~ms=500)
+            ->Promise.tap(_ => current.contents.close())
+            ->Promise.void
+
+            res
+          }
 
           itPromise("indexes", () => {
-            test()->Promise.tap(res => res->Array.leaf->Option.getUnsafe->Close.pack->Form.field->Subject.input->expect->toEqual(["index", "set1", "set2"]))
+            test()->Promise.tap(res => res->Close.pack->Form.field->Subject.input->expect->toEqual(["index", "set1", "set2"]))
           })
         })
 
         describe("clear", () => {
-          let test = MkDyn.test(context(),
-              [ #Action( ({set}) => set(["set", "set2"]) )
-              , #Action( ({clear}) => clear() )
-              ]
-            )
+          let test = () => {
+            let set = Rxjs.Subject.makeEmpty()
+            let {first, dyn} = Subject.makeDyn(context(), None, set->Rxjs.toObservable, None)
+            let current: ref<'ab> = {contents: first}
+
+            let res = dyn->Dynamic.switchSequence->applyCurrent(current)->Dynamic.toHistory
+
+            first.pack.actions.set(["set", "set2"])
+            first.pack.actions.clear()
+
+            Promise.sleep(500)->Promise.tap(_ => current.contents.close())->Promise.void
+            res
+          }
 
           itPromise("clears", () => {
             test()->Promise.tap(res => res->Array.leaf->Option.getUnsafe->Close.pack->Form.field->Subject.input->expect->toEqual([]))
@@ -239,17 +312,27 @@ describe("FieldArray", () => {
         })
 
         describe("reset", () => {
-          let test = MkDyn.test(context(),
-            [ #Action( ({set}) => set(["set", "set2"]) )
-            , #Action( ({reset}) => reset() )
-            ]
-          )
+          let test = () => {
+            let set = Rxjs.Subject.makeEmpty()
+            let {first, dyn} = Subject.makeDyn(context(), None, set->Rxjs.toObservable, None)
+            let current: ref<'ab> = {contents: first}
+
+            let res = dyn->Dynamic.switchSequence->applyCurrent(current)->Dynamic.toPromise
+
+            first.pack.actions.set(["set", "set2"])
+            first.pack.actions.reset()
+
+            Promise.sleep(500)->Promise.tap(_ => current.contents.close())->Promise.void
+
+            res
+          }
 
           itPromise("resets", () => {
-            test()->Promise.tap(res => res->Array.leaf->Option.getUnsafe->Close.pack->Form.field->Subject.input->expect->toEqual([]))
+            test()->Promise.tap(res => res->Close.pack->Form.field->Subject.input->expect->toEqual([]))
           })
         })
       })
     })
+
   })
 })

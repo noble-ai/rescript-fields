@@ -104,7 +104,7 @@ module Make: Make = (F: Field.T) => {
   let applyClear = (clear, actions, close) => {
       clear
       ->Rxjs.pipe(Rxjs.map((_, _i) => Store.init(None)))
-      ->Rxjs.pipe(Rxjs.map((field, _): Close.t<Form.t<t, actions<()>>> => {pack:{ field, actions }, close}))
+      ->Rxjs.pipe(Rxjs.map( (field, _): Close.t<Form.t<t, actions<()>>> => {pack:{ field, actions }, close}))
   }
 
   let applyInner = (inner: Rxjs.Observable.t<Close.t<Form.t<F.t, F.actions<()>>>>, actions, close) => {
@@ -132,15 +132,11 @@ module Make: Make = (F: Field.T) => {
   let makeDyn = (context: context, initial: option<input>, setOuter: Rxjs.Observable.t<input>, valOuter: option<Rxjs.Observable.t<()>> )
       : Dyn.t<Close.t<Form.t<t, actions<()>>>>
     => {
+    let field = init(context) 
+
     let complete = Rxjs.Subject.makeEmpty()
-    let close = Rxjs.next(complete)
 
-    let field =
-      initial
-      ->Option.map(set)
-      ->Option.or(init(context))
-
-    let clearInner: Rxjs.t<'c, Rxjs.source<()>, ()> =
+    let clearInner: Rxjs.t<'c, Rxjs.source<()>, ()> = 
         Rxjs.Subject.makeEmpty()
 
     let valInner = Rxjs.Subject.makeEmpty()
@@ -152,16 +148,18 @@ module Make: Make = (F: Field.T) => {
     let setOpt = opt->Dynamic.keepMap(x => x)
     let clearOpt = opt->Dynamic.keepMap(Option.invert(_, ()))
 
-    let (setOuter, clearOuter) =
+    let (setOuter, clearOuter) = 
       setOuter
       ->Dynamic.partition2((x=>x, Option.invert(_, ())))
 
     let clear = Rxjs.merge3(clearOuter, clearOpt, clearInner)
 
     let set = Rxjs.merge2(setOuter, setOpt)
-
+    
     let initialInner = initial->Option.join
-    let {first: firstInner, init: initInner, dyn: dynInner} = F.makeDyn(context, initialInner, set, Some(val))
+    let {first: firstInner, dyn: dynInner} = F.makeDyn(context, initialInner, set, Some(val))
+
+    let close = Rxjs.next(complete)
 
     let actions: actions<()> = {
       clear: Rxjs.next(clearInner),
@@ -171,9 +169,8 @@ module Make: Make = (F: Field.T) => {
     }
 
     let first: Close.t<Form.t<t, actions<()>>> = {pack: {field, actions}, close}
-    let init = initInner->applyInner(actions, close)
 
-    let clear =
+    let clear = 
       clear
       ->applyClear(actions, close)
       ->Dynamic.map(Dynamic.return)
@@ -184,12 +181,12 @@ module Make: Make = (F: Field.T) => {
     // Explicit validations need to take latest state, but we want the validation
     // async process to be interrupted by new state.
     // so maintain changes Observable-of-observable, and also
-    // collapse changes to change here to use in validation
+    // collapse changes to change here to use in validation 
     let change = changes//->Dynamic.map(Dynamic.return)
       ->Dynamic.switchSequence
 
     // FIXME: needs a startsWith for withLatestFrom in case validate comes before change
-    let validated = val
+    let validated = val 
       ->Dynamic.withLatestFrom(change)
       ->Rxjs.toObservable
       ->Dynamic.map( ((_, {pack: {field, actions}, close})) =>
@@ -197,12 +194,12 @@ module Make: Make = (F: Field.T) => {
         ->Dynamic.map((field): Close.t<Form.t<'f, 'a>> => {pack: {field, actions}, close})
       )
 
-    let dyn =
+    let dyn = 
       Rxjs.merge2(changes, validated)
       ->Rxjs.pipe(Rxjs.shareReplay(1))
       ->Rxjs.pipe(Rxjs.takeUntil(complete))
 
-    {first, init, dyn}
+    {first, dyn}
   }
  
   let enum = Store.toEnum

@@ -67,7 +67,7 @@ module Make: FieldIdentity = (T: T) => {
     clear: () => actions.clear()->fn,
     opt: i => i->actions.opt->fn,
   }
-
+    
   // let logField = Dynamic.tap(_, (x: Close.t<Form.t<t, 'a>>) => {
   //   Console.log2("FieldIdentity field", x.pack.field)
   // })
@@ -75,7 +75,7 @@ module Make: FieldIdentity = (T: T) => {
   let makeDyn = (context: context, initial: option<input>, setOuter: Rxjs.Observable.t<input>, val: option<Rxjs.Observable.t<()>> )
       : Dyn.t<Close.t<Form.t<t, actions<()>>>>
     => {
-    let debug = false
+    let debug = false 
     let debug = context.debug->Option.or(false) || debug
 
     if debug { Console.log("FieldIdentity makeDyn") }
@@ -95,8 +95,7 @@ module Make: FieldIdentity = (T: T) => {
 
     let field = initial->Option.map(set)->Option.or(init(context))
     let first: Close.t<Form.t<'f, 'a>> = {pack: {field, actions}, close}
-
-    let state = Rxjs.Subject.makeBehavior(first)
+    let state = Rxjs.Subject.make(first)
     let memoState = Dynamic.tap(_, (x: Close.t<Form.t<t, 'a>>) => {
       Rxjs.next(state, x)
     })
@@ -105,28 +104,26 @@ module Make: FieldIdentity = (T: T) => {
           ->Dynamic.map(_ => init(context))
           ->Dynamic._log(~enable=debug, "FieldIdentity clear")
 
-    let init = Dynamic.return(first)
-
     let set = Rxjs.merge3(setOuter, setInner, opt->Dynamic.keepMap(x => x))
           ->Dynamic.log(~enable=debug, "FieldIdentity set")
           ->Dynamic.map(set)
 
     let field = Rxjs.merge2(clear, set)
 
-    let validated =
+    let validated = 
       val
       ->Option.or(Rxjs.Subject.makeEmpty()->Rxjs.toObservable)
       ->Dynamic.withLatestFrom(field)
       ->Dynamic.map(Tuple.snd2)
 
-    let dyn =
-    Rxjs.merge2(field, validated)
+    let dyn = 
+      Rxjs.merge2(field, validated)
       ->Dynamic.map((field): Close.t<Form.t<'f, 'a>> => {pack: {field, actions}, close})
       ->memoState
       ->Dynamic.map(Dynamic.return)
       ->Rxjs.pipe(Rxjs.takeUntil(complete))
-
-    { first, init, dyn }
+    
+    { first, dyn }
   }
 
   let enum = Store.toEnum
