@@ -453,7 +453,7 @@ module Make: Make = (F: Field.T, I: IArray with type t = F.t) => {
         // which are applied outside of the scan
         // stateValues and stateObs can be passed to the combineLatestArray step
         // So we take those instead
-        ( ( _values, _obs, dyns, _)
+        ( ( _values, _obs, dyns)
         , ( change: 'change
           , stateValues: Array.t<Close.t<Form.t<(key, F.t), F.actions<unit>>>>
           , stateObs: Array.t<Rxjs.Observable.t<Close.t<Form.t<(key, F.t), F.actions<unit>>>>>
@@ -535,7 +535,6 @@ module Make: Make = (F: Field.T, I: IArray with type t = F.t) => {
               , Dyn.dyn<Close.t<Form.t<(key, F.t), F.actions<()>>>>
               >
             >
-        , Option.t<Array.t<Close.t<Form.t<(key, F.t), F.actions<unit>>>>>
         )
       ): Dyn.dyn<Array.t<Close.t<Form.t<(key, F.t), F.actions<()>>>>> => {
 
