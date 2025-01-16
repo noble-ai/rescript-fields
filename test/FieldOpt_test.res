@@ -22,27 +22,18 @@ module Behaviors = (F: Field.T) => {
 
 describe("FieldOpt", () => {
   module Subject = FieldOpt.Int
-  module Behaviors = Behaviors(Subject) 
+  module Behaviors = Behaviors(Subject)
+  module MkDyn = Test.MkDyn(Subject)
 
   describe("makeDyn", () => {
     describe("context default", () => {
       let context: Subject.context = {}
 
       describe("setOuter", () => {
-        let test = (values) => {
-          let set = Rxjs.Subject.makeEmpty()
-          let val = Rxjs.Subject.makeEmpty()
-          let {first, dyn} = Subject.makeDyn(context, None, set->Rxjs.toObservable, val->Rxjs.toObservable->Some) 
-          let current: ref<'a> = {contents: first}
-
-          let hist = dyn->Dynamic.switchSequence->Current.apply(current)->Dynamic.toHistory
-
-          values->Array.forEach(Rxjs.next(set))
-
-          Promise.sleep(500)->Promise.tap(_ => current.contents.close())->Promise.void
-
-          hist
-        }
+        let test = (values) =>
+          MkDyn.test(context,
+            values->Array.map( v => #Set(v) )
+          )()
 
         describe("some", () => {
           let values = [ Some("3")]
@@ -80,22 +71,12 @@ describe("FieldOpt", () => {
     describe("context valdiate", () => {
       let context: Subject.context = { validate: (_x) => Ok()->Promise.return->Promise.delay(~ms=100) } 
       describe("Clear during validate", () => {
-        let test = () => {
-          let set = Rxjs.Subject.makeEmpty()
-          let val = Rxjs.Subject.makeEmpty()
-          let {first, dyn} = Subject.makeDyn(context, None, set->Rxjs.toObservable, val->Rxjs.toObservable->Some) 
-          let current: ref<'a> = {contents: first}
-
-          let hist = dyn->Dynamic.switchSequence->Current.apply(current)->Dynamic.toHistory
-
-          Rxjs.next(set, Some("3"))
-          Rxjs.next(set, Some("5"))
-          Rxjs.next(set, None)
-
-          Promise.sleep(2000)->Promise.tap(_ => current.contents.close())->Promise.void
-
-          hist
-        }
+        let test = MkDyn.test(context,
+          [ #Set(Some("3"))
+          , #Set(Some("5"))
+          , #Set(None)
+          ]
+        )
 
         itPromise("shows busy", () => {
           test()->Promise.tap( hist => {
@@ -124,24 +105,13 @@ describe("FieldOpt", () => {
 
       describe("actions", () => {
         describe("opt", () => {
-          let test = () => {
-            let set = Rxjs.Subject.makeEmpty()
-            let val = Rxjs.Subject.makeEmpty()
-            let {first, dyn} = Subject.makeDyn(context, None, set->Rxjs.toObservable, val->Rxjs.toObservable->Some) 
-            let current: ref<'a> = {contents: first}
-
-            let hist = dyn->Dynamic.switchSequence->Current.apply(current)->Dynamic.toHistory
-
-            current.contents.pack.actions.opt(Some("3"))
-            current.contents.pack.actions.opt(None)
-            current.contents.pack.actions.opt(Some("4"))
-
-            Promise.sleep(500)->Promise.tap(_ => current.contents.pack.actions.opt(None))->Promise.void
-
-            Promise.sleep(800)->Promise.tap(_ => current.contents.close())->Promise.void
-
-            hist
-          }
+          let test = MkDyn.test(context,
+            [ #Action( ({opt})=> opt(Some("3")) )
+            , #Action( ({opt})=> opt(None) )
+            , #Action( ({opt})=> opt(Some("4")) )
+            , #Action( ({opt})=> opt(None) )
+            ]
+          )
 
           itPromise("captures every input", () => {
             test()->Promise.tap( hist => {
@@ -150,7 +120,7 @@ describe("FieldOpt", () => {
           })
 
           itPromise("ends with clear", () => {
-            test()->Promise.tap( res => 
+            test()->Promise.tap( res =>
               res
               ->Array.leaf
               ->Option.getUnsafe

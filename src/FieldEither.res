@@ -12,6 +12,23 @@ type error = [#Whole(string) | #Part]
 
 module Actions = FieldVector.Actions
 
+let combineLatestScan = (head: Rxjs.Observable.t<'left>, tail: Rxjs.Observable.t<'right>, init) =>
+      Rxjs.merge2(
+        head->Dynamic.map(Either.left),
+        tail->Dynamic.map(Either.right)
+      )
+      ->Rxjs.pipe(Rxjs.scan(
+          ( (hs: 'left , ts: 'right)
+          , d: Either.t<'left, 'right >
+          , _index
+          ) => {
+          switch d {
+          | Left(h) => (h, ts)
+          | Right(t) => (hs, t)
+          }
+      }, init))
+
+
 @ocamldoc("the Tail module type is an extension of Field with some extras for
 managing the recursive construction of FieldEither3,4,5...
 Some elements of Field are baked in to include a non recursive
@@ -75,7 +92,7 @@ module Either0 = {
   
   let setInner: input => inner = () => ()
   let set = (): t => Store.valid((), ())
-  
+
   let emptyInner = (): inner => ()
   let empty = (): inner => ()
   
@@ -110,44 +127,33 @@ module Either0 = {
   let splitInner = (_, _) => {
     ()
   }
- 
+
   let showInner = (_inner: inner): string => "(either0 inner)"
 
   let show = (_store: t): string => "Either0"
 
-  type observables = 
+  type observables =
     Rxjs.t<Rxjs.foreign, Rxjs.void, Form.t<t, actions<()>>>
-  
+
+  let null: Close.t<Form.t<'f, 'a>> = {pack: {field: (), actions: ()}, close: () => ()}
+
   let makeDynInner =  (_context: contextInner, _initial: option<input>, set: Rxjs.Observable.t<input>)
     : Dyn.t<Close.t<Form.t<inner, actionsInner<()>>>>
     => {
       // Since either0 is degenerate, it will never be meanigfully set
       // and it should never emit values on validation.
 
-      let first: Close.t<Form.t<'f, 'a>> = {pack: {field: (), actions: ()}, close: () => ()}
+      let first: Close.t<Form.t<'f, 'a>> = null
+      let init = Dynamic.return(null)
+      let dyn = set->Dynamic.map(_ => Dynamic.return(null))
 
-      let dyn = set 
-        ->Dynamic.map(_ => Dynamic.return(first))
-
-      {first, dyn}
+      {first, init, dyn}
     }
 
-  let makeDyn = (_context: context, initial: option<input>, setOuter: Rxjs.Observable.t<input>, valOuter: option<Rxjs.Observable.t<()>> )
-    : Dyn.t<Close.t<Form.t<t, actions<()>>>>
-    => {
-    let field = initial->Option.map(set)->Option.or(init())
-    let actions: actions<()> = () 
-    let first: Close.t<Form.t<'f, 'a>> = {pack: { field, actions }, close: () => ()}
-
-    let dyn = 
-      valOuter
-      ->Option.map(Rxjs.merge2(setOuter, _))
-      ->Option.or(setOuter)
-      ->Dynamic.map(_ => Dynamic.return(first))
-      ->Rxjs.toObservable
-
-    {first, dyn}
-  }
+  // Meaningless to be called, so far.
+  let makeDyn
+    : (context, option<input>, Rxjs.Observable.t<input>, option<Rxjs.Observable.t<()>> ) => Dyn.t<Close.t<Form.t<t, actions<()>>>>
+    = %raw("() => { debugger }")
 }
 
 module Rec = {
@@ -264,6 +270,28 @@ module Rec = {
       }`
     }
 
+    let isLeft = x => switch x {
+    | Either.Left(_) => true
+    | Either.Right(_) => false
+    }
+
+    let isRight =  x => switch x {
+    | Either.Left(_) => false
+    | Either.Right(_) => true
+    }
+
+
+    let toFieldHead = Dynamic.map(_, (head: Close.t<Form.t<Head.t, Head.actions<unit>>>) => head.pack.field->Either.left)
+    let toFieldTail = Dynamic.map(_, (tail: Close.t<Form.t<Tail.inner, Tail.actionsInner<unit>>>) => tail.pack.field->Either.right)
+
+    let filterByInitial = (initial, x) =>
+      switch initial {
+      | Some(Either.Left(_)) => isLeft(x)
+      | Some(Either.Right(_)) => isRight(x)
+      | None => false
+      }
+
+
     // Recursive elements of makeObservable
     let makeDynInner = (context: contextInner, initial: option<input>, set: Rxjs.Observable.t<input>)
       : Dyn.t<Close.t<Form.t<inner, actionsInner<()>>>>
@@ -274,93 +302,94 @@ module Rec = {
 
       let initialHead = initial->Option.bind(Either.toLeft)
       let initialTail = initial->Option.bind(Either.toRight)
-      let {first: firstHead, dyn: dynHead } = Head.makeDyn(contextHead, initialHead, setHead->Rxjs.toObservable, None)
 
-      let {first: firstTail, dyn: dynTail } = Tail.makeDynInner(contextTail, initialTail, setTail)
+      let head = Head.makeDyn(contextHead, initialHead, setHead, None)
+      let tail = Tail.makeDynInner(contextTail, initialTail, setTail)
 
-      let fieldFirst: inner = 
+      let innerFirst: inner =
         initial
         ->Option.map(Either.bimap(
-          _ =>  firstHead.pack->Form.field,
-          _ => firstTail.pack->Form.field
+          _ =>  head.first.pack->Form.field,
+          _ => tail.first.pack->Form.field
         ))
-        ->Option.or(Left(firstHead.pack->Form.field))
+        ->Option.or(Left(head.first.pack->Form.field))
 
-      let actionsFirst: actionsInner<()> = (firstHead.pack->Form.actions, firstTail.pack->Form.actions)
-      let closeFirst = () => {
-        firstTail.close()
-        firstHead.close()
-      }
+      let actionsFirstHead = head.first.pack->Form.actions
+      let actionsFirstTail = tail.first.pack->Form.actions
+      let actionsFirst: actionsInner<()> = (actionsFirstHead, actionsFirstTail)
+      let closeFirst = FieldVector.mergeCloses((tail.first.close, head.first.close))
 
-      let packFirst: Form.t<'f, 'a> = { field: fieldFirst, actions: actionsFirst }
+      let packFirst: Form.t<'f, 'a> = { field: innerFirst, actions: actionsFirst }
       let first: Close.t<Form.t<'f, 'a>> = { pack: packFirst, close: closeFirst }
 
-      let dynActionsHead = 
-        dynHead
-        ->Dynamic.switchMap(Dynamic.map(_,  head => head.pack.actions))
-        ->Dynamic.startWith(firstHead.pack.actions)
+      let init = {
+        // FIXME: Why is this startsWith?
+        let actionsHead = head.init->FieldVector.toActionsHead->Dynamic.startWith(actionsFirstHead)
+        let actionsTail = tail.init->FieldVector.toActionsTail->Dynamic.startWith(actionsFirstTail)
+        let actions = Rxjs.combineLatest2(actionsHead, actionsTail)
 
-      let dynActionsTail = 
-        dynTail
-        ->Dynamic.switchMap(Dynamic.map(_, tail => tail.pack.actions))
-        ->Dynamic.startWith(firstTail.pack.actions)
+        let closeHead = head.init->Dynamic.map(x => x.close)
+        let closeTail = tail.init->Dynamic.map(x => x.close)
+        let close =
+          Rxjs.combineLatest2(closeHead, closeTail)
+          ->Dynamic.map(FieldVector.mergeCloses)
+          ->Dynamic.startWith(closeFirst)
 
-      let dynActions = 
-            Rxjs.combineLatest2(dynActionsHead, dynActionsTail)
+        let fieldHead = head.init->toFieldHead
+        let fieldTail = tail.init->toFieldTail
+
+        Rxjs.merge2(fieldHead, fieldTail)
+        ->Dynamic.filter(filterByInitial(initial))
+        ->Dynamic.withLatestFrom2(actions, close)
+        ->Dynamic.map(FieldVector.makeClose)
+      }
+
+     let dyn = {
+        // FIXME: Why is this startsWith?
+        // Each of these startsWith so the combineLatest2 emits "immediately"
+        // So then why the startsWith there?
+        let actionsHead = head.dyn->Dynamic.switchMap(FieldVector.toActionsHead)->Dynamic.startWith(actionsFirstHead)
+        let actionsTail = tail.dyn->Dynamic.switchMap(FieldVector.toActionsTail)->Dynamic.startWith(actionsFirstTail)
+        let actions =
+            Rxjs.combineLatest2(actionsHead, actionsTail)
             ->Dynamic.startWith(actionsFirst)
 
-      let dynCloseHead = 
-        dynHead
-        ->Dynamic.switchMap( Dynamic.map(_, Close.close))
+        let closeHead = head.dyn->Dynamic.switchMap(Dynamic.map(_, Close.close))
+        let closeTail = tail.dyn->Dynamic.switchMap(Dynamic.map(_, Close.close))
 
-      let dynCloseTail = 
-        dynTail
-        ->Dynamic.switchMap(Dynamic.map(_, Close.close))
+        let close: Rxjs.t<Rxjs.foreign, Rxjs.void,() => ()> =
+          Rxjs.combineLatest2(closeHead, closeTail)
+          ->Dynamic.map(FieldVector.mergeCloses)
+          ->Dynamic.startWith(closeFirst)
 
-      let dynClose: Rxjs.t<Rxjs.foreign, Rxjs.void,() => ()> = 
-        Rxjs.combineLatest2(dynCloseHead, dynCloseTail)
-        ->Dynamic.map( ((closeHead, closeTail)) => {
-          () => {
-            closeHead()
-            closeTail()
-          }
-        })
-        ->Dynamic.startWith(closeFirst)
+        // Head and Tail both produce their own dyns
+        // As an Sum type, we are trying to produce only one or the other value at any moment
+        // But we still want to produce actions and close for both.
 
-      // Head and Tail both produce their own dyns
-      // As an Sum type, we are trying to produce only one or the other value at any moment
-      // But we still want to produce actions and close for both.
+        let fieldHead = head.dyn->Dynamic.map(toFieldHead)
+        let fieldTail = tail.dyn->Dynamic.map(toFieldTail)
 
-      let dynFieldHead = 
-        dynHead
-        ->Dynamic.map(Dynamic.map(_, head => head.pack.field->Either.left))
-
-      let dynFieldTail = 
-        dynTail
-        ->Dynamic.map(Dynamic.map(_, tail => tail.pack.field->Either.right))
-
-      let dyn = Rxjs.merge2( dynFieldHead, dynFieldTail)
+        Rxjs.merge2(fieldHead, fieldTail)
         ->Dynamic.map( field => {
-          field 
-          ->Dynamic.withLatestFrom2(dynActions, dynClose)
-          ->Dynamic.map( ((field, actions, close)): Close.t<Form.t<'f, 'a>> => {pack: {field, actions}, close })
+          field
+          ->Dynamic.withLatestFrom2(actions, close)
+          ->Dynamic.map(FieldVector.makeClose)
         })
+      }
 
-      {first, dyn}
+      {first, init, dyn}
     }
 
-    let applyInner = (inner: Rxjs.Observable.t<Close.t<Form.t<inner, actionsInner<()>>>>, actions, closeOpt) => {
-      inner
-      ->Dynamic.map(({pack}): Close.t<Form.t<t, actions<()>>> => {
-        let field = pack.field->makeStore
-        let actions: actions<()> = {
-          ...actions,
-          inner: pack.actions
-        }
 
-        let close = closeOpt
-        {pack: { field, actions }, close}
-      })
+    let applyInner = ({pack}: Close.t<Form.t<inner, actionsInner<()>>>, actions, closeOpt): Close.t<Form.t<t, actions<()>>> => {
+      let field = pack.field->makeStore
+      let actions: actions<()> = {
+        ...actions,
+        inner: pack.actions
+      }
+
+      let close = closeOpt
+      {pack: { field, actions }, close}
     }
 
 
@@ -368,11 +397,13 @@ module Rec = {
     let makeDyn = (context: context, initial: option<input>, setOuter: Rxjs.Observable.t<input>, valOuter: option<Rxjs.Observable.t<()>> )
       : Dyn.t<Close.t<Form.t<t, actions<()>>>>
       => {
+      let complete = Rxjs.Subject.makeEmpty()
+      let close = Rxjs.next(complete)
+
       let setInner = Rxjs.Subject.makeEmpty()
       let clearInner = Rxjs.Subject.makeEmpty()
       let opt = Rxjs.Subject.makeEmpty()
-      let valInner = Rxjs.Subject.makeEmpty() 
-      let complete = Rxjs.Subject.makeEmpty()
+      let valInner = Rxjs.Subject.makeEmpty()
 
       let setOpt = opt->Rxjs.pipe(Rxjs.keepMap(x => x))
       let clearOpt = opt->Rxjs.pipe(Rxjs.keepMap(Option.invert(_, ())))
@@ -381,44 +412,53 @@ module Rec = {
       let set = Rxjs.merge3(setOuter, setInner, setOpt)
       let clear = Rxjs.merge2(clearInner, clearOpt)
 
-      let {first: firstInner, dyn: dynInner} = makeDynInner(context.inner, initial, set)
+      let {first: firstInner, init: initInner, dyn: dynInner} = makeDynInner(context.inner, initial, set)
       let fieldFirst = firstInner.pack->Form.field->Store.init
-    
+
       let state = Rxjs.Subject.makeBehavior(fieldFirst)
 
       let actions: actions<()> = {
-        clear: Rxjs.next(clearInner), 
+        clear: Rxjs.next(clearInner),
         set: Rxjs.next(setInner),
         opt: Rxjs.next(opt),
         inner: firstInner.pack->Form.actions,
         validate: Rxjs.next(valInner),
       }
 
-      let close = Rxjs.next(complete)
-    
       let first: Close.t<Form.t<t, 'a>> = {pack: { field: fieldFirst, actions }, close}
 
-      let memoState = Dynamic.map(_, Dynamic.tap(_, (x: Close.t<Form.t<t, 'a>>) => Rxjs.next(state, x.pack.field)))
+      let memoStateInit = Dynamic.tap(_, (x: Close.t<Form.t<t, 'a>>) => Rxjs.next(state, x.pack.field))
 
-      let changes = Rxjs.merge2(
-        clear->Dynamic.map(_ => Dynamic.return(first))->memoState,
-        dynInner->Dynamic.map(applyInner(_, actions, close))->memoState
-      )
+      let init =
+        initInner
+        ->Dynamic.map(applyInner(_, actions, close))
+        ->memoStateInit
 
-      let validated = val 
+      let memoStateDyn = Dynamic.map(_, memoStateInit )
+
+      let changes =
+        Rxjs.merge2(
+          clear->Dynamic.map(_ => Dynamic.return(first)),
+          dynInner->Dynamic.map(Dynamic.map(_, applyInner(_, actions, close)))
+        )
+        ->memoStateDyn
+
+      let validated = val
         ->Dynamic.withLatestFrom(state)
         ->Dynamic.map( ((_validation, field)) => {
           validate(false, context, field)
           ->Dynamic.map((field): Close.t<Form.t<'f, 'a>> => {pack: {field, actions}, close})
         })
+        ->memoStateDyn
 
-      // Any single value from changes interrupts a validation sequence  
-      let dyn = 
+      // Any single value from changes interrupts a validation sequence
+      let dyn =
         Rxjs.merge2(changes, validated)
+        // FIXME: ShareReplay audit?
         ->Rxjs.pipe(Rxjs.shareReplay(1))
         ->Rxjs.pipe(Rxjs.takeUntil(complete))
 
-      {first, dyn}
+      {first, init, dyn}
     }
 
     let printErrorInner = (inner: inner): option<string> =>

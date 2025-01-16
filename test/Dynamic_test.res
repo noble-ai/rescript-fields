@@ -211,7 +211,6 @@ describe("source behavior", () => {
 
 describe("contramap", () => {
 	let subj: Rxjs.t<'c, Rxjs.source<string>, string> = Rxjs.Subject.makeEmpty()
-	// Console.log2("contramap", subj->Rxjs.toObserver->((x: Rxjs.Observer.t<'x>)=> x.next))
 	let contramapped = subj->Rxjs.toObserver->Dynamic.contramap(Int.toString)
 
 	itPromise("accepts values", () => {

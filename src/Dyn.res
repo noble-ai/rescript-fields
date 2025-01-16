@@ -16,12 +16,15 @@ One detail since we are using this for Field makeDyn only, and we want to be ope
 lets bake that into the dyn type as dyn<'t>
 ")
 
+type first<'a> = 'a
+type init<'a> = Rxjs.Observable.t<'a>
 type dyn<'a> = Rxjs.Observable.t<Rxjs.Observable.t<'a>>
 
 @deriving(accessors)
-type t<'a> = { first: 'a, dyn: dyn<'a> }
+type t<'a> = { first: 'a, init: init<'a>, dyn: dyn<'a> }
 
-let map = (d, fn) => {
-	first: d.first->fn,
-	dyn: d.dyn->Rxjs.pipe(Rxjs.map((x, _i) => x->Rxjs.pipe(Rxjs.map((x, _i) => fn(x)))))
+let map = ({first, init, dyn}, fn) => {
+	first: first->fn,
+	init: init->Rxjs.pipe(Rxjs.map((x, _i) => fn(x))),
+	dyn: dyn->Rxjs.pipe(Rxjs.map((x, _i) => x->Rxjs.pipe(Rxjs.map((x, _i) => fn(x)))))
 }

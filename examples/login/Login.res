@@ -92,7 +92,7 @@ let make = (~onSubmit) => {
 
   <form onSubmit={handleSubmit}>
     <div className="container">
-      <h1>{"Login"->React.string}</h1> 
+      <h1>{"Login"->React.string}</h1>
       <Input form />
       <button type_="submit"> {"Sign In"->React.string} </button>
     </div>

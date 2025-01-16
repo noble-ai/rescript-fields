@@ -36,6 +36,8 @@ module Subject = FieldSum.Sum2.Make(
   FieldString,
 )
 
+module MkDyn = Test.MkDyn(Subject)
+
 describe("FieldSum", () => {
   describe("Sum2", () => {
     describe( "context empty", () => {
@@ -51,20 +53,12 @@ describe("FieldSum", () => {
         describe("setOuter", () => {
           let values = [Haha("one"), Nono("2"), Haha("three")]
 
-          let test = () => {
-            let set = Rxjs.Subject.makeEmpty()
-            let validate = Rxjs.Subject.makeEmpty()
-            let {first, dyn} = Subject.makeDyn(context, None, set->Rxjs.toObservable, validate->Rxjs.toObservable->Some)
-            let current: ref<'a> = {contents: first}
-            let res = dyn->Dynamic.switchSequence->Current.apply(current)->Dynamic.toPromise
-
-            values->Array.forEach(Rxjs.next(set))
-            current.contents.close()
-            res
-          }
+          let test = MkDyn.test(context,
+            values->Array.map( v => #Set(v) )
+          )
 
           itPromise("applys last value", () => {
-            test()->Promise.tap(res => res->Close.pack->Form.field->Subject.input->expect->toEqual(values->Array.leaf->Option.getUnsafe))
+            test()->Promise.tap(res => res->Array.leaf->Option.getUnsafe->Close.pack->Form.field->Subject.input->expect->toEqual(values->Array.leaf->Option.getUnsafe))
           })
         })
       })

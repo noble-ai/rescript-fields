@@ -12,6 +12,9 @@ type t<'f, 'actions> = {
 	actions: 'actions,
 }
 
+let setField = ({actions}: t<'a, 'b>, field) => {field, actions}
+let setActions = ({field}: t<'a, 'b>, actions) => {field, actions}
+
 let bimap = ({field, actions}, f, g) => {
 	{field: f(field), actions: g(actions)}
 }

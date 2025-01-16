@@ -51,31 +51,36 @@ module Make = (I: Interface) => {
   let set = Store.dirty
 
   let validate = (force: bool, context: context, store: t): Rxjs.t<Rxjs.foreign, Rxjs.void, t> => {
+    // FIXME: needs to honor force flag?
     ignore(force)
     switch store {
     | Init(input)
-    | Dirty(input) =>
+    | Dirty(input) => {
       input
       ->I.parse
       ->Result.resolve(
         ~ok=value => {
           switch context.validate {
           | None => Store.valid(input, value)->Dynamic.return
-          | Some(validate) =>
-            value
-            ->validate
-            ->Promise.map(res => {
-              switch res {
-              | Ok(_) => Store.valid(input, value)
-              | Error(err) => Store.invalid(input, err)
-              }
-            })
-            ->Rxjs.fromPromise
-            ->Dynamic.startWith(Store.busy(input))
+          | Some(validate) => {
+              value
+              ->validate
+              ->Promise.map(res => {
+                switch res {
+                | Ok(_) => Store.valid(input, value)
+                | Error(err) => {
+                  Store.invalid(input, err)
+                }
+                }
+              })
+              ->Rxjs.fromPromise
+              ->Dynamic.startWith(Store.busy(input))
+            }
           }
         },
         ~err=err => Store.invalid(input, err)->Dynamic.return,
       )
+    }
     | _ => Dynamic.return(store)
     }
   }
@@ -104,26 +109,25 @@ module Make = (I: Interface) => {
     valOuter: option<Rxjs.Observable.t<unit>>,
   ): Dyn.t<Close.t<Form.t<t, actions<unit>>>> => {
     let complete = Rxjs.Subject.makeEmpty()
+    // For testing, you need to close EVERYTHING including the set to get the observable to close.
+    // FIXME: can this be more aggressive? - AxM
+    let close = Rxjs.next(complete)
+
     let clear = Rxjs.Subject.makeEmpty()
     let reset = Rxjs.Subject.makeEmpty()
     let setInner = Rxjs.Subject.makeEmpty()
     let valInner = Rxjs.Subject.makeEmpty()
 
-    let setCombined = Rxjs.merge2(setOuter, setInner)
-
     let actions: actions<unit> = {
       clear: Rxjs.next(clear),
       reset: Rxjs.next(reset),
       validate: Rxjs.next(valInner),
-      set: x => {Rxjs.next(setInner, x)},
+      set: x => Rxjs.next(setInner, x),
     }
 
-    // For testing, you need to close EVERYTHING including the set to get the observable to close.
-    // FIXME: can this be more aggressive? - AxM
-    let close = Rxjs.next(complete)
-
-    let field = 
-      initial->Option.map(set)
+    let field =
+      initial
+      ->Option.map(set)
       ->Option.or(init(context))
 
     let first: Close.t<Form.t<'f, 'a>> = {pack: {field, actions}, close}
@@ -131,48 +135,60 @@ module Make = (I: Interface) => {
 
     let val = valOuter->Option.map(Rxjs.merge2(_, valInner))->Option.or(valInner->Rxjs.toObservable)
 
-    let resetted = reset->Dynamic.map(_ =>
+    let validateOpt =
       if context.validateImmediate->Option.or(true) {
-        initial->Option.map(set)->Option.or(init(context))->validate(false, context, _)
+        validate(false, context, _)
       } else {
-        initial->Option.map(set)->Option.or(init(context))->Dynamic.return
+        Dynamic.return
       }
+
+    let resetted = reset->Dynamic.map(_ =>
+      initial
+      ->Option.map(set)
+      ->Option.or(init(context))
+      ->validateOpt
     )
 
-    let cleared = clear->Dynamic.map(_ => init(context)->Dynamic.return)
+    let cleared = clear->Dynamic.map(_ => {
+      init(context)
+      ->validateOpt
+    })
 
     let val =
       val
       ->Dynamic.withLatestFrom(state)
       ->Dynamic.map(((_, state)) => state.pack.field->validate(true, context, _))
 
-    let setValidated = setCombined->Dynamic.map(input => {
-      if context.validateImmediate->Option.or(true) {
-        Store.dirty(input)->validate(false, context, _)
-      } else {
-        Store.dirty(input)->Dynamic.return
-      }
+    let toClose = Dynamic.map(_, (field): Close.t<Form.t<t, 'b>> => {
+      {pack: {field, actions}, close}
     })
 
-    let memoState = Dynamic.map(
-      _,
-      Dynamic.tap(_, (x: Close.t<Form.t<t, 'a>>) => {
-        Rxjs.next(state, x)
-      }),
-    )
+    let init =
+      field
+      ->validateOpt
+      ->toClose
+
+    let setValidated =
+        Rxjs.merge2(
+          setOuter
+          , setInner
+        )
+        ->Dynamic.map(input => {
+          input->Store.dirty->validateOpt
+        })
 
     let dyn =
-      Rxjs.merge4(cleared, resetted, val, setValidated)
-      ->Dynamic.withLatestFrom(state)
-      ->Dynamic.map(((x, state)) =>
-        x
-        ->Dynamic.map((field): Close.t<Form.t<t, 'b>> => {pack: {field, actions}, close})
-        ->Dynamic.startWith(state)
+      Rxjs.merge4(
+        cleared
+        , resetted
+        , val
+        , setValidated
       )
-      ->memoState
+      ->Dynamic.map(toClose)
+      ->Dynamic.map(_, Dynamic.tap(_, Rxjs.next(state)))
       ->Rxjs.pipe(Rxjs.takeUntil(complete))
 
-    {first, dyn}
+    {first, init, dyn}
   }
 
   let printError = Store.error
@@ -194,6 +210,7 @@ module String = {
         "Too Long"->Result.Error
       | _ => Result.Ok()
       }->Promise.return
+      ->Promise.delay(~ms=1000)
     }
 
   let contextNonEmpty: Field.context = {
