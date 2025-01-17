@@ -202,6 +202,7 @@ module Make: Make = (F: Field.T, I: IArray with type t = F.t) => {
       prefer(#Busy, Store.busy, inner),
       preferFiltered(#Invalid, Store.invalid(_, #Part), inner, inner->I.filter),
       preferFiltered(#Dirty, Store.dirty, inner, inner->I.filter),
+      prefer(#Init, Store.init, inner),
       validate(inner),
     ]
     ->Array.reduce(Result.first, Error(#Invalid))
@@ -275,7 +276,6 @@ module Make: Make = (F: Field.T, I: IArray with type t = F.t) => {
     })
   }
 
-
   external outputToString: output => string = "%identity"
   let show = (store: t) => {
     `FieldArray{
@@ -288,7 +288,7 @@ module Make: Make = (F: Field.T, I: IArray with type t = F.t) => {
     }`
   }
 
-  let traverseSetk = (context: context, set, elements, validate) => {
+  let traverseSetk = (context: context, set, elements: Array.t<Field.Init.t<F.input>>, validate) => {
     elements
     ->Array.mapi( (value, index) => (value, index))
     ->traverseTuple3( ((value, index)) => {
@@ -329,20 +329,21 @@ module Make: Make = (F: Field.T, I: IArray with type t = F.t) => {
         )
       )
 
-  let makeDynInner = (context: context, initial: option<input>, set: Rxjs.Observable.t<input>, val: Option.t<Rxjs.Observable.t<()>>)
+  let makeDynInner = (context: context, initial: option<Field.Init.t<input>>, set: Rxjs.Observable.t<input>, val: Option.t<Rxjs.Observable.t<()>>)
     : (
       Array.t<Close.t<Form.t<(key, F.t), F.actions<unit>>>>,
       Array.t<Dyn.init<Close.t<Form.t<(key, F.t), F.actions<unit>>>>>,
       Array.t<Dyn.dyn<Close.t<Form.t<(key, F.t), F.actions<()>>>>>,
     )
    => {
-      Option.first(initial, Option.flap0(context.empty))
-      ->Option.or([])
+      Option.first(initial, Option.flap0(context.empty)->Option.map(x => Field.Init.Natural(x)))
+      ->Option.or(Field.Init.Natural([]))
+      ->Field.Init.distributeArray
       ->traverseSetk(context, set, _, val)
       ->packKey
     }
 
-  let makeDyn = (context: context, initial: option<input>, setOuter: Rxjs.Observable.t<input>, validate: option<Rxjs.Observable.t<()>>)
+  let makeDyn = (context: context, initial: option<Field.Init.t<input>>, setOuter: Rxjs.Observable.t<input>, validate: option<Rxjs.Observable.t<()>>)
     : Dyn.t<Close.t<Form.t<t, actions<()>>>>
   => {
     // Every observable has a complete, to terminate the stream
@@ -395,10 +396,10 @@ module Make: Make = (F: Field.T, I: IArray with type t = F.t) => {
             , close: makeClose(close)
             }
 
-    let applyInner = (inners): Rxjs.Observable.t<Close.t<Form.t<t, actions<()>>>> => {
+    let applyInner = (~validateFn, inners): Rxjs.Observable.t<Close.t<Form.t<t, actions<()>>>> => {
         let inners = mergeInner(inners)
         inners.pack.field
-        ->makeStore(~validate=validateImpl(context, false))
+        ->makeStore(~validate=validateFn)
         ->Dynamic.map(applyField(inners))
       }
 
@@ -425,9 +426,11 @@ module Make: Make = (F: Field.T, I: IArray with type t = F.t) => {
       ->Rxjs.pipe(Rxjs.distinct())
 
     let init = {
+      let validateInit = initial->Option.map(Field.Init.isValidate)->Option.or(false)
+      let validateFn = validateImpl(context, validateInit)
       combineLatestScan(initInner, firstInner)
       ->Dynamic.tap(Rxjs.next(stateValues))
-      ->Dynamic.switchMap(applyInner)
+      ->Dynamic.switchMap(applyInner(~validateFn))
     }
 
     let set = Rxjs.merge3(setOuter, setInner, setOpt)
@@ -461,18 +464,18 @@ module Make: Make = (F: Field.T, I: IArray with type t = F.t) => {
         , _sequence)
       : ( Array.t<Close.t<Form.t<(key, F.t), F.actions<unit>>>>
         , Array.t<Dyn.init<Close.t<Form.t<(key, F.t), F.actions<unit>>>>>
-        , Array.t
-            < Either.t
-              < (Dyn.init<Close.t<Form.t<(key, F.t), F.actions<unit>>>>, Dyn.dyn<Close.t<Form.t<(key, F.t), F.actions<()>>>>)
+        , Array.t<
+            Either.t<
+              (Dyn.init<Close.t<Form.t<(key, F.t), F.actions<unit>>>>, Dyn.dyn<Close.t<Form.t<(key, F.t), F.actions<()>>>>)
               , Dyn.dyn<Close.t<Form.t<(key, F.t), F.actions<()>>>>
-              >
             >
+          >
         )
      => {
       // We are tracking the init of dynamically added elements in the 'dyn' value.
       // When a new array level change comes in, we no longer want to replay the init,
       // So cast all the eithers to right, losing the inits
-      let dyns = dyns->Array.map(Either.either(x => x->Tuple.snd2->Either.right, Either.right))
+      // let dyns = Array.map(dyns, y => Either.either(x => x->Tuple.snd2->Either.right, x => Either.right(x), y))
 
       switch change {
       | #Clear => {
@@ -489,7 +492,7 @@ module Make: Make = (F: Field.T, I: IArray with type t = F.t) => {
       | #Add(value) =>  {
         let index = stateValues->Array.length
         let setElement = set->Dynamic.keepMap(Array.get(_, index))
-        let {first, init, dyn} = F.makeDyn(context.element, value, setElement, None)
+        let {first, init, dyn} = F.makeDyn(context.element, value->Option.map(Field.Init.natural), setElement, None)
         let key = getKey()
         let first = packKeyValue(key, first)
         let init = packKeyObss(key, init)
@@ -516,7 +519,7 @@ module Make: Make = (F: Field.T, I: IArray with type t = F.t) => {
       }
       | #Set(input) => {
         stateValues->Array.forEach(c => c.close())
-        let (values, obs, dyns) = input->traverseSetk(context, set, _, validate)->packKey
+        let (values, obs, dyns) = input->Array.map(Field.Init.natural)->traverseSetk(context, set, _, validate)->packKey
 
         let dyns = dyns->Array.mapi( (dyn, i) => (obs->Array.getUnsafe(i), dyn)->Either.left)
         ( values, obs, dyns)
@@ -585,11 +588,14 @@ module Make: Make = (F: Field.T, I: IArray with type t = F.t) => {
       }}
     })
 
-    let dyn =
+
+    let dyn = {
+      let validateFn = validateImpl(context, false)
       dynInner
       ->Dynamic.map(Dynamic.tap(_, Rxjs.next(stateValues)))
-      ->Dynamic.switchMap(Dynamic.map(_, applyInner))
+      ->Dynamic.switchMap(Dynamic.map(_, applyInner(~validateFn)))
       ->Rxjs.pipe(Rxjs.takeUntil(complete))
+    }
 
     {first, init, dyn}
   }

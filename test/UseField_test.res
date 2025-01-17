@@ -26,7 +26,7 @@ describe("UseField", () => {
       },
     }
 
-    let thunk = _ => Subject.use(. ~context, ~init=Some("i"), ~validateInit=false)
+    let thunk = _ => Subject.use(. ~context, ~init=Some(Natural("i")))
     let form = Tl.renderHook(thunk)
 
     beforeAll(

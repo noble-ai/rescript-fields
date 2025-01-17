@@ -72,7 +72,7 @@ module Make: FieldIdentity = (T: T) => {
   //   Console.log2("FieldIdentity field", x.pack.field)
   // })
 
-  let makeDyn = (context: context, initial: option<input>, setOuter: Rxjs.Observable.t<input>, val: option<Rxjs.Observable.t<()>> )
+  let makeDyn = (context: context, initial: option<Field.Init.t<input>>, setOuter: Rxjs.Observable.t<input>, val: option<Rxjs.Observable.t<()>> )
       : Dyn.t<Close.t<Form.t<t, actions<()>>>>
     => {
     let debug = false
@@ -93,7 +93,7 @@ module Make: FieldIdentity = (T: T) => {
 
     let close = Rxjs.next(complete)
 
-    let field = initial->Option.map(set)->Option.or(init(context))
+    let field = initial->Option.map(x => x->Field.Init.get->set)->Option.or(init(context))
     let first: Close.t<Form.t<'f, 'a>> = {pack: {field, actions}, close}
 
     let state = Rxjs.Subject.makeBehavior(first)

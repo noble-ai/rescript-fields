@@ -57,8 +57,8 @@ module type Tail = {
   type partition
   @ocaml.doc("Takes the fields of a part instead of a part since we are having to deconstruct in the outer `split` to prepare inner values so why reconstruct")
   let splitInner: (inner, actionsInner<()>) => partition
-  
-  let makeDynInner: (contextInner, option<input>, Rxjs.Observable.t<input>) => Dyn.t<Close.t<Form.t<inner, actionsInner<()>>>>
+
+  let makeDynInner: (contextInner, option<Field.Init.t<input>>, Rxjs.Observable.t<input>) => Dyn.t<Close.t<Form.t<inner, actionsInner<()>>>>
 
   let toEnumInner: inner => Store.enum
   let inputInner: inner => input
@@ -137,7 +137,7 @@ module Either0 = {
 
   let null: Close.t<Form.t<'f, 'a>> = {pack: {field: (), actions: ()}, close: () => ()}
 
-  let makeDynInner =  (_context: contextInner, _initial: option<input>, set: Rxjs.Observable.t<input>)
+  let makeDynInner =  (_context: contextInner, _initial: option<Field.Init.t<input>>, set: Rxjs.Observable.t<input>)
     : Dyn.t<Close.t<Form.t<inner, actionsInner<()>>>>
     => {
       // Since either0 is degenerate, it will never be meanigfully set
@@ -152,7 +152,7 @@ module Either0 = {
 
   // Meaningless to be called, so far.
   let makeDyn
-    : (context, option<input>, Rxjs.Observable.t<input>, option<Rxjs.Observable.t<()>> ) => Dyn.t<Close.t<Form.t<t, actions<()>>>>
+    : (context, option<Field.Init.t<input>>, Rxjs.Observable.t<input>, option<Rxjs.Observable.t<()>> ) => Dyn.t<Close.t<Form.t<t, actions<()>>>>
     = %raw("() => { debugger }")
 }
 
@@ -169,6 +169,11 @@ module Rec = {
     type contextInner = (Head.context, Tail.contextInner)
     type context = Context.t<input, validate, contextInner>
 
+    let inner = Store.inner
+    let setInner = Either.bimap(Head.set, Tail.setInner)
+
+    let inputInner = (inner: inner) => inner->Either.bimap(Head.input, Tail.inputInner, _)
+    let input = (store: t) => store->Store.inner->inputInner
     let showInput = (input: input): string => {
       switch input {
       | Left(a) => `Left(${a->Head.showInput})`
@@ -176,7 +181,36 @@ module Rec = {
       }
     }
 
-    let setInner = Either.bimap(Head.set, Tail.setInner)
+    let outputInner = (inner: inner) =>
+      inner->Either.bimap(Head.output, Tail.outputInner, _)->Either.sequence
+    let output = Store.output
+
+    let error = Store.error
+
+    let enum = Store.toEnum
+    let toEnumInner = Either.either(Head.enum, Tail.toEnumInner, _)
+
+    let showInner = (inner: inner): string =>
+      inner
+      ->Either.bimap(Head.show, Tail.showInner, _)
+      ->Either.either(x => `Left: ${x}`, x => `Right: ${x}`, _)
+
+    let show = (store: t): string => {
+      `EitherRec: {
+        inner: ${store->Store.inner->showInner}
+      }`
+    }
+
+    // TODO: move to Prelude
+    let isLeft = x => switch x {
+    | Either.Left(_) => true
+    | Either.Right(_) => false
+    }
+
+    let isRight =  x => switch x {
+    | Either.Left(_) => false
+    | Either.Right(_) => true
+    }
 
     // prefer a context given empty value over const A
     let emptyInner = (context): inner => {
@@ -200,6 +234,7 @@ module Rec = {
         output->Option.map(output => Store.valid(inner, output)),
         enum == #Init ? Store.init(inner)->Some : None,
         enum == #Invalid ? Store.invalid(inner, #Part)->Some : None,
+        enum == #Busy ? Store.busy(inner)->Some : None,
       ]
       ->Array.reduce(Option.first, None)
       ->Option.or(Store.dirty(inner))
@@ -228,7 +263,7 @@ module Rec = {
     // Application of actionsInner into our own local Actions, for direct clients of FieldEither.
     type actions<'change> = Actions.t<input, 'change, actionsInner<'change>>
     let mapActions = (actions, fn) => Actions.trimap(actions, x => x, fn, mapActionsInner(_, fn))
-  
+
     type pack = Form.t<t, actions<()>>
 
     type partition = Either.t<Form.t<Head.t, Head.actions<()>>, Tail.partition>
@@ -245,47 +280,11 @@ module Rec = {
       splitInner( part.field->Store.inner, part.actions.inner)
     }
 
-    let inner = Store.inner
-
-    let inputInner = (inner: inner) => inner->Either.bimap(Head.input, Tail.inputInner, _)
-    let input = (store: t) => store->Store.inner->inputInner
-
-    let outputInner = (inner: inner) =>
-      inner->Either.bimap(Head.output, Tail.outputInner, _)->Either.sequence
-    let output = Store.output
-
-    let error = Store.error
-
-    let enum = Store.toEnum
-    let toEnumInner = Either.either(Head.enum, Tail.toEnumInner, _)
-
-    let showInner = (inner: inner): string =>
-      inner
-      ->Either.bimap(Head.show, Tail.showInner, _)
-      ->Either.either(x => `Left: ${x}`, x => `Right: ${x}`, _)
-
-    let show = (store: t): string => {
-      `EitherRec: {
-        inner: ${store->Store.inner->showInner}
-      }`
-    }
-
-    let isLeft = x => switch x {
-    | Either.Left(_) => true
-    | Either.Right(_) => false
-    }
-
-    let isRight =  x => switch x {
-    | Either.Left(_) => false
-    | Either.Right(_) => true
-    }
-
-
     let toFieldHead = Dynamic.map(_, (head: Close.t<Form.t<Head.t, Head.actions<unit>>>) => head.pack.field->Either.left)
     let toFieldTail = Dynamic.map(_, (tail: Close.t<Form.t<Tail.inner, Tail.actionsInner<unit>>>) => tail.pack.field->Either.right)
 
     let filterByInitial = (initial, x) =>
-      switch initial {
+      switch initial->Option.map(Field.Init.get) {
       | Some(Either.Left(_)) => isLeft(x)
       | Some(Either.Right(_)) => isRight(x)
       | None => false
@@ -293,21 +292,22 @@ module Rec = {
 
 
     // Recursive elements of makeObservable
-    let makeDynInner = (context: contextInner, initial: option<input>, set: Rxjs.Observable.t<input>)
+    let makeDynInner = (context: contextInner, initial: option<Field.Init.t<input>>, set: Rxjs.Observable.t<input>)
       : Dyn.t<Close.t<Form.t<inner, actionsInner<()>>>>
       => {
       let (contextHead, contextTail) = context
       let setHead = set->Dynamic.keepMap(Either.toLeft)
       let setTail  = set->Dynamic.keepMap(Either.toRight)
 
-      let initialHead = initial->Option.bind(Either.toLeft)
-      let initialTail = initial->Option.bind(Either.toRight)
+      let initialHead = initial->Option.bind(x => x->Field.Init.collectOption(_, Either.toLeft))
+      let initialTail = initial->Option.bind(Field.Init.collectOption(_, Either.toRight))
 
       let head = Head.makeDyn(contextHead, initialHead, setHead, None)
       let tail = Tail.makeDynInner(contextTail, initialTail, setTail)
 
       let innerFirst: inner =
         initial
+        ->Option.map(Field.Init.get)
         ->Option.map(Either.bimap(
           _ =>  head.first.pack->Form.field,
           _ => tail.first.pack->Form.field
@@ -394,7 +394,7 @@ module Rec = {
 
 
     // Non-Recursive makeObservable
-    let makeDyn = (context: context, initial: option<input>, setOuter: Rxjs.Observable.t<input>, valOuter: option<Rxjs.Observable.t<()>> )
+    let makeDyn = (context: context, initial: option<Field.Init.t<input>>, setOuter: Rxjs.Observable.t<input>, valOuter: option<Rxjs.Observable.t<()>> )
       : Dyn.t<Close.t<Form.t<t, actions<()>>>>
       => {
       let complete = Rxjs.Subject.makeEmpty()

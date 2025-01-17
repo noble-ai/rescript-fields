@@ -35,6 +35,21 @@ module Make = (I: Interface) => {
 
   type context = {validate?: validate, validateImmediate?: bool}
 
+  let enum = Store.toEnum
+  let inner = Store.inner
+  let input = Store.inner
+  let output = Store.output
+  let error = Store.error
+
+  let show = (store: t) => {
+    `FieldParse {
+  state: ${store->enum->Store.enumToPretty},
+  input: ${store->input},
+  output: ${store->output->Option.map(I.show)->Option.or("None")}
+}`
+  }
+
+
   let logField = Dynamic.map(
     _,
     Dynamic.tap(_, (x: Close.t<Form.t<'t, 'a>>) => {
@@ -88,23 +103,9 @@ module Make = (I: Interface) => {
   type actions<'change> = Actions.t<input, 'change>
   let mapActions = Actions.mapActions
 
-  let enum = Store.toEnum
-  let inner = Store.inner
-  let input = Store.inner
-  let output = Store.output
-  let error = Store.error
-
-  let show = (store: t) => {
-    `FieldParse {
-  state: ${store->enum->Store.enumToPretty},
-  input: ${store->input},
-  output: ${store->output->Option.map(I.show)->Option.or("None")}
-}`
-  }
-
   let makeDyn = (
     context: context,
-    initial: option<input>,
+    initial: option<Field.Init.t<input>>,
     setOuter: Rxjs.Observable.t<input>,
     valOuter: option<Rxjs.Observable.t<unit>>,
   ): Dyn.t<Close.t<Form.t<t, actions<unit>>>> => {
@@ -127,7 +128,7 @@ module Make = (I: Interface) => {
 
     let field =
       initial
-      ->Option.map(set)
+      ->Option.map(x => x->Field.Init.get->set)
       ->Option.or(init(context))
 
     let first: Close.t<Form.t<'f, 'a>> = {pack: {field, actions}, close}
@@ -143,9 +144,7 @@ module Make = (I: Interface) => {
       }
 
     let resetted = reset->Dynamic.map(_ =>
-      initial
-      ->Option.map(set)
-      ->Option.or(init(context))
+      field
       ->validateOpt
     )
 
@@ -163,19 +162,25 @@ module Make = (I: Interface) => {
       {pack: {field, actions}, close}
     })
 
-    let init =
+    let init = {
+      // Console.log2("FieldParse init", initial)
+      let validateInit = initial->Option.map(Field.Init.isValidate)->Option.or(false)
+
+      let validateOpt =
+        if context.validateImmediate->Option.or(true) || validateInit {
+          validate(false, context, _)
+        } else {
+          Dynamic.return
+        }
+
       field
       ->validateOpt
       ->toClose
+    }
 
     let setValidated =
-        Rxjs.merge2(
-          setOuter
-          , setInner
-        )
-        ->Dynamic.map(input => {
-          input->Store.dirty->validateOpt
-        })
+        Rxjs.merge2(setOuter, setInner)
+        ->Dynamic.map(input => input->Store.dirty->validateOpt)
 
     let dyn =
       Rxjs.merge4(

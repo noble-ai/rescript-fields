@@ -165,7 +165,7 @@ module AddressMilitary = {
 	module Segment = {
 		type t = [#Unit | #Community | #Postal ]
 		let all: array<t> = [#Unit, #Community, #Postal ]
-			
+
 		external show: t => string = "%identity"
 		external fromStringUnsafe: string => t = "%identity"
 
@@ -413,12 +413,18 @@ module Input = {
 // Create a hook for running this field
 module Form = UseField.Make(Field)
 
+let init: Field.input = Street({
+	street: Some("333"),
+	city: Some("333"),
+	state: Some(#Alabama),
+	zip: Some("33")
+})
+
 @react.component
 let make = (~onSubmit) => {
   let form = Form.use(.
     ~context=contextDefault,
-    ~init=None,
-    ~validateInit=false,
+    ~init=Some(Validate(init)),
   )
 
   let handleSubmit = React.useMemo1( () => {

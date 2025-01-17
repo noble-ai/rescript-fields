@@ -117,10 +117,10 @@ module Sum1 = {
     
     let actionsFromVector: Inner.actions<()> => actions<()> = FieldVector.Actions.trimap(_, toEither, x=>x, fromTuple)
     let packFromEither = Form.bimap(_, storeToSum, actionsFromVector)
-    let makeDyn = (context: context, initial: option<input>, set: Rxjs.Observable.t<input>, val: option<Rxjs.Observable.t<()>>)
+    let makeDyn = (context: context, initial: option<Field.Init.t<input>>, set: Rxjs.Observable.t<input>, val: option<Rxjs.Observable.t<()>>)
       : Dyn.t<Close.t<Form.t<t, actions<()>>>>
       => {
-      Inner.makeDyn(context->contextToTuple, initial->Option.map(toEither), set->Dynamic.map(toEither), val)
+      Inner.makeDyn(context->contextToTuple, initial->Option.map(Field.Init.map(_, toEither)), set->Dynamic.map(toEither), val)
       ->Dyn.map(Close.map(_, packFromEither))
     }
 
@@ -249,10 +249,10 @@ module Sum2 = {
     
     let actionsFromVector: Inner.actions<()> => actions<()> = FieldVector.Actions.trimap(_, toEither, x=>x, fromTuple)
     let packFromEither = Form.bimap(_, storeToSum, actionsFromVector)
-    let makeDyn = (context: context, initial: option<input>, set: Rxjs.Observable.t<input>, val: option<Rxjs.Observable.t<()>>)
+    let makeDyn = (context: context, initial: option<Field.Init.t<input>>, set: Rxjs.Observable.t<input>, val: option<Rxjs.Observable.t<()>>)
       : Dyn.t<Close.t<Form.t<t, actions<()>>>>
       => {
-      Inner.makeDyn(context->contextToTuple, initial->Option.map(toEither), set->Dynamic.map(toEither), val)
+      Inner.makeDyn(context->contextToTuple, initial->Option.map(Field.Init.map(_, toEither)), set->Dynamic.map(toEither), val)
       ->Dyn.map(Close.map(_, packFromEither))
     }
  
@@ -391,10 +391,10 @@ module Sum3 = {
     
     let actionsFromVector: Inner.actions<()> => actions<()> = FieldVector.Actions.trimap(_, toEither, x=>x, fromTuple)
     let packFromEither = Form.bimap(_, storeToSum, actionsFromVector)
-    let makeDyn = (context: context, initial: option<input>, set: Rxjs.Observable.t<input>, val: option<Rxjs.Observable.t<()>>)
+    let makeDyn = (context: context, initial: option<Field.Init.t<input>>, set: Rxjs.Observable.t<input>, val: option<Rxjs.Observable.t<()>>)
       : Dyn.t<Close.t<Form.t<t, actions<()>>>>
       => {
-      Inner.makeDyn(context->contextToTuple, initial->Option.map(toEither), set->Dynamic.map(toEither), val)
+      Inner.makeDyn(context->contextToTuple, initial->Option.map(Field.Init.map(_, toEither)), set->Dynamic.map(toEither), val)
       ->Dyn.map(Close.map(_, packFromEither))
     }
  
@@ -560,10 +560,10 @@ module Sum4 = {
 
     let actionsFromVector: Inner.actions<()> => actions<()> = FieldVector.Actions.trimap(_, toEither, x=>x, fromTuple)
     let packFromEither = Form.bimap(_, storeToSum, actionsFromVector)
-    let makeDyn = (context: context, initial: option<input>, set: Rxjs.Observable.t<input>, val: option<Rxjs.Observable.t<()>>)
+    let makeDyn = (context: context, initial: option<Field.Init.t<input>>, set: Rxjs.Observable.t<input>, val: option<Rxjs.Observable.t<()>>)
       : Dyn.t<Close.t<Form.t<t, actions<()>>>>
       => {
-      Inner.makeDyn(context->contextToTuple, initial->Option.map(toEither), set->Dynamic.map(toEither), val)
+      Inner.makeDyn(context->contextToTuple, initial->Option.map(Field.Init.map(_, toEither)), set->Dynamic.map(toEither), val)
       ->Dyn.map(Close.map(_, packFromEither))
     }
  
@@ -752,10 +752,10 @@ module Sum5 = {
 
     let actionsFromVector: Inner.actions<()> => actions<()> = FieldVector.Actions.trimap(_, toEither, x=>x, fromTuple)
     let packFromEither = Form.bimap(_, storeToSum, actionsFromVector)
-    let makeDyn = (context: context, initial: option<input>, set: Rxjs.Observable.t<input>, val: option<Rxjs.Observable.t<()>>)
+    let makeDyn = (context: context, initial: option<Field.Init.t<input>>, set: Rxjs.Observable.t<input>, val: option<Rxjs.Observable.t<()>>)
       : Dyn.t<Close.t<Form.t<t, actions<()>>>>
       => {
-      Inner.makeDyn(context->contextToTuple, initial->Option.map(toEither), set->Dynamic.map(toEither), val)
+      Inner.makeDyn(context->contextToTuple, initial->Option.map(Field.Init.map(_, toEither)), set->Dynamic.map(toEither), val)
       ->Dyn.map(Close.map(_, packFromEither))
     }
  
@@ -958,10 +958,10 @@ module Sum6 = {
 
     let actionsFromVector: Inner.actions<()> => actions<()> = FieldVector.Actions.trimap(_, toEither, x=>x, fromTuple)
     let packFromEither = Form.bimap(_, storeToSum, actionsFromVector)
-    let makeDyn = (context: context, initial: option<input>, set: Rxjs.Observable.t<input>, val: option<Rxjs.Observable.t<()>>)
+    let makeDyn = (context: context, initial: option<Field.Init.t<input>>, set: Rxjs.Observable.t<input>, val: option<Rxjs.Observable.t<()>>)
       : Dyn.t<Close.t<Form.t<t, actions<()>>>>
       => {
-      Inner.makeDyn(context->contextToTuple, initial->Option.map(toEither), set->Dynamic.map(toEither), val)
+      Inner.makeDyn(context->contextToTuple, initial->Option.map(Field.Init.map(_, toEither)), set->Dynamic.map(toEither), val)
       ->Dyn.map(Close.map(_, packFromEither))
     }
  

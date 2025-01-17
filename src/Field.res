@@ -4,6 +4,60 @@ You'll see this Field.T in the Module Functions which asserts
 that a module passed to the function has each of these types and values.
 ")
 
+module Init = {
+  @deriving(accessors)
+  type t<'a> = Validate('a) | Natural('a)
+  let map = (t, fn) => {
+    switch t {
+    | Validate(a) => Validate(fn(a))
+    | Natural(a) => Natural(fn(a))
+    }
+  }
+
+  let get = t => {
+    switch t {
+    | Validate(a) => a
+    | Natural(a) => a
+    }
+  }
+
+  let toValidate = (t: t<'a>) => {
+    switch t {
+    | Validate(a) => Some(a)
+    | Natural(_) => None
+    }
+  }
+
+  let isValidate  = t => t->toValidate->Option.isSome
+
+  let toNatural = (t: t<'a>) => {
+    switch t {
+      | Validate(_) => None
+      | Natural(a) => Some(a)
+    }
+  }
+
+  let toNatural = t => t->toNatural->Option.isSome
+
+  let collectOption = (t: t<'a>, fn: 'a => option<'b>): option<t<'b>> => {
+    switch t {
+      | Validate(a) => fn(a)->Option.map(validate)
+      | Natural(a) => fn(a)->Option.map(natural)
+    }
+  }
+
+  let distributeOption = collectOption(_, x=>x)
+
+  let collectArray = (t: t<'a>, fn: 'a => array<'b>): array<t<'b>> => {
+    switch t {
+      | Validate(a) => fn(a)->Array.map(validate)
+      | Natural(a) => fn(a)->Array.map(natural)
+    }
+  }
+
+  let distributeArray = collectArray(_, x=>x)
+}
+
 module type T = {
   @ocamldoc("A field is passed a context to its validate and reduce methods
   and it can be any shape of your choosing.
@@ -85,7 +139,7 @@ module type T = {
   There may be cases where you _DO_ want to emit to dyn, like adding an element to FieldArray, but
   needs to be handled in Array - AxM
   ")
-  let makeDyn: (context, option<input>, Rxjs.Observable.t<input>, option<Rxjs.Observable.t<()>>) => 
+  let makeDyn: (context, option<Init.t<input>>, Rxjs.Observable.t<input>, option<Rxjs.Observable.t<()>>) =>
       Dyn.t<Close.t<Form.t<t, actions<()>>>>
 
   // Accessors for input, output, etc via the Field

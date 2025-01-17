@@ -159,10 +159,10 @@ module Product1 = {
 
     let actionsFromVector = FieldVector.Actions.trimap(_, toTuple, x=>x, fromTuple)
     let packFromVector = Form.bimap(_, storeToStructure, actionsFromVector)
-    let makeDyn = (context: context, initial: option<input>, set: Rxjs.Observable.t<input>, val: option<Rxjs.Observable.t<()>> )
+    let makeDyn = (context: context, initial: option<Field.Init.t<input>>, set: Rxjs.Observable.t<input>, val: option<Rxjs.Observable.t<()>> )
       : Dyn.t<Close.t<Form.t<t, actions<()>>>>
       => {
-      Inner.makeDyn(context->contextToTuple, initial->Option.map(toTuple), set->Dynamic.map(toTuple), val)
+      Inner.makeDyn(context->contextToTuple, initial->Option.map(Field.Init.map(_, toTuple)), set->Dynamic.map(toTuple), val)
       ->Dyn.map(Close.map(_, packFromVector))
     }
 
@@ -309,10 +309,10 @@ module Product2 = {
   
     let actionsFromVector = FieldVector.Actions.trimap(_, toTuple, x=>x, fromTuple)
     let packFromVector = Form.bimap(_, storeToStructure, actionsFromVector)
-    let makeDyn = (context: context, initial: option<input>, set: Rxjs.Observable.t<input>, val: option<Rxjs.Observable.t<()>>)
+    let makeDyn = (context: context, initial: option<Field.Init.t<input>>, set: Rxjs.Observable.t<input>, val: option<Rxjs.Observable.t<()>>)
       : Dyn.t<Close.t<Form.t<t, actions<()>>>>
       => {
-      Inner.makeDyn(context->contextToTuple, initial->Option.map(toTuple), set->Dynamic.map(toTuple), val)
+      Inner.makeDyn(context->contextToTuple, initial->Option.map(Field.Init.map(_, toTuple)), set->Dynamic.map(toTuple), val)
       ->Dyn.map(Close.map(_, packFromVector))
     }
  
@@ -439,10 +439,10 @@ module Product3 = {
   
     let actionsFromVector = FieldVector.Actions.trimap(_, toTuple, x=>x, fromTuple)
     let packFromVector = Form.bimap(_, storeToStructure, actionsFromVector)
-    let makeDyn = (context: context, initial: option<input>, set: Rxjs.Observable.t<input>, val: option<Rxjs.Observable.t<()>> )
+    let makeDyn = (context: context, initial: option<Field.Init.t<input>>, set: Rxjs.Observable.t<input>, val: option<Rxjs.Observable.t<()>> )
       : Dyn.t<Close.t<Form.t<t, actions<()>>>>
       => {
-     Inner.makeDyn(context->contextToTuple, initial->Option.map(toTuple), set->Dynamic.map(toTuple), val)
+     Inner.makeDyn(context->contextToTuple, initial->Option.map(Field.Init.map(_, toTuple)), set->Dynamic.map(toTuple), val)
       ->Dyn.map(Close.map(_, packFromVector))
     }
  
@@ -615,10 +615,10 @@ module Product4 = {
 
     let actionsFromVector = FieldVector.Actions.trimap(_, toTuple, x=>x, fromTuple)
     let packFromVector = Form.bimap(_, storeToStructure, actionsFromVector)
-    let makeDyn = (context: context, initial: option<input>, set: Rxjs.Observable.t<input>, val: option<Rxjs.Observable.t<()>> )
+    let makeDyn = (context: context, initial: option<Field.Init.t<input>>, set: Rxjs.Observable.t<input>, val: option<Rxjs.Observable.t<()>> )
       : Dyn.t<Close.t<Form.t<t, actions<()>>>>
       => {
-      let {first, init, dyn} = Inner.makeDyn(context->contextToTuple, initial->Option.map(toTuple), set->Dynamic.map(toTuple), val)
+      let {first, init, dyn} = Inner.makeDyn(context->contextToTuple, initial->Option.map(Field.Init.map(_, toTuple)), set->Dynamic.map(toTuple), val)
       ->Dyn.map(Close.map(_, packFromVector))
 
       let init = init
@@ -801,10 +801,10 @@ module Product5 = {
 
     let actionsFromVector = FieldVector.Actions.trimap(_, toTuple, x=>x, fromTuple)
     let packFromVector = Form.bimap(_, storeToStructure, actionsFromVector)
-    let makeDyn = (context: context, initial: option<input>, set: Rxjs.Observable.t<input>, val: option<Rxjs.Observable.t<()>> )
+    let makeDyn = (context: context, initial: option<Field.Init.t<input>>, set: Rxjs.Observable.t<input>, val: option<Rxjs.Observable.t<()>> )
       : Dyn.t<Close.t<Form.t<t, actions<()>>>>
       => {
-      Inner.makeDyn(context->contextToTuple, initial->Option.map(toTuple), set->Dynamic.map(toTuple), val)
+      Inner.makeDyn(context->contextToTuple, initial->Option.map(Field.Init.map(_, toTuple)), set->Dynamic.map(toTuple), val)
       ->Dyn.map(Close.map(_, packFromVector))
     }
  
@@ -988,10 +988,10 @@ module Product6 = {
 
     let actionsFromVector = FieldVector.Actions.trimap(_, toTuple, x=>x, fromTuple)
     let packFromVector = Form.bimap(_, storeToStructure, actionsFromVector)
-    let makeDyn = (context: context, initial: option<input>, set: Rxjs.Observable.t<input>, val: option<Rxjs.Observable.t<()>> )
+    let makeDyn = (context: context, initial: option<Field.Init.t<input>>, set: Rxjs.Observable.t<input>, val: option<Rxjs.Observable.t<()>> )
       : Dyn.t<Close.t<Form.t<t, actions<()>>>>
       => {
-      Inner.makeDyn(context->contextToTuple, initial->Option.map(toTuple), set->Dynamic.map(toTuple), val)
+      Inner.makeDyn(context->contextToTuple, initial->Option.map(Field.Init.map(_, toTuple)), set->Dynamic.map(toTuple), val)
       ->Dyn.map(Close.map(_, packFromVector))
     }
  
@@ -1187,10 +1187,10 @@ module Product7 = {
 
     let actionsFromVector = FieldVector.Actions.trimap(_, toTuple, x=>x, fromTuple)
     let packFromVector = Form.bimap(_, storeToStructure, actionsFromVector)
-    let makeDyn = (context: context, initial: option<input>, set: Rxjs.Observable.t<input>, val: option<Rxjs.Observable.t<()>> )
+    let makeDyn = (context: context, initial: option<Field.Init.t<input>>, set: Rxjs.Observable.t<input>, val: option<Rxjs.Observable.t<()>> )
       : Dyn.t<Close.t<Form.t<t, actions<()>>>>
       => {
-      Inner.makeDyn(context->contextToTuple, initial->Option.map(toTuple), set->Dynamic.map(toTuple), val)
+      Inner.makeDyn(context->contextToTuple, initial->Option.map(Field.Init.map(_, toTuple)), set->Dynamic.map(toTuple), val)
       ->Dyn.map(Close.map(_, packFromVector))
     }
 
