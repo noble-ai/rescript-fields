@@ -29,12 +29,12 @@ let mapActions: (actions<'a>, 'a => 'b) => actions<'b> = (actions, fn) => {
   set: input => input->actions.set->fn
 }
 
-let makeDyn = (context: context, initial: option<input>, setOuter: Rxjs.Observable.t<input>, _validate: option<Rxjs.Observable.t<()>> )
+let makeDyn = (context: context, initial: option<Field.Init.t<input>>, setOuter: Rxjs.Observable.t<input>, _validate: option<Rxjs.Observable.t<()>> )
     : Dyn.t<Close.t<Form.t<t, actions<()>>>>
   => {
   let field =
     initial
-    ->Option.map(set)
+    ->Option.map(x => x->Field.Init.get->set)
     ->Option.or(init(context))
 
   let complete = Rxjs.Subject.makeEmpty()

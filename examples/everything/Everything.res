@@ -96,8 +96,7 @@ let init: Field.input = [
 let make = (~onSubmit) => {
   let form = Form.use(.
     ~context=Addresses.contextDefault,
-    ~init=Some(init),
-    ~validateInit=true,
+    ~init=Some(Validate(init)),
   )
 
   let handleSubmit = React.useMemo1( () => {

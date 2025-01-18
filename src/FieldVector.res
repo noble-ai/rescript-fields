@@ -134,7 +134,7 @@ module type Tail = {
   type partition
   let splitInner: (inner, actionsInner<()>) => partition
 
-  let makeDynInner: (contextInner, option<input>, Rxjs.Observable.t<input>) =>
+  let makeDynInner: (contextInner, option<Field.Init.t<input>>, Rxjs.Observable.t<input>) =>
     Dyn.t<Close.t<Form.t<inner, actionsInner<()>>>>
 
   let toInputInner: inner => input
@@ -203,7 +203,7 @@ module Vector0 = {
 
   // We have no meaningful actions here, but you may get an external set event from a larger vector
   // So we want to produce a value for each set that comes in, at least
-  let makeDynInner = (_context: contextInner, _initial: option<input>, set: Rxjs.Observable.t<input>)
+  let makeDynInner = (_context: contextInner, _initial: option<Field.Init.t<input>>, set: Rxjs.Observable.t<input>)
     : Dyn.t<Close.t<Form.t<inner, actionsInner<()>>>>
   => {
     let pack: Form.t<'f, 'a> = { field: (), actions: () }
@@ -218,7 +218,7 @@ module Vector0 = {
 
   // I dont think you're going to find much use in creating a Vector0 directly but I may be wrong.
   let makeDyn
-    : (context, option<input>, Rxjs.Observable.t<input>, option<Rxjs.Observable.t<()>> ) => Dyn.t<Close.t<Form.t<t, actions<()>>>>
+    : (context, option<Field.Init.t<input>>, Rxjs.Observable.t<input>, option<Rxjs.Observable.t<()>> ) => Dyn.t<Close.t<Form.t<t, actions<()>>>>
     = %raw("() => { debugger }")
 }
 
@@ -292,7 +292,9 @@ module VectorRec = {
         // First Prioritize Busy first if any children are busy
         Result.predicate(inner->hasEnum(#Busy), Store.busy(inner)->Dynamic.return, #Invalid),
         // Then Prioritize Invalid state if any children are invalid
-        Result.predicate(inner->hasEnum(#Invalid), Store.busy(inner)->Dynamic.return, #Invalid),
+        Result.predicate(inner->hasEnum(#Invalid), Store.invalid(inner, #Part)->Dynamic.return, #Invalid),
+        Result.predicate(inner->hasEnum(#Dirty), Store.dirty(inner)->Dynamic.return, #Invalid),
+        Result.predicate(inner->hasEnum(#Init), Store.init(inner)->Dynamic.return, #Invalid),
         // Otherwise take the first error we find
         inner->toResultInner->Result.map(validate(inner)),
       ]
@@ -389,19 +391,19 @@ module VectorRec = {
       { pack: { field, actions }, close }
     }
 
-  let makeDynInner = (context: contextInner, initial: option<input>, set: Rxjs.Observable.t<input>)
+  let makeDynInner = (context: contextInner, initial: option<Field.Init.t<input>>, set: Rxjs.Observable.t<input>)
     : Dyn.t<Close.t<Form.t<inner, actionsInner<()>>>>
     => {
     // FIXME: pass validate to head and tail - AxM
     let head = {
-      let initial = initial->Option.map(Tuple.fst2)
+      let initial = initial->Option.map(Field.Init.map(_, Tuple.fst2))
       let set = set->Dynamic.map(Tuple.fst2)
       let context = context->Tuple.fst2
       Head.makeDyn(context, initial, set, None)
     }
 
     let tail = {
-      let initial = initial->Option.map(Tuple.snd2)
+      let initial = initial->Option.map(Field.Init.map(_, Tuple.snd2))
       let set = set->Dynamic.map(Tuple.snd2)
       let context = context->Tuple.snd2
       Tail.makeDynInner(context, initial, set)
@@ -424,7 +426,7 @@ module VectorRec = {
   }
 
 
-  let makeDyn = (context: context, initial: option<input>, setOuter: Rxjs.Observable.t<input>, valOuter: option<Rxjs.Observable.t<()>>)
+  let makeDyn = (context: context, initial: option<Field.Init.t<input>>, setOuter: Rxjs.Observable.t<input>, valOuter: option<Rxjs.Observable.t<()>>)
     : Dyn.t<Close.t<Form.t<t, actions<()>>>>
     => {
     let complete = Rxjs.Subject.makeEmpty()
@@ -457,11 +459,11 @@ module VectorRec = {
 
     let state = Rxjs.Subject.makeBehavior(first)
 
-    let fnValidate = validateOut(~validate=context.validate, ~immediate=context.validateImmediate->Option.or(true))
+    let validateInit = initial->Option.map(Field.Init.isValidate)->Option.or(false)
 
     // actions passed in to reuse the Vector level actions set, clear, opt, validate
-    let applyInner = (actions, inner: Close.t<Form.t<'fa, 'ai>>) =>
-        makeStore(~validate=fnValidate, inner.pack.field)
+    let applyInner = (~validateFn, actions, inner: Close.t<Form.t<'fa, 'ai>>) => {
+        makeStore(~validate=validateFn, inner.pack.field)
         ->Dynamic.map( (field): Close.t<Form.t<'f, actions<()>>> => {
           { pack: {
               field,
@@ -473,12 +475,18 @@ module VectorRec = {
             close
           }
         })
+    }
 
     let memoStateInit = Dynamic.tap(_, (x: Close.t<Form.t<t, 'a>>) => Rxjs.next(state, x))
 
     let init = {
+      // Init validateion includes validateInit while the dyn version will not.
+      // Even if validateImmediate is set false.
+      let immediate = context.validateImmediate->Option.or(true) || validateInit
+      let validateFn = validateOut(~validate=context.validate, ~immediate)
+
       inner.init
-      ->Dynamic.switchMap(applyInner(actionsFirst))
+      ->Dynamic.switchMap(applyInner(~validateFn, actionsFirst))
       ->memoStateInit
     }
 
@@ -487,15 +495,19 @@ module VectorRec = {
     // FIXME: block dyn changes on init completing? - AxM
     // FIXME: interaction betwween validations and inners?
     let dyn = {
+      let immediate = context.validateImmediate->Option.or(true)
+      let validateFn = validateOut(~validate=context.validate, ~immediate)
+
       let inner =
         inner.dyn
-        ->Dynamic.map(Dynamic.switchMap(_, applyInner(actionsFirst)))
+        ->Dynamic.map(Dynamic.switchMap(_, applyInner(~validateFn, actionsFirst)))
 
+        let validateFn = validateOut(~validate=context.validate, ~immediate=context.validateImmediate->Option.or(true))
       let validated =
         val
         ->Dynamic.withLatestFrom(state)
         ->Dynamic.map(((_, state:  Close.t<Form.t<t, 'a>>)) => {
-          makeStore(~validate=fnValidate, state.pack.field->Store.inner)
+          makeStore(~validate=validateFn, state.pack.field->Store.inner)
           ->Dynamic.map( (field): Close.t<Form.t<'f, actions<()>>> => {
             pack: Form.setField(state.pack, field),
             close

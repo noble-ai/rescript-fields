@@ -80,10 +80,9 @@ module Input = {
 
 @react.component
 let make = (~onSubmit) => {
-  let form = Form.use(. 
+  let form = Form.use(.
     ~context=contextValidate,
     ~init=None,
-    ~validateInit=false,
   )
 
   let handleSubmit = React.useMemo1( () => {

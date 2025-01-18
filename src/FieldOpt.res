@@ -60,22 +60,20 @@ module Make: Make = (F: Field.T) => {
     input->Option.map(F.set)->Dirty
   }
 
-  let makeStorePred = (inner, enum, ctor) =>
-    inner->F.enum == enum ? ctor(Some(inner))->Some : None
-
   // FieldOpt makeStore doesnt take validate like others
   // because the only goal of FieldOpt is to allow optional input values
-  // notice that our context is the F.context so we have no specific validation behavior 
+  // notice that our context is the F.context so we have no specific validation behavior
   let makeStore = (inner: F.t): t => {
     [
       inner->F.output->Option.map(output => Store.valid(Some(inner), output)),
       inner->F.error->Option.const(Store.invalid(Some(inner), #Part)),
-      makeStorePred(inner, #Busy, Store.busy),
-      makeStorePred(inner, #Dirty, Store.dirty),
-      makeStorePred(inner, #Init, Store.init),
+      inner->F.enum == #Busy ? Store.busy(Some(inner))->Some : None,
+      inner->F.enum == #Dirty ? Store.dirty(Some(inner))->Some : None,
+      inner->F.enum == #Init ? Store.init(Some(inner))->Some : None,
     ]
     ->Array.reduce(Option.first, None)
     ->Option.getExn(~desc="makeStore")
+    // ->Tap.tap(Console.log3("FieldOpt makeStore", inner, _))
   }
 
   let validate = (force, context: context, store: t): Rxjs.t<Rxjs.foreign, Rxjs.void,t> => {
@@ -129,7 +127,7 @@ module Make: Make = (F: Field.T) => {
     })
   }
 
-  let makeDyn = (context: context, initial: option<input>, setOuter: Rxjs.Observable.t<input>, valOuter: option<Rxjs.Observable.t<()>> )
+  let makeDyn = (context: context, initial: option<Field.Init.t<input>>, setOuter: Rxjs.Observable.t<input>, valOuter: option<Rxjs.Observable.t<()>> )
       : Dyn.t<Close.t<Form.t<t, actions<()>>>>
     => {
     let complete = Rxjs.Subject.makeEmpty()
@@ -137,7 +135,7 @@ module Make: Make = (F: Field.T) => {
 
     let field =
       initial
-      ->Option.map(set)
+      ->Option.map(x => x->Field.Init.get->set)
       ->Option.or(init(context))
 
     let clearInner: Rxjs.t<'c, Rxjs.source<()>, ()> =
@@ -160,8 +158,13 @@ module Make: Make = (F: Field.T) => {
 
     let set = Rxjs.merge2(setOuter, setOpt)
 
-    let initialInner = initial->Option.join
-    let {first: firstInner, init: initInner, dyn: dynInner} = F.makeDyn(context, initialInner, set, Some(val))
+
+    let {first: firstInner, init: initInner, dyn: dynInner} = {
+      let initial = initial->Option.bind(Field.Init.distributeOption)
+      // FIXME: this is taking in the composite validate, should it just be valOuter?
+      // How much should FieldOpt have its own actions at all?
+      F.makeDyn(context, initial, set, Some(val))
+    }
 
     let actions: actions<()> = {
       clear: Rxjs.next(clearInner),
